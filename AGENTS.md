@@ -18,6 +18,13 @@ Lee este archivo antes de tocar código. La sesión original está en
 - Stack del documento del proyecto (referencia): Python, FastAPI, React.js,
   Azure OpenAI Service, Azure AI Document Intelligence, PostgreSQL, Docker,
   GitHub Actions, LangChain, Microsoft Entra ID y Scrum.
+- **IA: OpenRouter (decisión del usuario, sin Azure por costo).**
+  El servicio de redacción usa OpenRouter (`https://openrouter.ai/api/v1`,
+  compatible con SDK OpenAI) en vez de Azure OpenAI Service.
+  Clave en variable de entorno del backend (`OPENROUTER_API_KEY`, nunca en código
+  ni en git) + `IA_MODEL` con el ID exacto del modelo elegido en
+  openrouter.ai/models (de preferencia uno marcado `:free`).
+  Headers recomendados: `HTTP-Referer` (URL de la app) y `X-Title: SisLegal`.
 - Implementación actual: el backend en uso es **Express + MariaDB**
   y la BD es MariaDB. **FastAPI NO está eliminado: aún no se incorpora**
   (está pendiente integrarlo según el stack oficial).
