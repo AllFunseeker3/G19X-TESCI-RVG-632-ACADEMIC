@@ -1,9 +1,20 @@
+// ============================================================================
+// ARCHIVO: src/Components/ResumenDocumento.jsx
+// FUNCIÓN GENERAL: diálogo de resumen previo a confirmar (categoría, tipo,
+//   destinatario y campos con formato legible).
+// FLUJO DE DATOS:
+//   - ENTRAN: abierto, categoriaNombre, tipoNombre, destinatario, campos,
+//     datos y onCerrar del padre (GenerarCarta).
+//   - SALEN: solo visual; Confirmar/Cerrar delegan a onCerrar del padre.
+// QUÉ MODIFICAR SI hay cambios: formato por tipo en formatoValorResumen.
+// ============================================================================
 import {
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   Typography, List, ListItem, ListItemText,
 } from '@mui/material';
 import { esFechaValida } from './CampoFormulario';
 
+// ============ AQUÍ EMPIEZA HELPERS de formato ============
 // Convierte ISO yyyy-mm-dd -> dd/mm/aaaa; si ya es dd/mm/aaaa lo deja tal cual.
 function formatoFechaResumen(valor) {
   if (!valor) return '—';
@@ -53,7 +64,9 @@ function formatoValorResumen(campo, valor) {
   }
   return valor || '—';
 }
+// ============ AQUÍ TERMINA HELPERS de formato ============
 
+// ============ AQUÍ EMPIEZA COMPONENTE ResumenDocumento ============
 export default function ResumenDocumento({
   abierto,
   categoriaNombre,
@@ -67,9 +80,12 @@ export default function ResumenDocumento({
 }) {
   return (
     <Dialog open={abierto} onClose={onCerrar} maxWidth="sm" fullWidth>
+      {/* ============ AQUÍ EMPIEZA TÍTULO del resumen ============ */}
       <DialogTitle color="encabezado.main" fontWeight="bold">
         Resumen del documento
       </DialogTitle>
+      {/* ============ AQUÍ TERMINA TÍTULO del resumen ============ */}
+      {/* ============ AQUÍ EMPIEZA LISTA de campos ============ */}
       <DialogContent dividers>
         <Typography variant="subtitle1" fontWeight="bold">
           {categoriaNombre} — {tipoNombre}
@@ -93,6 +109,8 @@ export default function ResumenDocumento({
           ))}
         </List>
       </DialogContent>
+      {/* ============ AQUÍ TERMINA LISTA de campos ============ */}
+      {/* ============ AQUÍ EMPIEZA ACCIONES cerrar/confirmar ============ */}
       <DialogActions>
         <Button onClick={onCerrar} color="primary">
           Cerrar
@@ -101,6 +119,8 @@ export default function ResumenDocumento({
           Confirmar
         </Button>
       </DialogActions>
+      {/* ============ AQUÍ TERMINA ACCIONES cerrar/confirmar ============ */}
     </Dialog>
   );
 }
+// ============ AQUÍ TERMINA COMPONENTE ResumenDocumento ============

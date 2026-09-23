@@ -31,9 +31,11 @@ import { getDocumentos, getDocumento } from '../lib/api.js';
 // Etiquetas legibles de etapas (código API -> visible).
 import { estadoBonito } from '../lib/estados';
 
+// ============ AQUÍ EMPIEZA PÁGINA SEGUIMIENTO ============
 // QUÉ HACE: página de trazabilidad con selector + ficha + línea de tiempo.
 // DÓNDE SE USA: ruta "/Seguimiento" en app.jsx; enlazada desde Inicio.
 export default function Seguimiento() {
+    // ============ AQUÍ EMPIEZA ESTADOS SEGUIMIENTO ============
     // ESTADO: lista para el selector (GET /api/documentos).
     const [docs, setDocs] = useState([]);
     // ESTADO: id del documento seleccionado en el NativeSelect.
@@ -43,7 +45,9 @@ export default function Seguimiento() {
     // ESTADO: carga y errores de red (se muestran en Alert).
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
+    // ============ AQUÍ TERMINA ESTADOS SEGUIMIENTO ============
 
+    // ============ AQUÍ EMPIEZA CARGA LISTA ============
     // CARGA: lista al montar; preselecciona el primero.
     useEffect(() => {
         let vivo = true;
@@ -63,7 +67,9 @@ export default function Seguimiento() {
         })();
         return () => { vivo = false; };
     }, []);
+    // ============ AQUÍ TERMINA CARGA LISTA ============
 
+    // ============ AQUÍ EMPIEZA CARGA DETALLE ============
     // CARGA: detalle + historial cada vez que cambia la selección.
     // Sin selección no hay nada que pedir (doc inicia en null).
     useEffect(() => {
@@ -82,11 +88,14 @@ export default function Seguimiento() {
         })();
         return () => { vivo = false; };
     }, [idDoc]);
+    // ============ AQUÍ TERMINA CARGA DETALLE ============
 
+    // Historial normalizado a arreglo (el Stepper lo recorre).
     const historial = Array.isArray(doc?.historial) ? doc.historial : [];
 
     return (
         // SECCIÓN JSX: contenedor raíz (id preexistente conservado).
+        // ============ AQUÍ EMPIEZA CONTENEDOR SEGUIMIENTO ============
         <Box id="Contenedor de seguimiento" sx={{ p: 2, width: '100%' }}>
             <PageHeader
                 id="Encabezado de seguimiento"
@@ -100,6 +109,7 @@ export default function Seguimiento() {
                 </Alert>
             )}
 
+            {/* ============ AQUÍ EMPIEZA SELECTOR DOCUMENTO (JSX) ============ */}
             {/* SECCIÓN JSX: selector del documento a consultar (id preexistente conservado). */}
             <Box id="Selector de documento" sx={{ maxWidth: 400, mb: 3 }}>
                 <InputLabel
@@ -126,7 +136,9 @@ export default function Seguimiento() {
                     ))}
                 </NativeSelect>
             </Box>
+            {/* ============ AQUÍ TERMINA SELECTOR DOCUMENTO (JSX) ============ */}
 
+            {/* ============ AQUÍ EMPIEZA FICHA Y LÍNEA DE TIEMPO ============ */}
             {doc && (
             <Grid container spacing={3}>
                 <Grid item xs={12} md={4}>
@@ -190,6 +202,9 @@ export default function Seguimiento() {
                 </Grid>
             </Grid>
             )}
+            {/* ============ AQUÍ TERMINA FICHA Y LÍNEA DE TIEMPO ============ */}
         </Box>
+        // ============ AQUÍ TERMINA CONTENEDOR SEGUIMIENTO ============
     );
 }
+// ============ AQUÍ TERMINA PÁGINA SEGUIMIENTO ============

@@ -1,3 +1,12 @@
+// ============================================================================
+// ARCHIVO: src/Components/DashboardLayout.jsx
+// FUNCIÓN GENERAL: layout autenticado (AppBar + drawer + contenido) con
+//   menú filtrado por permisos y badge de notificaciones.
+// FLUJO DE DATOS:
+//   - ENTRAN: leerUsuario/getSalud (../lib/api.js) y usePermisos().
+//   - SALEN: children (páginas) dentro del <Box> contenido; links a rutas.
+// QUÉ MODIFICAR SI hay cambios: opciones del drawer o heartbeat, aquí mismo.
+// ============================================================================
 import { useEffect, useMemo, useState } from 'react';
 import { Box, AppBar, Toolbar, Drawer, Typography, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse, Avatar } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,6 +27,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 
 const drawerWidth = 210;
 
+// ============ AQUÍ EMPIEZA COMPONENTE MenuInterior ============
 function MenuInterior({ children }) {
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
@@ -32,6 +42,7 @@ function MenuInterior({ children }) {
         return () => clearInterval(t);
     }, []);
 
+    // HANDLER: borra JWT y regresa a /Ingreso.
     const handleLogout = () => {
         guardarToken(null);
         navigate('/Ingreso', { replace: true });
@@ -39,6 +50,7 @@ function MenuInterior({ children }) {
 
     return (
         <Box sx={{ display: 'flex' }}>
+            {/* ============ AQUÍ EMPIEZA BARRA superior ============ */}
             <AppBar id="Barra superior" position="fixed" sx={{
                 width: `calc(100% - ${drawerWidth}px)`,
                 ml: `${drawerWidth}px`,
@@ -59,7 +71,9 @@ function MenuInterior({ children }) {
                     </Box>
                 </Toolbar>
             </AppBar>
+            {/* ============ AQUÍ TERMINA BARRA superior ============ */}
 
+            {/* ============ AQUÍ EMPIEZA MENU lateral ============ */}
             <Drawer
                 id="Menu lateral"
                 sx={{
@@ -145,7 +159,9 @@ function MenuInterior({ children }) {
                     </ListItem>
                 </List>
             </Drawer>
+            {/* ============ AQUÍ TERMINA MENU lateral ============ */}
 
+            {/* ============ AQUÍ EMPIEZA CONTENIDO principal ============ */}
             <Box
                 id="Contenido principal"
                 component="main"
@@ -159,10 +175,13 @@ function MenuInterior({ children }) {
                 <EstadoConexion soloError />
                 {children}
             </Box>
+            {/* ============ AQUÍ TERMINA CONTENIDO principal ============ */}
         </Box>
     );
 }
+// ============ AQUÍ TERMINA COMPONENTE MenuInterior ============
 
+// ============ AQUÍ EMPIEZA COMPONENTE DashBoardLayout ============
 export default function DashBoardLayout({ children }) {
     return (
         <PermisosProvider>
@@ -170,3 +189,4 @@ export default function DashBoardLayout({ children }) {
         </PermisosProvider>
     );
 }
+// ============ AQUÍ TERMINA COMPONENTE DashBoardLayout ============

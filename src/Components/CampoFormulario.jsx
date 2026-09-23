@@ -1,4 +1,15 @@
 /* eslint-disable react-refresh/only-export-components -- helpers de fecha se exportan junto al campo a propósito */
+// ============================================================================
+// ARCHIVO: src/Components/CampoFormulario.jsx
+// FUNCIÓN GENERAL: campo genérico del formulario dinámico (texto, area,
+//   fecha dd/mm/aaaa, email, seleccion, moneda, fotos, check, switch, anexos).
+// FLUJO DE DATOS:
+//   - ENTRAN: campo (catálogo), valor/error/ayudaVisible y handlers del padre
+//     (GenerarCarta, Revisión, Seguimiento).
+//   - SALEN: valor editado vía onChange/onFocus/onBlur; anexos vía onQuitarAnexo.
+// QUÉ MODIFICAR SI hay cambios: para un tipo nuevo, agrega su rama if
+//   (campo.tipo === '...') junto a SWITCH/CHECK/ANEXOS/FECHA.
+// ============================================================================
 import { useRef, useState } from 'react';
 import {
   Box, NativeSelect, Typography, TextField, Button, InputAdornment,
@@ -9,6 +20,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CloseIcon from '@mui/icons-material/Close';
 import Etiqueta from './Etiqueta';
 
+// ============ AQUÍ EMPIEZA HELPERS DE FECHA ============
 // Helpers de fecha dd/mm/aaaa (los usa GenerarCarta para validar y auto-hoy).
 export function formatearHoyDDMMAAAA() {
   const h = new Date();
@@ -44,7 +56,9 @@ function ddmmaaaaA_iso(v) {
   if (!m) return '';
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
+// ============ AQUÍ TERMINA HELPERS DE FECHA ============
 
+// ============ AQUÍ EMPIEZA COMPONENTE CAMPO genérico ============
 // Campo genérico del formulario dinámico.
 // Soporta tipos: texto | area | fecha | email | seleccion | moneda | fotos | check | switch | anexos
 // Reutilizable en cualquier pestaña que pida datos por catálogo (GenerarCarta,
@@ -61,7 +75,9 @@ export default function CampoFormulario({
 }) {
   const idCampo = `campo-${campo.id}`;
   const [vistaPrevia, setVistaPrevia] = useState(null); // { url, nombre }
-  const pickerRef = useRef(null);
+  const pickerRef = useRef(null); // Ref al picker nativo oculto (tipo fecha).
+
+  // Props comunes de los TextField (variante standard del formulario).
 
   const comun = {
     id: idCampo,
@@ -79,6 +95,7 @@ export default function CampoFormulario({
 
   const nombreArchivo = (a) => (typeof a === 'string' ? a : a?.name ?? '');
 
+  // ============ AQUÍ EMPIEZA HANDLERS vista previa anexos ============
   const abrirVistaPrevia = (archivo) => {
     if (typeof archivo === 'string') return; // solo Files reales tienen preview
     try {
@@ -95,7 +112,9 @@ export default function CampoFormulario({
     }
     setVistaPrevia(null);
   };
+  // ============ AQUÍ TERMINA HANDLERS vista previa anexos ============
 
+  // ============ AQUÍ EMPIEZA TIPO SWITCH ============
   // ---- SWITCH ----
   if (campo.tipo === 'switch') {
     return (
@@ -126,7 +145,9 @@ export default function CampoFormulario({
       </Box>
     );
   }
+  // ============ AQUÍ TERMINA TIPO SWITCH ============
 
+  // ============ AQUÍ EMPIEZA TIPO CHECK ============
   // ---- CHECK ----
   if (campo.tipo === 'check') {
     return (
@@ -152,7 +173,9 @@ export default function CampoFormulario({
       </Box>
     );
   }
+  // ============ AQUÍ TERMINA TIPO CHECK ============
 
+  // ============ AQUÍ EMPIEZA TIPO ANEXOS (solo PDF) ============
   // ---- ANEXOS (solo PDF) ----
   if (campo.tipo === 'anexos') {
     const archivos = Array.isArray(valor) ? valor : [];
@@ -228,7 +251,9 @@ export default function CampoFormulario({
       </Box>
     );
   }
+  // ============ AQUÍ TERMINA TIPO ANEXOS (solo PDF) ============
 
+  // ============ AQUÍ EMPIEZA TIPO FECHA ============
   // ---- FECHA dd/mm/aaaa con máscara + picker nativo oculto ----
   if (campo.tipo === 'fecha') {
     const abrirPicker = () => {
@@ -290,7 +315,9 @@ export default function CampoFormulario({
       </Box>
     );
   }
+  // ============ AQUÍ TERMINA TIPO FECHA ============
 
+  // ============ AQUÍ EMPIEZA TIPOS RESTANTES (area/moneda/fotos/email/seleccion/texto) ============
   let control;
   if (campo.tipo === 'area') {
     control = <TextField {...comun} multiline rows={campo.filas ?? 3} />;
@@ -360,14 +387,19 @@ export default function CampoFormulario({
   } else {
     control = <TextField {...comun} type="text" />;
   }
+  // ============ AQUÍ TERMINA TIPOS RESTANTES (area/moneda/fotos/email/seleccion/texto) ============
 
   const mostrarAyuda = campo.ayuda && ayudaVisible;
 
+  // ============ AQUÍ EMPIEZA RENDER GENÉRICO ============
   return (
     <Box>
+      {/* ============ AQUÍ EMPIEZA ETIQUETA DEL CAMPO ============ */}
       <Etiqueta htmlFor={idCampo} requerido={campo.requerido}>
         {campo.etiqueta}
       </Etiqueta>
+      {/* ============ AQUÍ TERMINA ETIQUETA DEL CAMPO ============ */}
+      {/* ============ AQUÍ EMPIEZA CONTROL + AYUDA ============ */}
       {control}
       {mostrarAyuda && (
         <Box
@@ -386,6 +418,9 @@ export default function CampoFormulario({
           </Typography>
         </Box>
       )}
+      {/* ============ AQUÍ TERMINA CONTROL + AYUDA ============ */}
     </Box>
   );
 }
+// ============ AQUÍ TERMINA RENDER GENÉRICO ============
+// ============ AQUÍ TERMINA COMPONENTE CAMPO genérico ============

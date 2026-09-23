@@ -1,17 +1,27 @@
 // ============================================================================
-// SCRIPT: server/test-conexion.js
-// FUNCIÓN: prueba la conexión a MariaDB sin levantar el servidor.
-// USO: npm run db:test   (desde server/)
-// SALE CON 0 si conecta y los seeds existen; 1 si algo falla.
+// ARCHIVO: server/test-conexion.js
+// FUNCIÓN GENERAL: prueba la conexión a MariaDB sin levantar el servidor.
+//   Verifica versión, conteos de seeds y hash del admin.
+// FLUJO DE DATOS:
+//   - ENTRAN: server/.env (credenciales) + tablas tipos_documento, campos_tipo,
+//     permisos_rol, usuarios.
+//   - SALEN: logs [OK]/[!!] en consola; exit 0 si todo bien, 1 si falla.
+// QUÉ MODIFICAR SI hay cambios: actualizar ESPERADO si cambian los seeds;
+//   uso: npm run db:test.
 // ============================================================================
+// ============ AQUÍ EMPIEZA IMPORTS ============
 const pool = require("./db");
+// ============ AQUÍ TERMINA IMPORTS ============
 
+// ============ AQUÍ EMPIEZA CONSTANTES ============
 const ESPERADO = {
   tipos_documento: 11,
   campos_tipo: 137,
   permisos_rol: 20,
 };
+// ============ AQUÍ TERMINA CONSTANTES ============
 
+// ============ AQUÍ EMPIEZA SCRIPT PRINCIPAL ============
 (async () => {
   try {
     const [[v]] = await pool.query("SELECT VERSION() AS v");
@@ -34,10 +44,11 @@ const ESPERADO = {
     } else {
       console.log("[OK] Admin con hash configurado");
     }
-    await pool.end();
+    await pool.end(); // Cierra pool para que el script termine.
     process.exit(ok ? 0 : 1);
   } catch (e) {
     console.log(`[X] No conecta a MariaDB: ${e.message}`);
     process.exit(1);
   }
 })();
+// ============ AQUÍ TERMINA SCRIPT PRINCIPAL ============

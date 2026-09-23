@@ -23,6 +23,7 @@ import {
 } from "react";
 import { getMisPermisos, leerToken } from "../lib/api.js";
 
+// ============ AQUÍ EMPIEZA CONTEXTO + HOOK usePermisos ============
 const PermisosContext = createContext(null);
 
 // Hook para consultar permisos desde menú y páginas. Ej: puede('oficios', 'crear').
@@ -32,13 +33,16 @@ export function usePermisos() {
     throw new Error("usePermisos debe usarse dentro de <PermisosProvider>");
   return ctx;
 }
+// ============ AQUÍ TERMINA CONTEXTO + HOOK usePermisos ============
 
+// ============ AQUÍ EMPIEZA PROVIDER PermisosProvider ============
 // Proveedor: va DENTRO del layout (solo zona autenticada). Ver DashboardLayout.
 export default function PermisosProvider({ children }) {
     const [datos, setDatos] = useState(null); // { admin, id_area, permisos: [...] }
     // Sin token (login) arranca listo; con token espera al fetch (ver effect).
     const [listo, setListo] = useState(() => !leerToken());
 
+    // ============ AQUÍ EMPIEZA EFFECT carga de permisos ============
     // CARGA: una vez al montar si hay token (callbacks async, no set directo).
     useEffect(() => {
         if (!leerToken()) return;
@@ -55,7 +59,9 @@ export default function PermisosProvider({ children }) {
       vivo = false;
     };
   }, []);
+  // ============ AQUÍ TERMINA EFFECT carga de permisos ============
 
+  // ============ AQUÍ EMPIEZA CONSULTAS puede/algunaCon ============
   // CONSULTA: ¿tiene este permiso? Sin datos (o admin) = abierto; el back decide.
   const puede = useCallback(
     (categoria, accion = "ver") => {
@@ -96,7 +102,9 @@ export default function PermisosProvider({ children }) {
     },
     [datos, puede],
   );
+  // ============ AQUÍ TERMINA CONSULTAS puede/algunaCon ============
 
+  // ============ AQUÍ EMPIEZA VALOR MEMO + PROVIDER ============
   const valor = useMemo(
     () => ({
       admin: datos ? Boolean(datos.admin) : true,
@@ -113,3 +121,5 @@ export default function PermisosProvider({ children }) {
     </PermisosContext.Provider>
   );
 }
+// ============ AQUÍ TERMINA VALOR MEMO + PROVIDER ============
+// ============ AQUÍ TERMINA PROVIDER PermisosProvider ============

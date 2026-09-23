@@ -11,6 +11,7 @@
 //   color en COLOR_POR_ESTADO (claves = códigos de la API).
 // ============================================================================
 
+// ============ AQUÍ EMPIEZA ETIQUETA_ESTADO ============
 // Código API -> etiqueta visible.
 export const ETIQUETA_ESTADO = {
   borrador: "Borrador",
@@ -19,7 +20,9 @@ export const ETIQUETA_ESTADO = {
   rechazado: "Rechazado",
   notificado: "Notificado",
 };
+// ============ AQUÍ TERMINA ETIQUETA_ESTADO ============
 
+// ============ AQUÍ EMPIEZA HELPERS estadoBonito/estadoCodigo ============
 // QUÉ HACE: código ('por_revisar') o etiqueta ('Por revisar') -> etiqueta.
 // Acepta ambas para no romper componentes que aún usen etiquetas.
 export function estadoBonito(estado) {
@@ -33,7 +36,9 @@ export function estadoCodigo(etiqueta) {
   const par = Object.entries(ETIQUETA_ESTADO).find(([, v]) => v === etiqueta);
   return par ? par[0] : etiqueta;
 }
+// ============ AQUÍ TERMINA HELPERS estadoBonito/estadoCodigo ============
 
+// ============ AQUÍ EMPIEZA COLOR_POR_ESTADO ============
 // QUÉ HACE: código API -> color MUI del chip (mismos que TablaGeneral).
 export const COLOR_POR_ESTADO = {
   borrador: "default",
@@ -42,3 +47,4 @@ export const COLOR_POR_ESTADO = {
   rechazado: "error",
   notificado: "info",
 };
+// ============ AQUÍ TERMINA COLOR_POR_ESTADO ============

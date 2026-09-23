@@ -21,6 +21,7 @@ import { getDocumentos } from '../lib/api.js';
 // Cuántas notificaciones se listan en el desplegado.
 const MAX_LISTA = 5;
 
+// ============ AQUÍ EMPIEZA COMPONENTE CentroNotificaciones ============
 // QUÉ HACE: campana con badge real + menú de últimas notificaciones.
 // DÓNDE SE USA: Components/DashboardLayout.jsx (AppBar, junto al usuario).
 export default function CentroNotificaciones() {
@@ -29,6 +30,7 @@ export default function CentroNotificaciones() {
     const [total, setTotal] = useState(0); // Total por revisar (badge)
     const abierto = Boolean(ancla);
 
+    // ============ AQUÍ EMPIEZA HANDLER cargar por revisar ============
     // CARGA: por revisar desde la BD. Silenciosa si falla (app.jsx redirige).
     const cargar = useCallback(async () => {
         try {
@@ -39,7 +41,9 @@ export default function CentroNotificaciones() {
             /* sin conexión: app.jsx te lleva al login */
         }
     }, []);
+    // ============ AQUÍ TERMINA HANDLER cargar por revisar ============
 
+    // ============ AQUÍ EMPIEZA EFFECT carga inicial + abrir menú ============
     // Al montar pide una vez para pintar el badge (en timeout para no setear en el effect).
     useEffect(() => {
         const t = setTimeout(cargar, 0);
@@ -51,16 +55,21 @@ export default function CentroNotificaciones() {
         setAncla(e.currentTarget);
         cargar();
     };
+    // ============ AQUÍ TERMINA EFFECT carga inicial + abrir menú ============
 
     return (
         <>
+            {/* ============ AQUÍ EMPIEZA CAMPANA + BADGE ============ */}
             <IconButton color="inherit" onClick={abrir} aria-label="Notificaciones">
                 {/* Badge REAL: se oculta solo cuando no hay pendientes. */}
                 <Badge badgeContent={total} color="error" invisible={total === 0}>
                     <NotificationsIcon />
                 </Badge>
             </IconButton>
+            {/* ============ AQUÍ TERMINA CAMPANA + BADGE ============ */}
+            {/* ============ AQUÍ EMPIEZA MENÚ de notificaciones ============ */}
             <Menu anchorEl={ancla} open={abierto} onClose={() => setAncla(null)}>
+                {/* ============ AQUÍ EMPIEZA ENCABEZADO del menú ============ */}
                 {/* QUÉ HACE: encabezado fijo del menú con el total real. */}
                 <Box id="Box-CentroNotificaciones-Encabezado" sx={{ px: 2, py: 1, minWidth: 300 }}>
                     <Typography variant="subtitle1" fontWeight="bold" color="encabezado.main">
@@ -73,6 +82,8 @@ export default function CentroNotificaciones() {
                     </Typography>
                 </Box>
                 <Divider />
+                {/* ============ AQUÍ TERMINA ENCABEZADO del menú ============ */}
+                {/* ============ AQUÍ EMPIEZA LISTA últimas 5 ============ */}
                 {avisos.length === 0 && (
                     <MenuItem disabled>No tienes avisos pendientes</MenuItem>
                 )}
@@ -107,7 +118,10 @@ export default function CentroNotificaciones() {
                         </MenuItem>
                     </Box>
                 )}
+                {/* ============ AQUÍ TERMINA LISTA últimas 5 ============ */}
             </Menu>
+            {/* ============ AQUÍ TERMINA MENÚ de notificaciones ============ */}
         </>
     );
 }
+// ============ AQUÍ TERMINA COMPONENTE CentroNotificaciones ============

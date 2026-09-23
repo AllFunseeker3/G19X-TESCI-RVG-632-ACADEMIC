@@ -60,6 +60,8 @@ function aplicarMascaraFecha(v) {
 }
 
 export default function GenerarCarta() {
+  // ============ AQUÍ EMPIEZA ESTADOS FORMULARIO ============
+  // Selección (categoría/tipo), datos capturados, UI (resumen, foco, errores) e IA.
   const [categoria, setCategoria] = useState('');
   const [tipoDoc, setTipoDoc] = useState('');
   const [datos, setDatos] = useState({});
@@ -76,7 +78,10 @@ export default function GenerarCarta() {
   const [iaCargando, setIaCargando] = useState(false);
   const [iaError, setIaError] = useState('');
   const [guardado, setGuardado] = useState(null); // { id, archivo } del documento + PDF
+  // ============ AQUÍ TERMINA ESTADOS FORMULARIO ============
 
+  // ============ AQUÍ EMPIEZA SINCRONIZACIÓN POR URL ============
+  // Precarga categoría/tipo desde ?categoria=&tipo= (lo manda plantillas.jsx).
   const claveParams = `${params.get('categoria') ?? ''}|${params.get('tipo') ?? ''}`;
   if (claveParams !== claveAplicada) {
     setClaveAplicada(claveParams);
@@ -93,6 +98,10 @@ export default function GenerarCarta() {
     setErrores({});
   }
 
+  // ============ AQUÍ TERMINA SINCRONIZACIÓN POR URL ============
+
+  // ============ AQUÍ EMPIEZA CAMPOS VISIBLES ============
+  // Tipos y campos del catálogo filtrados por mostrarSi y destinatario opcional.
   const tiposDisponibles = tiposDeCategoria(categoria);
   const campos = camposDeTipo(tipoDoc);
 
@@ -103,7 +112,10 @@ export default function GenerarCarta() {
   };
   const camposVisibles = campos.filter(esVisible);
   const mostrarDestinatario = tipoDoc !== '' && !TIPOS_SIN_DESTINATARIO_OPCIONAL.has(tipoDoc);
+  // ============ AQUÍ TERMINA CAMPOS VISIBLES ============
 
+  // ============ AQUÍ EMPIEZA LIMPIEZA DEPENDIENTES ============
+  // Borra datos/errores hijos cuando el padre cambia (ej. motivo != Otro).
   const limpiarDependientes = (id, valor, copiaDatos, copiaErrores) => {
     if (id === 'estadoFisico' && valor !== 'Con detalles') {
       delete copiaDatos.especifiqueDetalles;
@@ -119,7 +131,10 @@ export default function GenerarCarta() {
       delete copiaErrores[mapa[id]];
     }
   };
+  // ============ AQUÍ TERMINA LIMPIEZA DEPENDIENTES ============
 
+  // ============ AQUÍ EMPIEZA HANDLERS CATEGORÍA Y TIPO ============
+  // Reinician tipo/datos/errores al cambiar la selección principal.
   const handleCategoria = (e) => {
     setCategoria(e.target.value);
     setTipoDoc('');
@@ -137,7 +152,10 @@ export default function GenerarCarta() {
     setAgregarDestinatario(false);
     setErrores({});
   };
+  // ============ AQUÍ TERMINA HANDLERS CATEGORÍA Y TIPO ============
 
+  // ============ AQUÍ EMPIEZA HANDLERS DE DATOS ============
+  // Actualizan `datos` por tipo de campo y limpian su error al escribir.
   const handleDato = (id) => (e) => {
     const valor = e.target.value;
     setDatos((prev) => {
@@ -236,7 +254,10 @@ export default function GenerarCarta() {
     }
     return handleDato(campo.id)(e);
   };
+  // ============ AQUÍ TERMINA HANDLERS DE DATOS ============
 
+  // ============ AQUÍ EMPIEZA LIMPIAR Y DESTINATARIO ============
+  // Reinician el formulario o quitan el destinatario opcional.
   const handleLimpiar = () => {
     setCategoria('');
     setTipoDoc('');
@@ -262,7 +283,10 @@ export default function GenerarCarta() {
       });
     }
   };
+  // ============ AQUÍ TERMINA LIMPIAR Y DESTINATARIO ============
 
+  // ============ AQUÍ EMPIEZA VALIDACIÓN Y SUBMIT ============
+  // Revisa requeridos/formatos y abre el resumen solo si no hay errores.
   const validar = () => {
     const nuevosErrores = {};
     if (categoria === '') nuevosErrores.categoria = 'Seleccione la categoría';
@@ -314,7 +338,9 @@ export default function GenerarCarta() {
     if (Object.keys(nuevosErrores).length > 0) return;
     setResumenAbierto(true);
   };
+  // ============ AQUÍ TERMINA VALIDACIÓN Y SUBMIT ============
 
+  // ============ AQUÍ EMPIEZA SERIALIZACIÓN E IA ============
   // Convierte datos a JSON seguro (File[] de fotos/anexos -> nombres).
   const datosSerializables = () => {
     const plano = {};
@@ -389,7 +415,10 @@ export default function GenerarCarta() {
       /* descarga no disponible */
     }
   };
+  // ============ AQUÍ TERMINA SERIALIZACIÓN E IA ============
 
+  // ============ AQUÍ EMPIEZA RENDER HELPERS ============
+  // Resuelven campos por id y los pintan (area/fotos/anexos a ancho completo).
   const campoPorId = (id) => campos.find((c) => c.id === id);
   const renderCampo = (campo) => (
     <CampoFormulario
@@ -418,16 +447,23 @@ export default function GenerarCarta() {
       </Box>
     ));
 
+  // ============ AQUÍ TERMINA RENDER HELPERS ============
+
   return (
+    // ============ AQUÍ EMPIEZA CONTENEDOR GENERAR CARTA ============
     <Box id="Box-GenerarCarta-Contenedor" sx={{ m: 0, p: 2, width: '100%' }}>
+      {/* ============ AQUÍ EMPIEZA ENCABEZADO GENERAR CARTA ============ */}
       <PageHeader
         id="Box-GenerarCarta-Encabezado"
         titulo="Generar notificación legal"
         subtitulo="Seleccione la categoría, el tipo de documento y capture sus datos."
       />
+      {/* ============ AQUÍ TERMINA ENCABEZADO GENERAR CARTA ============ */}
 
+      {/* ============ AQUÍ EMPIEZA FORMULARIO GENERAR CARTA ============ */}
       <Box id="Box-GenerarCarta-Form" component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
 
+        {/* ============ AQUÍ EMPIEZA SELECTOR CATEGORÍA Y TIPO ============ */}
         <SelectorCategoriaTipo
           categoria={categoria}
           tipoDoc={tipoDoc}
@@ -437,8 +473,10 @@ export default function GenerarCarta() {
           onCategoria={handleCategoria}
           onTipo={handleTipo}
         />
+        {/* ============ AQUÍ TERMINA SELECTOR CATEGORÍA Y TIPO ============ */}
 
         {tipoDoc !== '' && (
+          // ============ AQUÍ EMPIEZA DATOS DEL DOCUMENTO ============
           <Box id="Box-GenerarCarta-Datos" sx={{ mt: 3 }}>
             <Divider sx={{ mb: 2.5 }} />
             <Typography variant="h5" fontWeight="bold" color="encabezado.main" sx={{ mb: 1 }}>
@@ -458,6 +496,7 @@ export default function GenerarCarta() {
               />
             )}
 
+            {/* ============ AQUÍ EMPIEZA GRID CAMPOS POR TIPO ============ */}
             <Box sx={{
               display: 'grid',
               gap: 3,
@@ -648,7 +687,9 @@ export default function GenerarCarta() {
                 ))
               )}
             </Box>
+            {/* ============ AQUÍ TERMINA GRID CAMPOS POR TIPO ============ */}
 
+            {/* ============ AQUÍ EMPIEZA ALERTA GUARDADO ============ */}
             {guardado && (
               <Alert severity="success" sx={{ mt: 2 }} onClose={() => setGuardado(null)}>
                 Documento #{guardado.id} guardado como borrador (con redacción IA
@@ -660,7 +701,9 @@ export default function GenerarCarta() {
                 )}
               </Alert>
             )}
+            {/* ============ AQUÍ TERMINA ALERTA GUARDADO ============ */}
 
+            {/* ============ AQUÍ EMPIEZA BOTONES ACCIÓN ============ */}
             <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap' }}>
               <Button type="submit" variant="contained" color="primary">
                 Generar documento
@@ -674,11 +717,15 @@ export default function GenerarCarta() {
                 Limpiar
               </Button>
             </Box>
+            {/* ============ AQUÍ TERMINA BOTONES ACCIÓN ============ */}
           </Box>
+          // ============ AQUÍ TERMINA DATOS DEL DOCUMENTO ============
         )}
 
       </Box>
+      {/* ============ AQUÍ TERMINA FORMULARIO GENERAR CARTA ============ */}
 
+      {/* ============ AQUÍ EMPIEZA RESUMEN DOCUMENTO ============ */}
       <ResumenDocumento
         abierto={resumenAbierto}
         categoriaNombre={nombreCategoria(categoria)}
@@ -690,8 +737,10 @@ export default function GenerarCarta() {
         datos={datos}
         onCerrar={() => setResumenAbierto(false)}
       />
+      {/* ============ AQUÍ TERMINA RESUMEN DOCUMENTO ============ */}
 
       {/* Preview de la redacción IA: valida primero, redacta, permite guardar */}
+      {/* ============ AQUÍ EMPIEZA DIÁLOGO IA ============ */}
       <Dialog open={iaAbierto} onClose={() => !iaCargando && setIaAbierto(false)} maxWidth="md" fullWidth>
         <DialogTitle color="encabezado.main" fontWeight="bold">
           Redacción con IA — {nombreTipo(categoria, tipoDoc)}
@@ -734,7 +783,9 @@ export default function GenerarCarta() {
           </Button>
         </DialogActions>
       </Dialog>
+      {/* ============ AQUÍ TERMINA DIÁLOGO IA ============ */}
 
     </Box>
+    // ============ AQUÍ TERMINA CONTENEDOR GENERAR CARTA ============
   );
 }

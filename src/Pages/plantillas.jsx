@@ -39,26 +39,33 @@ import {
 // PERMISOS: filtra categorías y deshabilita "Usar plantilla" sin crear.
 import { usePermisos } from "../Components/PermisosProvider";
 
+// ============ AQUÍ EMPIEZA PÁGINA PLANTILLAS ============
 // QUÉ HACE: galería de plantillas agrupada por categoría.
 // DÓNDE SE USA: ruta "/Plantillas" en app.jsx; enlazada desde Inicio (acceso directo).
 // QUÉ MODIFICAR SI: cambia el catálogo, edita ../lib/tiposDocumentos.js.
 // Galería de plantillas: una tarjeta por tipo de documento.
 // "Usar plantilla" abre GenerarCarta con la categoría y el tipo preseleccionados.
 export default function Plantillas() {
+  // ============ AQUÍ EMPIEZA FILTRO POR PERMISOS ============
   // Solo categorías con permiso de ver (sin datos aún: todas; el back decide).
   const { listo, puede } = usePermisos();
   const cats = listo
     ? CATEGORIAS.filter((c) => puede(c.id, "ver"))
     : CATEGORIAS;
+  // ============ AQUÍ TERMINA FILTRO POR PERMISOS ============
   return (
     // SECCIÓN JSX: contenedor raíz + encabezado (id preexistente conservado).
+    // ============ AQUÍ EMPIEZA CONTENEDOR PLANTILLAS ============
     <Box id="Contenedor de plantillas" sx={{ p: 2, width: "100%" }}>
+      {/* ============ AQUÍ EMPIEZA ENCABEZADO PLANTILLAS ============ */}
       <PageHeader
         id="Encabezado de plantillas"
         titulo="Plantillas de documentos"
         subtitulo="Elige una plantilla para generar un documento con sus datos precargados."
       />
+      {/* ============ AQUÍ TERMINA ENCABEZADO PLANTILLAS ============ */}
 
+      {/* ============ AQUÍ EMPIEZA GRUPOS POR CATEGORÍA ============ */}
       {/* SECCIÓN JSX: un grupo por categoría PERMITIDA (id preexistente conservado). */}
       {cats.map((cat) => (
         <Box
@@ -75,6 +82,7 @@ export default function Plantillas() {
             {cat.nombre}
           </Typography>
           <Grid container spacing={3}>
+            {/* ============ AQUÍ EMPIEZA TARJETAS POR TIPO ============ */}
             {/* SECCIÓN JSX: una tarjeta por tipo. numCampos solo cuenta campos del catálogo. */}
             {TIPOS_POR_CATEGORIA[cat.id].map((t) => {
               // CÁLCULO: número de datos solicitados de la plantilla.
@@ -142,9 +150,13 @@ export default function Plantillas() {
                 </Grid>
               );
             })}
+            {/* ============ AQUÍ TERMINA TARJETAS POR TIPO ============ */}
           </Grid>
         </Box>
       ))}
+      {/* ============ AQUÍ TERMINA GRUPOS POR CATEGORÍA ============ */}
     </Box>
+    // ============ AQUÍ TERMINA CONTENEDOR PLANTILLAS ============
   );
 }
+// ============ AQUÍ TERMINA PÁGINA PLANTILLAS ============

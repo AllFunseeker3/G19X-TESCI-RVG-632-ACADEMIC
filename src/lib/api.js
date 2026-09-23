@@ -12,6 +12,7 @@
 // ============================================================================
 
 // URL base del back-end (ver .env.example). Sin .env, apunta al dev local.
+// ============ AQUÍ EMPIEZA CONFIG BASE Y TOKEN ============
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
 const CLAVE_TOKEN = "sislegal-token";
 // Usuario logueado { id, nombre, correo, rol, id_rol, id_area } (lo da /auth/login).
@@ -21,6 +22,9 @@ const CLAVE_USUARIO = "sislegal-usuario";
 //  - 'sislegal:sin-conexion': el servidor no responde (apagado o caído).
 //  - 'sislegal:sesion-expirada': el back devolvió 401 (token inválido/vencido).
 // En ambos casos la app regresa a /Ingreso para loguearse de nuevo.
+// ============ AQUÍ TERMINA CONFIG BASE Y TOKEN ============
+
+// ============ AQUÍ EMPIEZA HELPERS DE SESIÓN (token/usuario) ============
 export const EVENTO_SIN_CONEXION = "sislegal:sin-conexion";
 export const EVENTO_SESION_EXPIRADA = "sislegal:sesion-expirada";
 
@@ -51,7 +55,9 @@ export const leerUsuario = () => {
     return null;
   }
 };
+// ============ AQUÍ TERMINA HELPERS DE SESIÓN (token/usuario) ============
 
+// ============ AQUÍ EMPIEZA NÚCLEO FETCH api() ============
 // QUÉ HACE: fetch con JSON + Bearer automáticos. Lanza Error con el
 // detalle del back si el status no es 2xx (el front lo muestra al usuario).
 // Si no hay red/servidor: avisa 'sislegal:sin-conexion' (app.jsx te manda a
@@ -81,18 +87,24 @@ async function api(ruta, { metodo = "GET", cuerpo, token } = {}) {
   if (!res.ok) throw new Error(datos.detail ?? `Error ${res.status}`);
   return datos;
 }
+// ============ AQUÍ TERMINA NÚCLEO FETCH api() ============
 
+// ============ AQUÍ EMPIEZA AUTH ============
 // --- Auth (backend/app/routers/auth.py) ---
 export const login = (correo, contrasena) =>
   api("/auth/login", { metodo: "POST", cuerpo: { correo, contrasena } });
+// ============ AQUÍ TERMINA AUTH ============
 
+// ============ AQUÍ EMPIEZA CATÁLOGO ============
 // --- Catálogo (backend/app/routers/catalogo.py): Campo 1, Campo 2 y campos ---
 export const getCategorias = () => api("/catalogo/categorias");
 export const getTipos = (categoria) =>
   api(`/catalogo/tipos?categoria=${encodeURIComponent(categoria)}`);
 export const getCampos = (idTipo) =>
   api(`/catalogo/tipos/${encodeURIComponent(idTipo)}/campos`);
+// ============ AQUÍ TERMINA CATÁLOGO ============
 
+// ============ AQUÍ EMPIEZA DOCUMENTOS ============
 // --- Documentos (backend/app/routers/documentos.py) ---
 export const getDocumentos = (params = {}) => {
   const q = new URLSearchParams(
@@ -114,7 +126,9 @@ export const cambiarEstado = (id, estado, comentario) =>
   });
 export const agregarAdjunto = (id, adjunto) =>
   api(`/documentos/${id}/adjuntos`, { metodo: "POST", cuerpo: adjunto });
+// ============ AQUÍ TERMINA DOCUMENTOS ============
 
+// ============ AQUÍ EMPIEZA USUARIOS ============
 // --- Usuarios (backend/app/routers/usuarios.py) ---
 export const getMisPermisos = () => api("/usuarios/yo/permisos");
 export const getUsuarios = () => api("/usuarios");
@@ -135,7 +149,9 @@ export const actualizarPermisoRol = (idRol, categoria, accion, valor) =>
   });
 export const bajaUsuario = (id) =>
   api(`/usuarios/${id}`, { metodo: "DELETE" });
+// ============ AQUÍ TERMINA USUARIOS ============
 
+// ============ AQUÍ EMPIEZA IA Y PDF ============
 // --- IA (server/routes/ia.js -> ai-service FastAPI + OpenRouter) ---
 // Redacta el documento con IA a partir del tipo y los datos capturados.
 export const redactarConIA = (idTipo, datos) =>
@@ -152,6 +168,9 @@ export const descargarPDF = async (archivo) => {
   if (!res.ok) throw new Error("No se pudo descargar el PDF");
   return res.blob();
 };
+// ============ AQUÍ TERMINA IA Y PDF ============
 
+// ============ AQUÍ EMPIEZA SALUD ============
 // --- Salud (sin auth): ping a MariaDB + conteos ---
 export const getSalud = () => api("/salud");
+// ============ AQUÍ TERMINA SALUD ============

@@ -1,6 +1,17 @@
+// ============================================================================
+// ARCHIVO: src/Components/SelectorCategoriaTipo.jsx
+// FUNCIÓN GENERAL: selectores de Categoría (Campo 1) + Tipo (Campo 2).
+//   El Tipo se habilita solo tras elegir Categoría.
+// FLUJO DE DATOS:
+//   - ENTRAN: categoria, tipoDoc, categorias, tiposDisponibles, errores y
+//     handlers del padre (GenerarCarta).
+//   - SALEN: onCategoria/onTipo hacia el padre.
+// QUÉ MODIFICAR SI hay cambios: opciones o validaciones, aquí mismo.
+// ============================================================================
 import { Box, NativeSelect, Typography } from '@mui/material';
 import Etiqueta from './Etiqueta';
 
+// ============ AQUÍ EMPIEZA COMPONENTE SelectorCategoriaTipo ============
 // Selectores de Categoría (Campo 1) + Tipo (Campo 2).
 // Reutilizable en GenerarCarta y en futuros filtros de Revisión/Seguimiento.
 export default function SelectorCategoriaTipo({
@@ -18,6 +29,7 @@ export default function SelectorCategoriaTipo({
             gap: 4,
             gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
         }}>
+            {/* ============ AQUÍ EMPIEZA SELECTOR Categoría ============ */}
             <Box sx={{ minWidth: 200 }}>
                 <Etiqueta htmlFor="categoria-select" requerido>
                     Categoría del documento
@@ -41,7 +53,9 @@ export default function SelectorCategoriaTipo({
                     </Typography>
                 )}
             </Box>
+            {/* ============ AQUÍ TERMINA SELECTOR Categoría ============ */}
 
+            {/* ============ AQUÍ EMPIEZA SELECTOR Tipo ============ */}
             <Box sx={{ minWidth: 200, opacity: categoria === '' ? 0.5 : 1 }}>
                 <Etiqueta htmlFor="tipo-select" requerido>
                     Tipo de documento
@@ -66,6 +80,8 @@ export default function SelectorCategoriaTipo({
                     </Typography>
                 )}
             </Box>
+            {/* ============ AQUÍ TERMINA SELECTOR Tipo ============ */}
         </Box>
     );
 }
+// ============ AQUÍ TERMINA COMPONENTE SelectorCategoriaTipo ============

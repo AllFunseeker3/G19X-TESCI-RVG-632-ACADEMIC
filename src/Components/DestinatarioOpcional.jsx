@@ -1,6 +1,16 @@
+// ============================================================================
+// ARCHIVO: src/Components/DestinatarioOpcional.jsx
+// FUNCIÓN GENERAL: checkbox "¿Desea agregar un destinatario?" + campo
+//   condicional. Sin marcar, el destinatario es "A quien corresponda".
+// FLUJO DE DATOS:
+//   - ENTRAN: marcado/valor/error y handlers del padre (GenerarCarta).
+//   - SALEN: onCheck/onChange hacia el formulario padre.
+// QUÉ MODIFICAR SI hay cambios: texto por defecto o layout, aquí mismo.
+// ============================================================================
 import { Box, Typography, TextField, Checkbox, FormControlLabel, Tooltip } from '@mui/material';
 import Etiqueta from './Etiqueta';
 
+// ============ AQUÍ EMPIEZA COMPONENTE DestinatarioOpcional ============
 // Checkbox "¿Desea agregar un destinatario?" + campo condicional.
 // Si no está marcado, el destinatario por defecto es "A quien corresponda".
 export default function DestinatarioOpcional({
@@ -12,6 +22,7 @@ export default function DestinatarioOpcional({
 }) {
     return (
         <>
+            {/* ============ AQUÍ EMPIEZA CHECKBOX destinatario ============ */}
             <Box sx={{ mt: 2, mb: 1 }}>
                 <FormControlLabel
                     control={<Checkbox checked={marcado} onChange={onCheck} color="primary" />}
@@ -50,7 +61,9 @@ export default function DestinatarioOpcional({
                     }
                 />
             </Box>
+            {/* ============ AQUÍ TERMINA CHECKBOX destinatario ============ */}
 
+            {/* ============ AQUÍ EMPIEZA CAMPO condicional ============ */}
             {marcado && (
                 <Box sx={{ mt: 1, mb: 5, pb: 1, maxWidth: { xs: '100%', md: '33%' } }}>
                     <Etiqueta htmlFor="campo-destinatario" requerido>
@@ -71,6 +84,8 @@ export default function DestinatarioOpcional({
                     />
                 </Box>
             )}
+            {/* ============ AQUÍ TERMINA CAMPO condicional ============ */}
         </>
     );
 }
+// ============ AQUÍ TERMINA COMPONENTE DestinatarioOpcional ============

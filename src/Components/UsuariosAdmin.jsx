@@ -32,6 +32,7 @@ import { usePermisos } from "./PermisosProvider.jsx";
 import SeccionFormulario from "./SeccionFormulario.jsx";
 import Etiqueta from "./Etiqueta.jsx";
 
+// ============ AQUÍ EMPIEZA HELPER generarCorreo ============
 // QUÉ HACE: genera correo automático 3+3+3 letras, sin acentos (igual que el back).
 function generarCorreo(nombre) {
   if (!nombre) return "";
@@ -43,7 +44,9 @@ function generarCorreo(nombre) {
   const m = partes.length > 2 ? partes[2].substring(0, 3).toLowerCase() : "xxx";
   return `${n}${p}${m}@sislegal.mx`;
 }
+// ============ AQUÍ TERMINA HELPER generarCorreo ============
 
+// ============ AQUÍ EMPIEZA COMPONENTE UsuariosAdmin ============
 const FORM_VACIO = {
   nombre: "", paterno: "", materno: "",
   id_rol: "", id_area: "", puesto: "", telefono: "", fecha_ingreso: "",
@@ -66,6 +69,7 @@ export default function UsuariosAdmin() {
   const [confirmarBaja, setConfirmarBaja] = useState(null);
   const [permisoEnCurso, setPermisoEnCurso] = useState(null); // "categoria:accion" mientras guarda
 
+  // ============ AQUÍ EMPIEZA EFFECT carga inicial ============
   // CARGA inicial: usuarios (crítico) + catálogos (tolerante: si el server
   // está desactualizado y no trae roles/áreas, la tabla igual se muestra).
   useEffect(() => {
@@ -93,7 +97,9 @@ export default function UsuariosAdmin() {
     })();
     return () => { vivo = false; };
   }, []);
+  // ============ AQUÍ TERMINA EFFECT carga inicial ============
 
+  // ============ AQUÍ EMPIEZA HANDLER recargar ============
   const recargar = async () => {
     try {
       setUsuarios(await getUsuarios());
@@ -101,7 +107,9 @@ export default function UsuariosAdmin() {
       setError(e.message);
     }
   };
+  // ============ AQUÍ TERMINA HANDLER recargar ============
 
+  // ============ AQUÍ EMPIEZA ROLES ofrecidos/base + super ============
   // Roles ofrecidos: los gestores (superusuarios) solo los ve el admin
   // (diálogo de detalle). En el formulario de alta no se listan: se usa el
   // switch "¿Es superusuario?" que mapea al super de la misma área.
@@ -148,7 +156,9 @@ export default function UsuariosAdmin() {
   const emailPreview = generarCorreo(
     `${form.nombre} ${form.paterno} ${form.materno}`.trim()
   );
+  // ============ AQUÍ TERMINA ROLES ofrecidos/base + super ============
 
+  // ============ AQUÍ EMPIEZA HANDLERS alta/detalle/rol/reactivar ============
   // ALTA: nombre compuesto + rol/área/datos. El back genera email y pass genérica.
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -243,10 +253,12 @@ export default function UsuariosAdmin() {
       setPermisoEnCurso(null);
     }
   };
+  // ============ AQUÍ TERMINA HANDLERS alta/detalle/rol/reactivar ============
 
   if (!listo) return null;
   if (!puede("*", "gestionar")) return null;
 
+  // ============ AQUÍ EMPIEZA RENDER tabs + paneles ============
   return (
     <Box sx={{ p: 2 }}>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
@@ -402,6 +414,7 @@ export default function UsuariosAdmin() {
       )}
       {/* ============ AQUÍ TERMINA EL FORMULARIO (alta "Usuario nuevo") ============ */}
 
+      {/* ============ AQUÍ EMPIEZA TABLA Ver usuarios ============ */}
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>Ver usuarios</Typography>
@@ -462,7 +475,9 @@ export default function UsuariosAdmin() {
           </TableContainer>
         </Paper>
       )}
+      {/* ============ AQUÍ TERMINA TABLA Ver usuarios ============ */}
 
+      {/* ============ AQUÍ EMPIEZA DIÁLOGO detalle + permisos ============ */}
       {/* DETALLE: datos + matriz + cambio de rol (quita/da permisos) + baja/reactivar */}
       {detalle && (
         <Dialog open={!!detalle} onClose={() => setDetalle(null)} maxWidth="md" fullWidth>
@@ -552,7 +567,9 @@ export default function UsuariosAdmin() {
           </DialogActions>
         </Dialog>
       )}
+      {/* ============ AQUÍ TERMINA DIÁLOGO detalle + permisos ============ */}
 
+      {/* ============ AQUÍ EMPIEZA DIÁLOGO confirmar baja ============ */}
       {/* Confirmar baja lógica */}
       {confirmarBaja && (
         <Dialog open onClose={() => setConfirmarBaja(null)} maxWidth="sm">
@@ -578,6 +595,9 @@ export default function UsuariosAdmin() {
           </DialogActions>
         </Dialog>
       )}
+      {/* ============ AQUÍ TERMINA DIÁLOGO confirmar baja ============ */}
     </Box>
   );
 }
+// ============ AQUÍ TERMINA RENDER tabs + paneles ============
+// ============ AQUÍ TERMINA COMPONENTE UsuariosAdmin ============

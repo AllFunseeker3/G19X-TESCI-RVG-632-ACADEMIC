@@ -1,3 +1,12 @@
+// ============================================================================
+// ARCHIVO: src/Pages/Ingreso.jsx
+// FUNCIÓN GENERAL: Pantalla de login (correo + contraseña).
+//   Valida contra el back, guarda token/usuario y navega a /Inicio.
+// FLUJO DE DATOS:
+//   - ENTRAN: credenciales del formulario hacia lib/api.js (login).
+//   - SALEN: token/usuario a localStorage y navegación a Inicio.jsx.
+// QUÉ MODIFICAR SI hay cambios: campos y handleLogin; estilos del Paper/Box.
+// ============================================================================
 import {
     Alert,
     Box,
@@ -21,14 +30,21 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { guardarToken, guardarUsuario, login } from '../lib/api.js';
 
+// ============ AQUÍ EMPIEZA INGRESO ============
+// Página de acceso: formulario controlado que autentica contra el back.
 export default function Ingreso() {
     const navigate = useNavigate();
+    // ============ AQUÍ EMPIEZA ESTADOS INGRESO ============
+    // Campos del formulario + flags de UI (ver contraseña, error, carga).
     const [correo, setCorreo] = useState('admin@sislegal.mx');
     const [contrasena, setContrasena] = useState('Admin123*');
     const [mostrarPassword, setMostrarPassword] = useState(false);
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(false);
+    // ============ AQUÍ TERMINA ESTADOS INGRESO ============
 
+    // ============ AQUÍ EMPIEZA HANDLER LOGIN ============
+    // Autentica, persiste sesión y redirige; muestra el mensaje del back si falla.
     const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
@@ -45,8 +61,10 @@ export default function Ingreso() {
             setCargando(false);
         }
     };
+    // ============ AQUÍ TERMINA HANDLER LOGIN ============
 
     return (
+        // ============ AQUÍ EMPIEZA CONTENEDOR INGRESO ============
         <Box
             sx={{
                 minHeight: 'calc(100vh - 16px)',
@@ -72,6 +90,7 @@ export default function Ingreso() {
                     boxShadow: '0 20px 55px rgba(22, 49, 114, 0.12)',
                 }}
             >
+                {/* ============ AQUÍ EMPIEZA PANEL LATERAL BIENVENIDA ============ */}
                 <Box
                     sx={{
                         display: 'flex',
@@ -115,7 +134,9 @@ export default function Ingreso() {
                         Plataforma de gestión documental
                     </Typography>
                 </Box>
+                {/* ============ AQUÍ TERMINA PANEL LATERAL BIENVENIDA ============ */}
 
+                {/* ============ AQUÍ EMPIEZA FORMULARIO ACCESO ============ */}
                 <Box component="form" onSubmit={handleLogin} sx={{ p: { xs: 4, sm: 6, md: 8 } }}>
                     <Stack spacing={1} sx={{ mb: 4 }}>
                         <Typography variant="overline" color="encabezado.main" fontWeight={700} letterSpacing={1.2}>
@@ -136,6 +157,7 @@ export default function Ingreso() {
                     )}
 
                     <Stack spacing={2.5}>
+                        {/* ============ AQUÍ EMPIEZA CAMPO CORREO ============ */}
                         <Box>
                             <InputLabel
                                 shrink
@@ -161,6 +183,8 @@ export default function Ingreso() {
                                 }}
                             />
                         </Box>
+                        {/* ============ AQUÍ TERMINA CAMPO CORREO ============ */}
+                        {/* ============ AQUÍ EMPIEZA CAMPO CONTRASEÑA ============ */}
                         <Box>
                             <InputLabel
                                 shrink
@@ -197,8 +221,10 @@ export default function Ingreso() {
                                 }}
                             />
                         </Box>
+                        {/* ============ AQUÍ TERMINA CAMPO CONTRASEÑA ============ */}
                     </Stack>
 
+                    {/* ============ AQUÍ EMPIEZA OPCIONES ACCESO ============ */}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, mb: 3 }}>
                         <FormControlLabel
                             control={<Checkbox size="small" color="primary" />}
@@ -208,7 +234,9 @@ export default function Ingreso() {
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </Box>
+                    {/* ============ AQUÍ TERMINA OPCIONES ACCESO ============ */}
 
+                    {/* ============ AQUÍ EMPIEZA BOTÓN INGRESAR ============ */}
                     <Button
                         fullWidth
                         variant="contained"
@@ -220,7 +248,10 @@ export default function Ingreso() {
                         {cargando ? 'Ingresando...' : 'Ingresar'}
                     </Button>
                 </Box>
+                {/* ============ AQUÍ TERMINA FORMULARIO ACCESO ============ */}
             </Paper>
         </Box>
+        // ============ AQUÍ TERMINA CONTENEDOR INGRESO ============
     );
 }
+// ============ AQUÍ TERMINA INGRESO ============

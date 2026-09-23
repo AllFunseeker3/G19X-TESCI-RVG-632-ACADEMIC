@@ -20,11 +20,13 @@ import { getSalud } from "../lib/api.js";
 // QUÉ HACE: verifica la conexión al montar y muestra el aviso.
 // DÓNDE SE USA: Pages/Ingreso.jsx (aviso completo) y
 //   Components/DashboardLayout.jsx (soloError para fallas dentro de la app).
+// ============ AQUÍ EMPIEZA COMPONENTE EstadoConexion ============
 export default function EstadoConexion({ soloError = false }) {
   const [estado, setEstado] = useState("cargando"); // cargando | ok | error
-  const [version, setVersion] = useState("");
-  const [abierto, setAbierto] = useState(true);
+  const [version, setVersion] = useState(""); // Versión MariaDB del /salud.
+  const [abierto, setAbierto] = useState(true); // Visibilidad del Snackbar.
 
+  // ============ AQUÍ EMPIEZA HANDLER verificar ============
   // HANDLER: pregunta al back (GET /api/salud). Actualiza estado/version.
   const verificar = useCallback(async () => {
     setAbierto(true);
@@ -37,17 +39,21 @@ export default function EstadoConexion({ soloError = false }) {
       setAbierto(true);
     }
   }, []);
+  // ============ AQUÍ TERMINA HANDLER verificar ============
 
+  // ============ AQUÍ EMPIEZA EFFECT verificación inicial ============
   // Al montar verifica una vez (en timeout para no setear estado en el effect).
   useEffect(() => {
     const t = setTimeout(verificar, 0);
     return () => clearTimeout(t);
   }, [verificar]);
+  // ============ AQUÍ TERMINA EFFECT verificación inicial ============
 
   // Mientras verifica o si todo ok en modo soloError: no pinta nada.
   if (estado === "cargando") return null;
   if (estado === "ok" && soloError) return null;
 
+  // ============ AQUÍ EMPIEZA AVISO Snackbar + Alert ============
   return (
     <Snackbar
       id="Box-EstadoConexion-Aviso"
@@ -78,3 +84,5 @@ export default function EstadoConexion({ soloError = false }) {
     </Snackbar>
   );
 }
+// ============ AQUÍ TERMINA AVISO Snackbar + Alert ============
+// ============ AQUÍ TERMINA COMPONENTE EstadoConexion ============

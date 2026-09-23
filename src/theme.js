@@ -1,19 +1,16 @@
-/* ============================================================================
- * ARCHIVO: src/theme.js
- * FUNCIÓN GENERAL: fábrica del tema MUI (modo claro/oscuro + 4 acentos).
- *   - Define ACCENTOS: azul (actual), rojo, verde y blanco.
- *   - buildAppTheme(mode, accentId) crea el theme según Configuración.
- * FLUJO DE DATOS:
- *   - ENTRAN (DATOS PROVENIENTES DE): Components/ThemeModeProvider.jsx ->
- *     le pasa (mode, accentId) guardados en localStorage.
- *   - SALEN (DATOS QUE SE MANDAN A <archivo> para procesamiento):
- *     -> ThemeModeProvider: usa el theme en <ThemeProvider theme={...}>.
- * QUÉ MODIFICAR SI hay cambios:
- *   - Nuevo color: agrega entrada en ACCENTOS (main + contrastText cómodos).
- *   - Ajuste global de letra: typography de abajo (se mantiene escala -5%).
- * ========================================================================== */
+// ============================================================================
+// ARCHIVO: src/theme.js
+// FUNCIÓN GENERAL: fábrica del tema MUI (modo claro/oscuro + 4 acentos).
+//   Define ACCENTOS: azul (actual), rojo, verde y blanco.
+// FLUJO DE DATOS:
+//   - ENTRAN: Components/ThemeModeProvider.jsx le pasa (mode, accentId).
+//   - SALEN: ThemeModeProvider usa el theme en <ThemeProvider theme={...}>.
+// QUÉ MODIFICAR SI hay cambios: nuevo color en ACCENTOS; ajuste global en
+//   typography de abajo (se mantiene escala -5%).
+// ============================================================================
 import { createTheme } from '@mui/material/styles';
 
+// ============ AQUÍ EMPIEZA CATÁLOGO DE ACENTOS ============
 // Catálogo de acentos elegibles desde Configuración.
 // main: color de AppBar, drawer, botones contained y banners.
 // contrastText: texto/iconos encima del acento (debe contrastar SIEMPRE).
@@ -44,11 +41,15 @@ export const ACCENTOS = {
         contrastText: '#163172',
     },
 };
+// ============ AQUÍ TERMINA CATÁLOGO DE ACENTOS ============
 
+// ============ AQUÍ EMPIEZA CONSTANTES DE MODO ============
 export const ACCENTO_IDS = Object.keys(ACCENTOS);
 export const MODO_CLARO = 'light';
 export const MODO_OSCURO = 'dark';
+// ============ AQUÍ TERMINA CONSTANTES DE MODO ============
 
+// ============ AQUÍ EMPIEZA ENCABEZADOS ============
 // Color de encabezados/títulos/iconos SOBRE papel (fondo claro u oscuro).
 // Por qué existe: primary.main no sirve como texto en 2 casos:
 //  - acento blanco en modo claro (gris claro sobre blanco = invisible);
@@ -68,7 +69,9 @@ export const ENCABEZADOS = {
         blanco: '#ffffff',
     },
 };
+// ============ AQUÍ TERMINA ENCABEZADOS ============
 
+// ============ AQUÍ EMPIEZA buildAppTheme ============
 // QUÉ HACE: construye el theme MUI para (mode, accentId).
 // - mode 'light': fondo blanco, papel blanco.
 // - mode 'dark': fondo azul-gris muy oscuro y papel ligeramente más claro
@@ -119,8 +122,11 @@ export function buildAppTheme(mode = MODO_CLARO, accentId = 'azul') {
         },
     });
 }
+// ============ AQUÍ TERMINA buildAppTheme ============
 
+// ============ AQUÍ EMPIEZA TEMA POR DEFECTO ============
 // Tema por defecto (compatibilidad): claro + azul institucional.
 const theme = buildAppTheme(MODO_CLARO, 'azul');
 
 export default theme;
+// ============ AQUÍ TERMINA TEMA POR DEFECTO ============

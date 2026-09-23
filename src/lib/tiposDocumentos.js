@@ -1,8 +1,18 @@
-// Catálogo de documentos legales (según "Tipos de documentos legales.txt").
-// Espejo de db/sislegal_schema.sql tabla campos_tipo (137 campos, 11 tipos).
-// Campo 1: categoría general. Campo 2: tipo específico (depende del Campo 1).
-// Cada tipo específico define los "campos" (datos) que el formulario pedirá.
-// tipo de campo: 'texto' | 'email' | 'fecha' | 'area' | 'seleccion' | 'moneda' | 'fotos' | 'check' | 'switch' | 'anexos'
+// ============================================================================
+// ARCHIVO: src/lib/tiposDocumentos.js
+// FUNCIÓN GENERAL: catálogo local de documentos legales (Campo 1, Campo 2 y
+//   campos por tipo). Espejo de db/sislegal_schema.sql tabla campos_tipo.
+// FLUJO DE DATOS:
+//   - ENTRAN: "Tipos de documentos legales.txt" (11 tipos, 137 campos).
+//   - SALEN: Components/SelectorCategoriaTipo.jsx y CampoFormulario.jsx vía
+//     helpers (nombreCategoria, tiposDeCategoria, camposDeTipo).
+// QUÉ MODIFICAR SI hay cambios: CATEGORIAS, TIPOS_POR_CATEGORIA o
+//   CAMPOS_POR_TIPO aquí mismo (tipos: texto|email|fecha|area|seleccion|
+//   moneda|fotos|check|switch|anexos).
+// ============================================================================
+
+// ============ AQUÍ EMPIEZA CATEGORIAS (Campo 1) ============
+// Campo 1: categoría general (Cartas, Oficios, Avisos, Notificaciones).
 
 export const CATEGORIAS = [
   { id: 'cartas', nombre: 'Cartas' },
@@ -10,7 +20,9 @@ export const CATEGORIAS = [
   { id: 'avisos', nombre: 'Avisos' },
   { id: 'notificaciones', nombre: 'Notificaciones Legales' },
 ];
+// ============ AQUÍ TERMINA CATEGORIAS (Campo 1) ============
 
+// ============ AQUÍ EMPIEZA TIPOS_POR_CATEGORIA (Campo 2) ============
 // Subtipos por categoría (Campo 2). Se habilita solo tras elegir Campo 1.
 export const TIPOS_POR_CATEGORIA = {
   cartas: [
@@ -35,7 +47,9 @@ export const TIPOS_POR_CATEGORIA = {
     { id: 'notificacion-general', nombre: 'Notificación legal general' },
   ],
 };
+// ============ AQUÍ TERMINA TIPOS_POR_CATEGORIA (Campo 2) ============
 
+// ============ AQUÍ EMPIEZA CAMPOS_POR_TIPO ============
 // Datos que pide cada tipo de documento específico.
 export const CAMPOS_POR_TIPO = {
   'carta-poder': [
@@ -201,8 +215,10 @@ export const CAMPOS_POR_TIPO = {
     { id: 'fecha', etiqueta: 'Fecha', tipo: 'fecha', requerido: true },
   ],
 };
+// ============ AQUÍ TERMINA CAMPOS_POR_TIPO ============
 
-// Helpers para la vista
+// ============ AQUÍ EMPIEZA HELPERS DE VISTA ============
+// Helpers para la vista (resuelven nombres y listas sin exponer el catálogo).
 export const nombreCategoria = (id) =>
   CATEGORIAS.find((c) => c.id === id)?.nombre ?? '';
 
@@ -213,3 +229,4 @@ export const nombreTipo = (idCategoria, idTipo) =>
   tiposDeCategoria(idCategoria).find((t) => t.id === idTipo)?.nombre ?? '';
 
 export const camposDeTipo = (idTipo) => CAMPOS_POR_TIPO[idTipo] ?? [];
+// ============ AQUÍ TERMINA HELPERS DE VISTA ============

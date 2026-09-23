@@ -38,12 +38,15 @@ import { estadoBonito } from '../lib/estados';
 // PERMISOS: dictaminar exige 'modificar' en la categoría de la fila.
 import { usePermisos } from '../Components/PermisosProvider';
 
+// ============ AQUÍ EMPIEZA FILTROS REVISIÓN ============
 // CONSTANTE: pestañas de filtro por estado (etiquetas visibles).
 // QUÉ HACE: define los valores del Tabs y del filtro `visibles`.
 // DÓNDE SE USA: sección id="Filtros por estado".
 // QUÉ MODIFICAR SI: agregas un estado, añádelo aquí (y en ../lib/estados.js).
 const FILTROS = ['Todos', 'Por revisar', 'Aprobado', 'Rechazado'];
+// ============ AQUÍ TERMINA FILTROS REVISIÓN ============
 
+// ============ AQUÍ EMPIEZA FORMATO VALOR ============
 // QUÉ HACE: valor de un campo del documento para el resumen del Dialog.
 // Objetos/arreglos/bools se aplanan a texto legible.
 function formatoValor(v) {
@@ -57,10 +60,13 @@ function formatoValor(v) {
   if (typeof v === 'object') return v.name ?? JSON.stringify(v);
   return String(v);
 }
+// ============ AQUÍ TERMINA FORMATO VALOR ============
 
+// ============ AQUÍ EMPIEZA PÁGINA REVISIÓN ============
 // QUÉ HACE: bandeja de revisión con dictamen persistente en BD.
 // DÓNDE SE USA: ruta "/Revision" en app.jsx; enlazada desde Inicio.
 export default function Revision() {
+    // ============ AQUÍ EMPIEZA ESTADOS REVISIÓN ============
     // ESTADO: filtro activo del Tabs. DÓNDE SE USA: `visibles` y Tabs value/onChange.
     const [filtro, setFiltro] = useState('Todos');
     // ESTADO: documentos de la bandeja (GET /api/documentos, área+permiso del back).
@@ -74,7 +80,9 @@ export default function Revision() {
     const [comentario, setComentario] = useState('');
     // PERMISOS: para habilitar Aprobar/Rechazar por categoría de la fila.
     const { puede } = usePermisos();
+    // ============ AQUÍ TERMINA ESTADOS REVISIÓN ============
 
+    // ============ AQUÍ EMPIEZA CARGA BANDEJA ============
     // CARGA: bandeja completa al montar (el back ya filtra por área y permiso).
     const cargar = async () => {
         try {
@@ -105,7 +113,9 @@ export default function Revision() {
         })();
         return () => { vivo = false; };
     }, []);
+    // ============ AQUÍ TERMINA CARGA BANDEJA ============
 
+    // ============ AQUÍ EMPIEZA HANDLERS DICTAMEN ============
     // CÁLCULO: filas visibles según el filtro activo (etiqueta vs código API).
     const visibles = filtro === 'Todos'
         ? docs
@@ -148,10 +158,13 @@ export default function Revision() {
     // CÁLCULO: ¿puede dictaminar esta fila? (por_revisar + modificar en su categoría).
     const puedeDictaminar = (doc) =>
         doc.estado === 'por_revisar' && puede(doc.categoria, 'modificar');
+    // ============ AQUÍ TERMINA HANDLERS DICTAMEN ============
 
     return (
         // SECCIÓN JSX: contenedor raíz (id preexistente conservado).
+        // ============ AQUÍ EMPIEZA CONTENEDOR REVISIÓN ============
         <Box id="Contenedor de revision" sx={{ p: 2, width: '100%' }}>
+            {/* ============ AQUÍ EMPIEZA ENCABEZADO REVISIÓN ============ */}
             <PageHeader
                 id="Encabezado de revision"
                 titulo="Revisión de cartas"
@@ -164,6 +177,9 @@ export default function Revision() {
                 </Alert>
             )}
 
+            {/* ============ AQUÍ TERMINA ENCABEZADO REVISIÓN ============ */}
+
+            {/* ============ AQUÍ EMPIEZA FILTROS POR ESTADO (JSX) ============ */}
             {/* SECCIÓN JSX: tabs de filtro (id preexistente conservado). */}
             <Box id="Filtros por estado" sx={{ mb: 2 }}>
                 <Tabs value={filtro} onChange={(_, v) => setFiltro(v)} variant="scrollable" scrollButtons="auto">
@@ -172,7 +188,9 @@ export default function Revision() {
                     ))}
                 </Tabs>
             </Box>
+            {/* ============ AQUÍ TERMINA FILTROS POR ESTADO (JSX) ============ */}
 
+            {/* ============ AQUÍ EMPIEZA TABLA BANDEJA ============ */}
             {/* SECCIÓN JSX: tabla de la bandeja (id preexistente conservado). */}
             <Box id="Tabla de documentos por revisar">
                 <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
@@ -226,7 +244,9 @@ export default function Revision() {
                     </Table>
                 </TableContainer>
             </Box>
+            {/* ============ AQUÍ TERMINA TABLA BANDEJA ============ */}
 
+            {/* ============ AQUÍ EMPIEZA DIÁLOGO DICTAMEN ============ */}
             {/* SECCIÓN JSX: Dialog de dictamen (se abre con `seleccionado`). */}
             <Dialog open={Boolean(seleccionado)} onClose={cerrarDialogo} maxWidth="sm" fullWidth>
                 {seleccionado && (
@@ -302,6 +322,9 @@ export default function Revision() {
                     </Box>
                 )}
             </Dialog>
+            {/* ============ AQUÍ TERMINA DIÁLOGO DICTAMEN ============ */}
         </Box>
+        // ============ AQUÍ TERMINA CONTENEDOR REVISIÓN ============
     );
 }
+// ============ AQUÍ TERMINA PÁGINA REVISIÓN ============

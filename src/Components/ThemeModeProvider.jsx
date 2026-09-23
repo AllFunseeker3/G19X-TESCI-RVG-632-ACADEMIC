@@ -25,6 +25,7 @@ const CLAVE_ACENTO = 'plurione-theme-accent';
 const MODO_POR_DEFECTO = MODO_CLARO;
 const ACENTO_POR_DEFECTO = 'azul';
 
+// ============ AQUÍ EMPIEZA LECTURA inicial localStorage ============
 // Lee localStorage con validación (si el valor no existe o es inválido, usa defecto).
 function leerModoInicial() {
     try {
@@ -43,7 +44,9 @@ function leerAcentoInicial() {
         return ACENTO_POR_DEFECTO;
     }
 }
+// ============ AQUÍ TERMINA LECTURA inicial localStorage ============
 
+// ============ AQUÍ EMPIEZA CONTEXTO + HOOK useThemeMode ============
 const ThemeModeContext = createContext(null);
 
 // Hook para leer/cambiar apariencia desde cualquier página (lo usa Configuración).
@@ -52,12 +55,15 @@ export function useThemeMode() {
     if (!ctx) throw new Error('useThemeMode debe usarse dentro de <ThemeModeProvider>');
     return ctx;
 }
+// ============ AQUÍ TERMINA CONTEXTO + HOOK useThemeMode ============
 
+// ============ AQUÍ EMPIEZA PROVIDER ThemeModeProvider ============
 // Proveedor: envuelve la app y aplica el theme MUI correspondiente.
 export default function ThemeModeProvider({ children }) {
     const [mode, setMode] = useState(leerModoInicial);
     const [accentId, setAccentId] = useState(leerAcentoInicial);
 
+    // ============ AQUÍ EMPIEZA PERSISTENCIA en localStorage ============
     // Persiste cada cambio para que sobreviva recargas.
     useEffect(() => {
         try {
@@ -74,7 +80,9 @@ export default function ThemeModeProvider({ children }) {
             /* almacenamiento no disponible: se ignora */
         }
     }, [accentId]);
+    // ============ AQUÍ TERMINA PERSISTENCIA en localStorage ============
 
+    // ============ AQUÍ EMPIEZA THEME memo + valor ============
     // Memoriza el theme para no recrearlo en cada render.
     const theme = useMemo(() => buildAppTheme(mode, accentId), [mode, accentId]);
 
@@ -105,3 +113,5 @@ export default function ThemeModeProvider({ children }) {
         </ThemeModeContext.Provider>
     );
 }
+// ============ AQUÍ TERMINA THEME memo + valor ============
+// ============ AQUÍ TERMINA PROVIDER ThemeModeProvider ============

@@ -1,28 +1,17 @@
-import { Box, Typography, Button } from '@mui/material';
-
 // ============================================================================
 // ARCHIVO: src/Components/PageHeader.jsx
-// FUNCIÓN GENERAL: Encabezado uniforme de página: título + subtítulo opcional
-//   + botón de acción opcional a la derecha. Usado en Plantillas, Revisión,
-//   Seguimiento, GenerarCarta, etc.
-// PROPS QUE RECIBE (datos provenientes de):
-//   - id (string|undefined): id para el <Box> raíz. Lo manda la página padre;
-//     si no llega, usa 'Encabezado de pagina' por defecto.
-//   - titulo (string): título grande. Viene de la página (ej. "Revisar cartas").
-//   - subtitulo (string|undefined): texto secundario debajo del título.
-//   - textoAccion (string|undefined): si existe, pinta el <Button>. Viene de la página.
-//   - onAccion (función|undefined): handler del botón. Lo ejecuta la página padre.
-// QUÉ MANDA/RETORNA (datos que se mandan a otro archivo para procesamiento):
-//   - Retorna layout visual. Al pulsar el botón, delega a `onAccion` de la
-//     página padre (no procesa nada aquí).
-// QUÉ MODIFICAR SI hay cambios:
-//   - RAMA subtitulo: `{subtitulo && ...}` — QUÉ HACE: oculta la línea si no hay
-//     subtítulo. SI siempre quieres subtítulo, vuelve obligatorio en el padre.
-//   - RAMA textoAccion: `{textoAccion && <Button ...>}` — QUÉ HACE: botón solo
-//     si hay texto. SI necesitas 2 botones, agregar props textoAccion2/onAccion2.
-//   - <Box> raíz conserva `id={id ?? ...}` — NO renombrar; los tests buscan ese id.
+// FUNCIÓN GENERAL: encabezado uniforme de página: título + subtítulo
+//   opcional + botón de acción opcional a la derecha.
+// FLUJO DE DATOS:
+//   - ENTRAN: id, titulo, subtitulo, textoAccion y onAccion de la página padre.
+//   - SALEN: layout visual; el botón delega a onAccion del padre.
+// QUÉ MODIFICAR SI hay cambios: rama subtitulo (oculta si no hay) y rama
+//   textoAccion (botón solo si hay texto); <Box> raíz conserva su id.
 // ============================================================================
 // Encabezado uniforme para las páginas: título, subtítulo y acción opcional.
+// ============ AQUÍ EMPIEZA COMPONENTE PageHeader ============
+import { Box, Typography, Button } from '@mui/material';
+
 export default function PageHeader({ id, titulo, subtitulo, textoAccion, onAccion }) {
     return (
         <Box
@@ -35,6 +24,7 @@ export default function PageHeader({ id, titulo, subtitulo, textoAccion, onAccio
                 mb: 2.5,
             }}
         >
+            {/* ============ AQUÍ EMPIEZA TEXTOS (título+subtítulo) ============ */}
             {/* QUÉ HACE: columna de textos (título+subtítulo). SI agregas breadcrumb, ponerlo aquí arriba. */}
             <Box id="Box-PageHeader-Textos">
                 {/* Título con token encabezado (legible en claro/oscuro y en acento blanco). */}
@@ -47,11 +37,15 @@ export default function PageHeader({ id, titulo, subtitulo, textoAccion, onAccio
                     </Typography>
                 )}
             </Box>
+            {/* ============ AQUÍ TERMINA TEXTOS (título+subtítulo) ============ */}
+            {/* ============ AQUÍ EMPIEZA BOTÓN acción opcional ============ */}
             {textoAccion && (
                 <Button variant="contained" color="primary" onClick={onAccion} sx={{ flexShrink: 0 }}>
                     {textoAccion}
                 </Button>
             )}
+            {/* ============ AQUÍ TERMINA BOTÓN acción opcional ============ */}
         </Box>
     );
 }
+// ============ AQUÍ TERMINA COMPONENTE PageHeader ============

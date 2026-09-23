@@ -1,15 +1,23 @@
 // ============================================================================
-// RUTAS: /api/documentos — CRUD de cartas/oficios/avisos/notificaciones.
-// TABLAS: documentos, documento_historial, adjuntos (+tipos para categoría).
-// ALCANCE POR ÁREA: no-admin solo ve/toca docs de SU id_area en categorías
-//   con permiso. Admin ve todo y puede indicar id_area al crear.
+// ARCHIVO: server/routes/documentos.js
+// FUNCIÓN GENERAL: CRUD de cartas/oficios/avisos/notificaciones + historial,
+//   cambios de estado y registro de adjuntos PDF.
+// FLUJO DE DATOS:
+//   - ENTRAN: requests autenticados + tablas documentos, documento_historial,
+//     adjuntos, tipos_documento.
+//   - SALEN: JSON de lista/detalle/historial hacia el front.
+// QUÉ MODIFICAR SI hay cambios: agregar estados en ESTADOS; ajustar alcance
+//   por área en docVisible y GET /; nuevas validaciones en POST/PATCH.
 // ============================================================================
+// ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
 const pool = require("../db");
 const { conAuth, tienePermiso } = require("../middleware");
+// ============ AQUÍ TERMINA IMPORTS ============
 
+// ============ AQUÍ EMPIEZA ROUTER Y CONSTANTES ============
 const router = express.Router();
-router.use(conAuth);
+router.use(conAuth); // Todas exigen login.
 
 const ESTADOS = new Set([
   "borrador",
@@ -18,7 +26,9 @@ const ESTADOS = new Set([
   "rechazado",
   "notificado",
 ]);
+// ============ AQUÍ TERMINA ROUTER Y CONSTANTES ============
 
+// ============ AQUÍ EMPIEZA FUNCIÓN CATEGORÍADE ============
 // QUÉ HACE: categoría del tipo (para checar permiso). 404 si no existe.
 async function categoriaDe(idTipo) {
   const [filas] = await pool.query(
@@ -27,7 +37,9 @@ async function categoriaDe(idTipo) {
   );
   return filas[0] ? filas[0].id_categoria : null;
 }
+// ============ AQUÍ TERMINA FUNCIÓN CATEGORÍADE ============
 
+// ============ AQUÍ EMPIEZA FUNCIÓN DOCVISIBLE ============
 // QUÉ HACE: trae el doc + valida área y permiso (404/403 según aplique).
 async function docVisible(idDoc, u, accion) {
   const [filas] = await pool.query(
@@ -54,7 +66,9 @@ async function docVisible(idDoc, u, accion) {
   }
   return d;
 }
+// ============ AQUÍ TERMINA FUNCIÓN DOCVISIBLE ============
 
+// ============ AQUÍ EMPIEZA RUTA GET LISTA ============
 // GET /api/documentos?estado=&tipo= — lista (máx 500, recientes primero).
 router.get("/", async (req, res, next) => {
   try {
@@ -65,11 +79,11 @@ router.get("/", async (req, res, next) => {
                   t.id_categoria AS categoria
            FROM documentos d JOIN tipos_documento t ON t.id_tipo = d.id_tipo
            LEFT JOIN clientes c ON c.id_cliente = d.id_cliente
-           WHERE 1 = 1`;
+           WHERE 1 = 1`; // Base para concatenar filtros.
   const args = [];
   if (!u.admin) {
     q += " AND d.id_area = ?";
-    args.push(u.id_area);
+    args.push(u.id_area); // No-admin: solo su área.
   }
   if (req.query.estado) {
     q += " AND d.estado = ?";
@@ -85,7 +99,7 @@ router.get("/", async (req, res, next) => {
     const visibles = [];
     for (const f of filas) {
       if (await tienePermiso(u.id_rol, false, f.categoria, "ver"))
-        visibles.push(f);
+        visibles.push(f); // Filtra por permiso de categoría.
     }
     filas = visibles;
   }
@@ -94,7 +108,9 @@ router.get("/", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET LISTA ============
 
+// ============ AQUÍ EMPIEZA RUTA POST CREAR ============
 // POST /api/documentos — crea en 'borrador' + historial inicial.
 router.post("/", async (req, res, next) => {
   try {
@@ -107,7 +123,7 @@ router.post("/", async (req, res, next) => {
       .status(403)
       .json({ detail: `Sin permiso de crear en '${cat}'` });
   }
-  const area = u.admin && id_area ? id_area : u.id_area;
+  const area = u.admin && id_area ? id_area : u.id_area; // Solo admin puede forzar área.
   const [r] = await pool.query(
     `INSERT INTO documentos
      (folio, id_tipo, id_cliente, id_creador, id_area, estado, datos, contenido, modelo_ia)
@@ -125,14 +141,16 @@ router.post("/", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA POST CREAR ============
 
+// ============ AQUÍ EMPIEZA RUTA GET ACTIVIDAD RECIENTE ============
 // GET /api/documentos/actividad/reciente?limite=6 — últimas etapas de la
 // trazabilidad (para Inicio). No-admin: solo su área. OJO: va ANTES de /:id
 // para que Express no la confunda con un id.
 router.get("/actividad/reciente", async (req, res, next) => {
   try {
     const u = req.usuario;
-    const lim = Math.min(Number(req.query.limite) || 6, 50);
+    const lim = Math.min(Number(req.query.limite) || 6, 50); // Tope 50.
     let q = `SELECT h.id_historial AS n, d.id_documento AS docId, t.nombre AS tipo,
                     h.estado_nuevo AS etapa, h.creado_en AS fecha,
                     u.nombre AS responsable, h.comentario
@@ -154,7 +172,9 @@ router.get("/actividad/reciente", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET ACTIVIDAD RECIENTE ============
 
+// ============ AQUÍ EMPIEZA RUTA GET DETALLE ============
 // GET /api/documentos/:id — detalle + datos JSON + historial + adjuntos.
 router.get("/:id", async (req, res, next) => {
   try {
@@ -172,7 +192,7 @@ router.get("/:id", async (req, res, next) => {
        WHERE id_documento = ? ORDER BY id_adjunto`,
       [d.id_documento]
     );
-    d.datos = typeof d.datos === "string" ? JSON.parse(d.datos) : d.datos;
+    d.datos = typeof d.datos === "string" ? JSON.parse(d.datos) : d.datos; // mysql2 devuelve TEXT.
     d.historial = hist;
     d.adjuntos = adj;
     return res.json(d);
@@ -180,7 +200,9 @@ router.get("/:id", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET DETALLE ============
 
+// ============ AQUÍ EMPIEZA RUTA PATCH ESTADO ============
 // PATCH /api/documentos/:id/estado — cambia estado + deja rastro.
 router.patch("/:id/estado", async (req, res, next) => {
   try {
@@ -203,14 +225,16 @@ router.patch("/:id/estado", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA PATCH ESTADO ============
 
+// ============ AQUÍ EMPIEZA RUTA POST ADJUNTO ============
 // POST /api/documentos/:id/adjuntos — ficha de un PDF ya almacenado.
 router.post("/:id/adjuntos", async (req, res, next) => {
   try {
     const { nombre_archivo, tipo_mime = "application/pdf", tamano_bytes = null, ruta } = req.body || {};
     const d = await docVisible(Number(req.params.id), req.usuario, "modificar");
     if (tipo_mime !== "application/pdf")
-      return res.status(400).json({ detail: "Solo se aceptan PDF" });
+      return res.status(400).json({ detail: "Solo se aceptan PDF" }); // CHECK solo-PDF.
     const [r] = await pool.query(
       `INSERT INTO adjuntos
        (id_documento, nombre_archivo, tipo_mime, tamano_bytes, ruta, id_subido_por)
@@ -222,5 +246,8 @@ router.post("/:id/adjuntos", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA POST ADJUNTO ============
 
+// ============ AQUÍ EMPIEZA EXPORTS ============
 module.exports = router;
+// ============ AQUÍ TERMINA EXPORTS ============

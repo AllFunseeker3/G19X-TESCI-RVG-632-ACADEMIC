@@ -1,10 +1,14 @@
 # ============================================================================
-# SERVICIO IA SisLegal (FastAPI + LangChain + OpenRouter).
-# POST /redactar { id_tipo, datos } -> { contenido, modelo, id_tipo }.
-# Plantillas: solo carta-poder (piloto); otros tipos -> 400.
-# ENV (ai-service/.env, nunca en git): OPENROUTER_API_KEY, IA_MODEL, IA_PORT.
-# ARRANQUE: uvicorn main:app --port 8001  (desde ai-service/)
+# ARCHIVO: ai-service/main.py
+# FUNCIÓN GENERAL: microservicio IA (FastAPI + LangChain + OpenRouter).
+#   Expone POST /redactar y POST /pdf (piloto: solo carta-poder).
+# FLUJO DE DATOS:
+#   - ENTRAN: JSON { id_tipo, datos } desde server/routes/ia.js (proxy /api/ia).
+#   - SALEN: { contenido, modelo, id_tipo } o { archivo, ruta, bytes } al backend.
+# QUÉ MODIFICAR SI hay cambios: agregar plantillas en PLANTILLAS y su prompt;
+#   cambiar modelo/puerto en ai-service/.env (IA_MODEL, IA_PORT).
 # ============================================================================
+# ============ AQUÍ EMPIEZA IMPORTS ============
 import os
 
 from dotenv import load_dotenv
@@ -13,13 +17,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
+# ============ AQUÍ TERMINA IMPORTS ============
 
-load_dotenv()
+# ============ AQUÍ EMPIEZA CONFIGURACIÓN ============
+load_dotenv()  # Lee ai-service/.env (nunca en git).
 
 API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 MODEL = os.getenv("IA_MODEL", "")
 PORT = int(os.getenv("IA_PORT", "8001"))
+# ============ AQUÍ TERMINA CONFIGURACIÓN ============
 
+# ============ AQUÍ EMPIEZA APP Y CORS ============
 app = FastAPI(title="SisLegal IA")
 app.add_middleware(
     CORSMiddleware,
@@ -28,8 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ============ AQUÍ TERMINA APP Y CORS ============
 
-
+# ============ AQUÍ EMPIEZA MODELOS DE ENTRADA ============
 class RedactarIn(BaseModel):
     id_tipo: str
     datos: dict
@@ -39,8 +48,9 @@ class PdfIn(BaseModel):
     id_tipo: str
     datos: dict
     nombre_base: str = "carta-poder"
+# ============ AQUÍ TERMINA MODELOS DE ENTRADA ============
 
-
+# ============ AQUÍ EMPIEZA PLANTILLAS ============
 PROMPT_CARTA_PODER = PromptTemplate.from_template(
     "Eres un abogado mexicano experto en redacción de documentos legales. "
     "Redacta una CARTA PODER formal en español, lista para firmar, usando "
@@ -59,9 +69,10 @@ PROMPT_CARTA_PODER = PromptTemplate.from_template(
     "Tono solemne y preciso. Devuelve SOLO el texto del documento."
 )
 
-PLANTILLAS = {"carta-poder": PROMPT_CARTA_PODER}
+PLANTILLAS = {"carta-poder": PROMPT_CARTA_PODER}  # Piloto: solo carta-poder.
+# ============ AQUÍ TERMINA PLANTILLAS ============
 
-
+# ============ AQUÍ EMPIEZA FUNCIÓN GET_LLM ============
 def get_llm() -> ChatOpenAI:
     if not API_KEY:
         raise HTTPException(status_code=500, detail="Falta OPENROUTER_API_KEY en ai-service/.env")
@@ -70,16 +81,18 @@ def get_llm() -> ChatOpenAI:
     return ChatOpenAI(
         model=MODEL,
         api_key=API_KEY,
-        base_url="https://openrouter.ai/api/v1",
+        base_url="https://openrouter.ai/api/v1",  # Endpoint compatible OpenAI.
         default_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "SisLegal"},
     )
+# ============ AQUÍ TERMINA FUNCIÓN GET_LLM ============
 
-
+# ============ AQUÍ EMPIEZA ENDPOINT GET SALUD ============
 @app.get("/salud")
 def salud():
     return {"ok": True, "modelo": MODEL, "plantillas": sorted(PLANTILLAS)}
+# ============ AQUÍ TERMINA ENDPOINT GET SALUD ============
 
-
+# ============ AQUÍ EMPIEZA ENDPOINT POST REDACTAR ============
 @app.post("/redactar")
 def redactar(body: RedactarIn):
     plantilla = PLANTILLAS.get(body.id_tipo)
@@ -105,7 +118,7 @@ def redactar(body: RedactarIn):
         testigo2Nombre=d.get("testigo2Nombre", ""),
         testigo2TipoDoc=d.get("testigo2TipoDoc", ""),
         testigo2Id=d.get("testigo2Id", ""),
-        vigencia=d.get("vigencia") or "el tiempo necesario para el objeto del poder",
+        vigencia=d.get("vigencia") or "el tiempo necesario para el objeto del poder",  # Valor por defecto.
         lugar=d.get("lugar", ""),
         fecha=d.get("fecha", ""),
     )
@@ -121,10 +134,11 @@ def redactar(body: RedactarIn):
                 detail="Modelo saturado en OpenRouter (pool gratis). Espera un minuto "
                 "y reintenta, o cambia IA_MODEL en ai-service/.env",
             )
-        raise HTTPException(status_code=502, detail=f"Error del proveedor IA: {msg[:300]}")
+        raise HTTPException(status_code=502, detail=f"Error del proveedor IA: {msg[:300]}")  # Recorta mensaje.
     return {"contenido": resp.content, "modelo": MODEL, "id_tipo": body.id_tipo}
+# ============ AQUÍ TERMINA ENDPOINT POST REDACTAR ============
 
-
+# ============ AQUÍ EMPIEZA ENDPOINT POST PDF ============
 @app.post("/pdf")
 def generar_pdf(body: PdfIn):
     """Genera el PDF con formato institucional y lo guarda en
@@ -135,7 +149,7 @@ def generar_pdf(body: PdfIn):
             detail=f"PDF no implementado para '{body.id_tipo}' (piloto: carta-poder)",
         )
     try:
-        from pdf_carta_poder import generar_carta_poder
+        from pdf_carta_poder import generar_carta_poder  # Import tardío: solo se usa aquí.
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"No se pudo cargar el generador PDF: {e}")
     try:
@@ -143,9 +157,11 @@ def generar_pdf(body: PdfIn):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"No se pudo generar el PDF: {e}")
     return {**out, "id_tipo": body.id_tipo}
+# ============ AQUÍ TERMINA ENDPOINT POST PDF ============
 
-
+# ============ AQUÍ EMPIEZA ARRANQUE ============
 if __name__ == "__main__":
-    import uvicorn
+    import uvicorn  # Import local: solo para ejecución directa.
 
-    uvicorn.run(app, host="127.0.0.1", port=PORT)
+    uvicorn.run(app, host="127.0.0.1", port=PORT)  # Arranque: uvicorn main:app --port 8001.
+# ============ AQUÍ TERMINA ARRANQUE ============

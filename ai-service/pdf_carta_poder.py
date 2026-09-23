@@ -1,9 +1,14 @@
 # ============================================================================
-# Genera el PDF de carta poder con el formato institucional:
-# lugar/fecha a la derecha, título centrado subrayado, cuerpo justificado
-# con los datos integrados, "Atentamente" y bloques de firma.
-# Guarda en <raiz>/documentos/Sistema legal/ (PDF_DIR).
+# ARCHIVO: ai-service/pdf_carta_poder.py
+# FUNCIÓN GENERAL: genera el PDF de carta poder con formato institucional
+#   (lugar/fecha a la derecha, título centrado, cuerpo justificado y firmas).
+# FLUJO DE DATOS:
+#   - ENTRAN: dict `datos` + `nombre_base` desde main.py (endpoint POST /pdf).
+#   - SALEN: archivo PDF en documentos/Sistema legal + dict {archivo, ruta, bytes}.
+# QUÉ MODIFICAR SI hay cambios: ajustar estilos en _estilos, layout en
+#   generar_carta_poder o carpeta destino vía env PDF_DIR.
 # ============================================================================
+# ============ AQUÍ EMPIEZA IMPORTS ============
 import re
 from datetime import datetime
 from pathlib import Path
@@ -18,27 +23,31 @@ from reportlab.platypus import (
     Spacer,
     Table,
 )
+# ============ AQUÍ TERMINA IMPORTS ============
 
+# ============ AQUÍ EMPIEZA CONSTANTES ============
 MESES = {
     "01": "enero", "02": "febrero", "03": "marzo", "04": "abril",
     "05": "mayo", "06": "junio", "07": "julio", "08": "agosto",
     "09": "septiembre", "10": "octubre", "11": "noviembre", "12": "diciembre",
 }
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent  # Raíz del proyecto.
 PDF_DIR = Path(
     __import__("os").getenv("PDF_DIR", str(BASE_DIR / "documentos" / "Sistema legal"))
 )
+# ============ AQUÍ TERMINA CONSTANTES ============
 
-
+# ============ AQUÍ EMPIEZA FUNCIÓN FECHA_LARGA ============
 def fecha_larga(v: str) -> str:
-    m = re.match(r"^(\d{2})/(\d{2})/(\d{4})$", (v or "").strip())
+    m = re.match(r"^(\d{2})/(\d{2})/(\d{4})$", (v or "").strip())  # Solo acepta DD/MM/AAAA.
     if not m:
         return v or ""
     dd, mm, aa = m.groups()
     return f"{int(dd)} de {MESES.get(mm, mm)} de {aa}"
+# ============ AQUÍ TERMINA FUNCIÓN FECHA_LARGA ============
 
-
+# ============ AQUÍ EMPIEZA FUNCIÓN ESTILOS ============
 def _estilos():
     base = ParagraphStyle("base", fontName="Times-Roman", fontSize=12, leading=18)
     return {
@@ -52,27 +61,29 @@ def _estilos():
         ),
         "firma": ParagraphStyle("firma", parent=base, alignment=1, fontSize=11, leading=15),
     }
+# ============ AQUÍ TERMINA FUNCIÓN ESTILOS ============
 
-
+# ============ AQUÍ EMPIEZA FUNCIÓN BLOQUE_FIRMA ============
 def _bloque_firma(nombre: str, doc: str, rol: str):
     e = _estilos()
     return [
         Paragraph(f"<b>{rol}</b>", e["firma"]),
-        Spacer(1, 1.6 * cm),
-        HRFlowable(width="80%", thickness=1, hAlign="CENTER", spaceAfter=4),
+        Spacer(1, 1.6 * cm),  # Espacio para firma manuscrita.
+        HRFlowable(width="80%", thickness=1, hAlign="CENTER", spaceAfter=4),  # Línea de firma.
         Paragraph(nombre or "", e["firma"]),
         Paragraph(doc or "", e["firma"]),
     ]
+# ============ AQUÍ TERMINA FUNCIÓN BLOQUE_FIRMA ============
 
-
+# ============ AQUÍ EMPIEZA FUNCIÓN GENERAR_CARTA_PODER ============
 def generar_carta_poder(datos: dict, nombre_base: str = "carta-poder") -> dict:
     """Genera el PDF y lo guarda. Devuelve {archivo, ruta, bytes}."""
     d = datos or {}
     e = _estilos()
-    PDF_DIR.mkdir(parents=True, exist_ok=True)
+    PDF_DIR.mkdir(parents=True, exist_ok=True)  # Crea carpeta si no existe.
 
-    sello = datetime.now().strftime("%Y%m%d-%H%M%S")
-    limpio = re.sub(r"[^a-zA-Z0-9_-]+", "-", (nombre_base or "carta-poder")).strip("-")
+    sello = datetime.now().strftime("%Y%m%d-%H%M%S")  # Evita colisiones de nombre.
+    limpio = re.sub(r"[^a-zA-Z0-9_-]+", "-", (nombre_base or "carta-poder")).strip("-")  # Sanitiza nombre.
     archivo = f"{limpio}-{sello}.pdf"
     ruta = PDF_DIR / archivo
 
@@ -149,5 +160,6 @@ def generar_carta_poder(datos: dict, nombre_base: str = "carta-poder") -> dict:
             colWidths=[7.5 * cm, 7.5 * cm],
         ),
     ]
-    doc.build(historia)
+    doc.build(historia)  # Escribe el PDF en disco.
     return {"archivo": archivo, "ruta": str(ruta), "bytes": ruta.stat().st_size}
+# ============ AQUÍ TERMINA FUNCIÓN GENERAR_CARTA_PODER ============

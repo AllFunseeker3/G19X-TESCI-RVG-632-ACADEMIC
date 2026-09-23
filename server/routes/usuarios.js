@@ -1,20 +1,26 @@
 // ============================================================================
-// RUTAS: /api/usuarios — gestión de usuarios y matriz de permisos propia.
-// REGLA DE ALCANCE: admin gestiona a todos; superusuario SOLO a usuarios de
-//   SU área y solo roles de SU área. El resto: 403.
-// TABLAS: usuarios, roles, permisos_rol, areas.
+// ARCHIVO: server/routes/usuarios.js
+// FUNCIÓN GENERAL: gestión de usuarios (alta, detalle, edición, baja lógica)
+//   y matriz de permisos propia; catálogos de roles/áreas/puestos.
+// FLUJO DE DATOS:
+//   - ENTRAN: requests autenticados + tablas usuarios, roles, permisos_rol, areas.
+//   - SALEN: JSON de usuarios/permisos hacia la vista Usuarios del front.
+// QUÉ MODIFICAR SI hay cambios: ajustar reglas de alcance en validarCreacion
+//   y puedeGestionar; agregar campos editables en PATCH /:id.
 // ============================================================================
+// ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
 const pool = require("../db");
 const { hashContrasena } = require("../auth");
 const { conAuth } = require("../middleware");
+// ============ AQUÍ TERMINA IMPORTS ============
 
+// ============ AQUÍ EMPIEZA ROUTER Y AUTH ============
 const router = express.Router();
-router.use(conAuth);
+router.use(conAuth); // Todas exigen login.
+// ============ AQUÍ TERMINA ROUTER Y AUTH ============
 
-// ============================================================================
-// HELPERS
-// ============================================================================
+// ============ AQUÍ EMPIEZA HELPERS ============
 
 // QUÉ HACE: ¿puede `u` gestionar usuarios? Admin sí; si tiene
 // puede_gestionar_usuarios en alguna categoría, solo dentro de su área.
@@ -31,10 +37,10 @@ async function puedeGestionar(u) {
 // Sin acentos (los correos van en ASCII): Méndez -> men.
 function generarCorreo(nombreCompleto) {
   const sinAcentos = String(nombreCompleto || "")
-    .normalize("NFD")
+    .normalize("NFD") // Descompone acentos para quitarlos.
     .replace(/[\u0300-\u036f]/g, "");
   const partes = sinAcentos.trim().split(/\s+/);
-  if (partes.length < 2) return null;
+  if (partes.length < 2) return null; // Requiere al menos nombre + paterno.
   const nombre = partes[0].substring(0, 3).toLowerCase();
   const paterno = partes[1].substring(0, 3).toLowerCase();
   const materno = partes.length > 2 ? partes[2].substring(0, 3).toLowerCase() : "xxx";
@@ -72,13 +78,12 @@ async function validarCreacion(u, idRol, id_area = null) {
   if (rol.id_area !== u.id_area) {
     return { ok: false, msg: "Solo roles de tu área" };
   }
-  return { ok: true, area: u.id_area };
+  return { ok: true, area: u.id_area }; // Forza su propia área.
 }
 
-// ============================================================================
-// ENDPOINTS
-// ============================================================================
+// ============ AQUÍ TERMINA HELPERS ============
 
+// ============ AQUÍ EMPIEZA RUTA GET MIS PERMISOS ============
 // GET /api/usuarios/yo/permisos — matriz del usuario (la UI filtra con esto).
 router.get("/yo/permisos", async (req, res) => {
   const u = req.usuario;
@@ -97,12 +102,14 @@ router.get("/yo/permisos", async (req, res) => {
       "puede_eliminar",
       "puede_gestionar",
     ]) {
-      f[k] = f[k] === 1;
+      f[k] = f[k] === 1; // Normaliza TINYINT a booleano.
     }
   }
   return res.json({ admin: u.admin, id_area: u.id_area, permisos: filas });
 });
+// ============ AQUÍ TERMINA RUTA GET MIS PERMISOS ============
 
+// ============ AQUÍ EMPIEZA RUTA GET LISTA USUARIOS ============
 // GET /api/usuarios — admin: todos; super: solo los de su área.
 router.get("/", async (req, res, next) => {
   try {
@@ -126,7 +133,9 @@ router.get("/", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET LISTA USUARIOS ============
 
+// ============ AQUÍ EMPIEZA RUTA GET ROLES ============
 // GET /api/roles — roles asignables según alcance (admin: todos).
 router.get("/roles", async (req, res, next) => {
   try {
@@ -150,7 +159,9 @@ router.get("/roles", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET ROLES ============
 
+// ============ AQUÍ EMPIEZA RUTA GET ÁREAS ============
 // GET /api/areas — áreas asignables según alcance (admin: todas).
 router.get("/areas", async (req, res, next) => {
   try {
@@ -161,7 +172,7 @@ router.get("/areas", async (req, res, next) => {
     const args = [];
     if (!u.admin) {
       q += " AND id_area = ?";
-      args.push(u.id_area);
+      args.push(u.id_area); // Super: solo su área.
     }
     const [filas] = await pool.query(q, args);
     return res.json(filas);
@@ -169,7 +180,9 @@ router.get("/areas", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET ÁREAS ============
 
+// ============ AQUÍ EMPIEZA RUTA GET PUESTOS ============
 // GET /api/puestos — catálogo para el select de Usuarios (cualquiera que gestiona).
 router.get("/puestos", async (req, res, next) => {
   try {
@@ -184,7 +197,9 @@ router.get("/puestos", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET PUESTOS ============
 
+// ============ AQUÍ EMPIEZA RUTA GET DETALLE USUARIO ============
 // GET /api/usuarios/:id — detalle de un usuario con sus permisos.
 router.get("/:id", async (req, res, next) => {
   try {
@@ -227,7 +242,9 @@ router.get("/:id", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA GET DETALLE USUARIO ============
 
+// ============ AQUÍ EMPIEZA RUTA POST CREAR USUARIO ============
 // POST /api/usuarios — alta con email auto y contraseña genérica.
 router.post("/", async (req, res, next) => {
   try {
@@ -260,7 +277,7 @@ router.post("/", async (req, res, next) => {
       while (true) {
         const [existe] = await pool.query("SELECT 1 FROM usuarios WHERE correo = ?", [emailFinal]);
         if (!existe.length) break;
-        emailFinal = email.replace("@sislegal.mx", "") + contador + "@sislegal.mx";
+        emailFinal = email.replace("@sislegal.mx", "") + contador + "@sislegal.mx"; // Sufijo numérico.
         contador++;
       }
       email = emailFinal;
@@ -277,7 +294,7 @@ router.post("/", async (req, res, next) => {
       [
         String(nombre || "").trim(),
         email,
-        hashContrasena(contrasena || pass),
+        hashContrasena(contrasena || pass), // Guarda hash, nunca claro.
         id_rol,
         area,
         puesto,
@@ -285,7 +302,7 @@ router.post("/", async (req, res, next) => {
         fecha_ingreso || null,
       ]
     );
-    return res.status(201).json({ id: r.insertId, correo: email, contrasena: pass });
+    return res.status(201).json({ id: r.insertId, correo: email, contrasena: pass }); // Devuelve credenciales iniciales.
   } catch (e) {
     if (e && e.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ detail: "Correo ya registrado" });
@@ -293,7 +310,9 @@ router.post("/", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA POST CREAR USUARIO ============
 
+// ============ AQUÍ EMPIEZA RUTA PATCH ACTUALIZAR USUARIO ============
 // PATCH /api/usuarios/:id — actualizar usuario (permisos, activo, datos).
 router.patch("/:id", async (req, res, next) => {
   try {
@@ -351,7 +370,9 @@ router.patch("/:id", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA PATCH ACTUALIZAR USUARIO ============
 
+// ============ AQUÍ EMPIEZA RUTA PATCH PERMISOS DEL ROL ============
 // PATCH /api/usuarios/roles/:id/permisos — prende/apaga un permiso del ROL.
 // BODY: { categoria: 'cartas'|'oficios'|'avisos'|'notificaciones',
 //         accion: 'ver'|'crear'|'modificar'|'eliminar'|'gestionar',
@@ -393,7 +414,7 @@ router.patch("/roles/:id/permisos", async (req, res, next) => {
     );
     if (!cats[0]) return res.status(400).json({ detail: "Categoría inexistente" });
     await pool.query(
-      `UPDATE permisos_rol SET ${columna} = ? WHERE id_rol = ? AND id_categoria = ?`,
+      `UPDATE permisos_rol SET ${columna} = ? WHERE id_rol = ? AND id_categoria = ?`, // Columna de lista blanca.
       [valor ? 1 : 0, idRol, categoria]
     );
     return res.json({ ok: true, id_rol: idRol, categoria, accion, valor });
@@ -401,7 +422,9 @@ router.patch("/roles/:id/permisos", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA PATCH PERMISOS DEL ROL ============
 
+// ============ AQUÍ EMPIEZA RUTA DELETE BAJA LÓGICA ============
 // DELETE /api/usuarios/:id — baja lógica (activo = 0). No borra de la BD.
 router.delete("/:id", async (req, res, next) => {
   try {
@@ -427,5 +450,8 @@ router.delete("/:id", async (req, res, next) => {
     return next(e);
   }
 });
+// ============ AQUÍ TERMINA RUTA DELETE BAJA LÓGICA ============
 
+// ============ AQUÍ EMPIEZA EXPORTS ============
 module.exports = router;
+// ============ AQUÍ TERMINA EXPORTS ============

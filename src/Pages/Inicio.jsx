@@ -46,6 +46,7 @@ import HistoryIcon from '@mui/icons-material/History';
 // DATOS PROVENIENTES DE ../Components/TablaGeneral.jsx: tabla reutilizable del resumen.
 import TablaGeneral from '../Components/TablaGeneral';
 
+// ============ AQUÍ EMPIEZA ACCESOS DIRECTOS ============
 // CONSTANTE: tarjetas de accesos directos (icono + destino).
 // QUÉ HACE: define título, descripción, icono y ruta de cada acceso.
 // DÓNDE SE USA: sección id="Accesos directos" (map a Card-Link).
@@ -57,7 +58,9 @@ const ACCESOS = [
   { titulo: 'Plantillas', descripcion: 'Ver las 11 plantillas', icono: <GridViewIcon sx={{ color: 'encabezado.main' }} />, to: '/Plantillas' },
   { titulo: 'Seguimiento', descripcion: 'Trazabilidad por documento', icono: <TimelineIcon sx={{ color: 'encabezado.main' }} />, to: '/Seguimiento' },
 ];
+// ============ AQUÍ TERMINA ACCESOS DIRECTOS ============
 
+// ============ AQUÍ EMPIEZA COLORES DONA ============
 // CONSTANTE: color hex por estado para la dona y leyenda.
 // QUÉ HACE: mapea estado -> color CSS del conic-gradient.
 // DÓNDE SE USA: cálculo de `dona` y puntos de leyenda.
@@ -69,10 +72,13 @@ const COLOR_HEX = {
   Notificado: '#0288d2',
   Borrador: '#9e9e9e',
 };
+// ============ AQUÍ TERMINA COLORES DONA ============
 
+// ============ AQUÍ EMPIEZA PÁGINA INICIO ============
 // QUÉ HACE: página dashboard con resumen, accesos, dona, actividad, buscador y tabla.
 // DÓNDE SE USA: ruta "/Inicio" en app.jsx (dentro de DashBoardLayout).
 export default function Inicio() {
+  // ============ AQUÍ EMPIEZA CARGA DATOS INICIO ============
   // DATOS REALES: lista completa (dona/buscador/tabla) + actividad del back.
   // (server/routes/documentos.js, ya filtrados por área y permiso).
   // Si el servidor cae, api.js dispara el evento y app.jsx regresa al login.
@@ -105,7 +111,9 @@ export default function Inicio() {
       vivo = false;
     };
   }, []);
+  // ============ AQUÍ TERMINA CARGA DATOS INICIO ============
 
+  // ============ AQUÍ EMPIEZA CÁLCULOS DONA ============
   // CÁLCULO: conteo por estado para la gráfica (etiquetas visibles).
   // DÓNDE SE USA: segmentos/dona + leyenda de "Documentos por estado".
   const conteo = {};
@@ -125,7 +133,9 @@ export default function Inicio() {
   const dona = total === 0
     ? '#e0e0e0'
     : `conic-gradient(${segmentos.join(', ')})`;
+  // ============ AQUÍ TERMINA CÁLCULOS DONA ============
 
+  // ============ AQUÍ EMPIEZA USUARIO Y NOTIFICACIONES ============
   // USUARIO LOGUEADO: nombre para el saludo (lo guarda Ingreso.jsx al login).
   // DATOS PROVENIENTES DE ../lib/api.js -> leerUsuario() (localStorage).
   const [usuario] = useState(() => leerUsuario());
@@ -143,7 +153,9 @@ export default function Inicio() {
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
   const porRevisar = notis.porRevisar.length;
   const borradores = notis.borradores;
+  // ============ AQUÍ TERMINA USUARIO Y NOTIFICACIONES ============
 
+  // ============ AQUÍ EMPIEZA BUSCADOR Y TABLA ============
   // ESTADO: texto del buscador por folio, tipo o cliente (filtra la lista real).
   // QUÉ HACE: filtra `todos` y muestra hasta 5 resultados con link a Seguimiento.
   // DÓNDE SE USA: sección id="Buscador de documentos".
@@ -163,10 +175,14 @@ export default function Inicio() {
     fecha: String(d.creado_en ?? '').slice(0, 10),
     estado: estadoBonito(d.estado),
   }));
+  // ============ AQUÍ TERMINA BUSCADOR Y TABLA ============
 
   return (
     // SECCIÓN JSX: contenedor raíz de la página (id nuevo descriptivo).
+    // ============ AQUÍ EMPIEZA CONTENEDOR INICIO ============
     <Box id="Box-Inicio-Contenedor" sx={{pt:1,pl:0, width:'100%'}}>
+
+      {/* ============ AQUÍ EMPIEZA BANNER BIENVENIDA ============ */}
 
       {/* SECCIÓN JSX: banner de bienvenida (id preexistente conservado).
           DATOS QUE SE MANDAN A Revision.jsx para procesamiento: botón "Ir a revisión" -> to="/Revision". */}
@@ -196,7 +212,9 @@ export default function Inicio() {
           </CardContent>
         </Card>
       </Box>
+      {/* ============ AQUÍ TERMINA BANNER BIENVENIDA ============ */}
 
+      {/* ============ AQUÍ EMPIEZA NOTIFICACIONES ============ */}
       {/* SECCIÓN JSX: notificaciones REALES (reemplaza la campana de prueba).
           DATOS PROVENIENTES DE la lista real `todos` (filtrada a por_revisar)
           (ya filtrados por área y permiso). Máx 5 + link a /Revision. */}
@@ -241,7 +259,9 @@ export default function Inicio() {
           </CardContent>
         </Card>
       </Box>
+      {/* ============ AQUÍ TERMINA NOTIFICACIONES ============ */}
 
+      {/* ============ AQUÍ EMPIEZA TARJETAS KPI ============ */}
       {/* SECCIÓN JSX: tarjetas KPI (id preexistente conservado). Valores fijos demo. */}
       <Box id="ContenedorTarjetas" sx={{width: '99%'}}>
       <Typography variant="h4" fontWeight="bold" sx={{mb:3}}>
@@ -329,7 +349,9 @@ export default function Inicio() {
 
       </Grid>
     </Box>
+    {/* ============ AQUÍ TERMINA TARJETAS KPI ============ */}
 
+    {/* ============ AQUÍ EMPIEZA ACCESOS DIRECTOS (JSX) ============ */}
     {/* SECCIÓN JSX: accesos directos (id preexistente conservado).
         DATOS QUE SE MANDAN A GenerarCarta.jsx (/Menu), Revision.jsx, plantillas.jsx y Seguimiento.jsx
         para procesamiento: Card-Link con to={a.to}. */}
@@ -375,7 +397,9 @@ export default function Inicio() {
         ))}
       </Grid>
     </Box>
+    {/* ============ AQUÍ TERMINA ACCESOS DIRECTOS (JSX) ============ */}
 
+    {/* ============ AQUÍ EMPIEZA FILA ESTADÍSTICAS ============ */}
     {/* SECCIÓN JSX: fila dona por estado + actividad reciente. */}
     <Box id="Box-Inicio-FilaEstadisticas" sx={{width: '99%', mt: 5}}>
       <Grid container spacing={3}>
@@ -461,7 +485,9 @@ export default function Inicio() {
         </Grid>
       </Grid>
     </Box>
+    {/* ============ AQUÍ TERMINA FILA ESTADÍSTICAS ============ */}
 
+    {/* ============ AQUÍ EMPIEZA BUSCADOR DOCUMENTOS ============ */}
     {/* SECCIÓN JSX: buscador sobre la lista real (id preexistente conservado). */}
     <Box id="Box-Inicio-FilaBuscadorVencimientos" sx={{width: '99%', mt: 5}}>
       <Grid container spacing={3}>
@@ -520,7 +546,9 @@ export default function Inicio() {
         </Grid>
       </Grid>
     </Box>
+    {/* ============ AQUÍ TERMINA BUSCADOR DOCUMENTOS ============ */}
 
+    {/* ============ AQUÍ EMPIEZA TABLA PROCESADOS ============ */}
     {/* SECCIÓN JSX: tabla de documentos procesados (id preexistente conservado).
         DATOS QUE SE MANDAN A ../Components/TablaGeneral.jsx para procesamiento: datos={tablaDocs} (reales). */}
     <Box id="ContenedorTabla" sx={{width: '99%'}}>
@@ -530,12 +558,15 @@ export default function Inicio() {
     <TablaGeneral datos={tablaDocs}/>
 
     </Box>
+    {/* ============ AQUÍ TERMINA TABLA PROCESADOS ============ */}
 
 
 
     </Box>
+    // ============ AQUÍ TERMINA CONTENEDOR INICIO ============
 
 
 
   );
 }
+// ============ AQUÍ TERMINA PÁGINA INICIO ============
