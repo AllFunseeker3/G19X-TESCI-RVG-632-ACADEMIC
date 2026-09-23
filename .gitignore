@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# PDFs generados por la IA (documentos/Sistema legal, se regeneran)
+documentos/
+
 # Secretos y entorno local (nunca subir credenciales)
 .env
 backend/venv/

@@ -18,7 +18,7 @@ import {
   CATEGORIAS, tiposDeCategoria, nombreCategoria,
   nombreTipo, camposDeTipo,
 } from '../lib/tiposDocumentos';
-import { crearDocumento, redactarConIA } from '../lib/api.js';
+import { crearDocumento, descargarPDF, generarPDF, redactarConIA } from '../lib/api.js';
 import PageHeader from '../Components/PageHeader';
 import CampoFormulario, { esFechaValida, formatearHoyDDMMAAAA } from '../Components/CampoFormulario';
 import SeccionFormulario from '../Components/SeccionFormulario';
@@ -75,7 +75,7 @@ export default function GenerarCarta() {
   const [iaModelo, setIaModelo] = useState('');
   const [iaCargando, setIaCargando] = useState(false);
   const [iaError, setIaError] = useState('');
-  const [guardado, setGuardado] = useState(null); // id del documento guardado
+  const [guardado, setGuardado] = useState(null); // { id, archivo } del documento + PDF
 
   const claveParams = `${params.get('categoria') ?? ''}|${params.get('tipo') ?? ''}`;
   if (claveParams !== claveAplicada) {
@@ -349,7 +349,8 @@ export default function GenerarCarta() {
     }
   };
 
-  // Guarda el documento con la redacción IA como borrador.
+  // Guarda el documento con la redacción IA como borrador y genera su PDF
+  // en documentos/Sistema legal (queda como adjunto del documento).
   const handleGuardarIA = async () => {
     setIaError('');
     try {
@@ -359,10 +360,33 @@ export default function GenerarCarta() {
         contenido: iaTexto,
         modelo_ia: iaModelo,
       });
-      setGuardado(r.id);
+      let archivo = null;
+      try {
+        const pdf = await generarPDF(tipoDoc, datosSerializables(), r.id);
+        archivo = pdf.archivo ?? null;
+      } catch (ePdf) {
+        setIaError(`Documento #${r.id} guardado, pero el PDF falló: ${ePdf.message}`);
+      }
+      setGuardado({ id: r.id, archivo });
       setIaAbierto(false);
     } catch (e) {
       setIaError(e.message || 'No se pudo guardar');
+    }
+  };
+
+  // Descarga el PDF generado (Blob autenticado -> download).
+  const handleDescargarPDF = async () => {
+    if (!guardado?.archivo) return;
+    try {
+      const blob = await descargarPDF(guardado.archivo);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = guardado.archivo;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      /* descarga no disponible */
     }
   };
 
@@ -627,7 +651,13 @@ export default function GenerarCarta() {
 
             {guardado && (
               <Alert severity="success" sx={{ mt: 2 }} onClose={() => setGuardado(null)}>
-                Documento #{guardado} guardado como borrador (con redacción IA).
+                Documento #{guardado.id} guardado como borrador (con redacción IA
+                {guardado.archivo ? ' y PDF' : ''}).
+                {guardado.archivo && (
+                  <Button size="small" onClick={handleDescargarPDF} sx={{ ml: 1, color: 'encabezado.main' }}>
+                    Descargar PDF
+                  </Button>
+                )}
               </Alert>
             )}
 

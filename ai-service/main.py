@@ -35,6 +35,12 @@ class RedactarIn(BaseModel):
     datos: dict
 
 
+class PdfIn(BaseModel):
+    id_tipo: str
+    datos: dict
+    nombre_base: str = "carta-poder"
+
+
 PROMPT_CARTA_PODER = PromptTemplate.from_template(
     "Eres un abogado mexicano experto en redacción de documentos legales. "
     "Redacta una CARTA PODER formal en español, lista para firmar, usando "
@@ -117,6 +123,26 @@ def redactar(body: RedactarIn):
             )
         raise HTTPException(status_code=502, detail=f"Error del proveedor IA: {msg[:300]}")
     return {"contenido": resp.content, "modelo": MODEL, "id_tipo": body.id_tipo}
+
+
+@app.post("/pdf")
+def generar_pdf(body: PdfIn):
+    """Genera el PDF con formato institucional y lo guarda en
+    documentos/Sistema legal. Piloto: solo carta-poder."""
+    if body.id_tipo != "carta-poder":
+        raise HTTPException(
+            status_code=400,
+            detail=f"PDF no implementado para '{body.id_tipo}' (piloto: carta-poder)",
+        )
+    try:
+        from pdf_carta_poder import generar_carta_poder
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo cargar el generador PDF: {e}")
+    try:
+        out = generar_carta_poder(body.datos or {}, body.nombre_base)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo generar el PDF: {e}")
+    return {**out, "id_tipo": body.id_tipo}
 
 
 if __name__ == "__main__":

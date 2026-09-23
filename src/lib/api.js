@@ -140,6 +140,18 @@ export const bajaUsuario = (id) =>
 // Redacta el documento con IA a partir del tipo y los datos capturados.
 export const redactarConIA = (idTipo, datos) =>
   api("/ia/redactar", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos } });
+// Genera el PDF institucional en documentos/Sistema legal (+ adjunto si hay id).
+export const generarPDF = (idTipo, datos, idDocumento = null) =>
+  api("/ia/pdf", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos, id_documento: idDocumento } });
+// Descarga el PDF generado (devuelve Blob para abrir/descargar).
+export const descargarPDF = async (archivo) => {
+  const t = leerToken();
+  const res = await fetch(`${BASE}/ia/pdf/${encodeURIComponent(archivo)}`, {
+    headers: t ? { Authorization: `Bearer ${t}` } : {},
+  });
+  if (!res.ok) throw new Error("No se pudo descargar el PDF");
+  return res.blob();
+};
 
 // --- Salud (sin auth): ping a MariaDB + conteos ---
 export const getSalud = () => api("/salud");

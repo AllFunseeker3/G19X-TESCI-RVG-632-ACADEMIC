@@ -124,8 +124,15 @@ Lee este archivo antes de tocar código. La sesión original está en
 - BD: migración `db/migracion_ia_contenido.sql` (`contenido MEDIUMTEXT`,
   `modelo_ia VARCHAR(120)`); aplicador `server/aplicar-migracion-ia.js`.
   `POST /api/documentos` acepta `contenido` + `modelo_ia` (borrador).
-- Front: `redactarConIA()` en `lib/api.js`; botón "Redactar con IA" en
-  `GenerarCarta.jsx` (solo carta-poder): valida, redacta, preview en Dialog,
-  "Guardar documento" persiste como borrador.
+- Front: `redactarConIA()`, `generarPDF()`, `descargarPDF()` en `lib/api.js`;
+  botón "Redactar con IA" en `GenerarCarta.jsx` (solo carta-poder): valida,
+  redacta, preview en Dialog, "Guardar documento" persiste como borrador,
+  genera el PDF y muestra "Descargar PDF" (Blob autenticado).
+- PDFs: `ai-service/pdf_carta_poder.py` (reportlab, formato institucional:
+  lugar/fecha derecha, título centrado subrayado, cuerpo justificado con datos,
+  firmas Otorgante/Apoderado + Testigos). `POST /pdf` en ai-service;
+  `POST /api/ia/pdf` (registra adjunto solo-PDF si hay `id_documento`);
+  `GET /api/ia/pdf/:archivo` descarga con login. Carpeta
+  `documentos/Sistema legal/` (ignorada en git, se regenera).
 - Tras cambiar `server/`, reiniciar la API (`npm run todo` de nuevo):
   Node no recarga solo.
