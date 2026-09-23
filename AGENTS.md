@@ -9,7 +9,9 @@ Lee este archivo antes de tocar código. La sesión original está en
 - Ruta: `C:\Users\vave_\Escritorio\proyecto_r\proyecto_resi`
 - Front: React 19 + Vite + MUI v9 + React Router 7 (`src/`)
 - Back: Express + MariaDB (`server/`), BD `sislegal` en `localhost:3306`
-- **No es repo git.** No hay `git status/diff`; verifica con `npm run build` y `npx eslint .`
+- **Repo git local.** Hay `.git` con commit inicial estable. Antes de cambios
+  grandes revisa `git status`; si algo se rompe, `git diff` / `git checkout -- <archivo>`
+  para revertir. Verifica siempre con `npm run build` y `npx eslint .`
 
 ## Stack oficial y UI
 
