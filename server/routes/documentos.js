@@ -99,7 +99,7 @@ router.get("/", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   try {
     const u = req.usuario;
-  const { id_tipo, folio = null, id_cliente = null, id_area = null, datos = {} } = req.body || {};
+  const { id_tipo, folio = null, id_cliente = null, id_area = null, datos = {}, contenido = null, modelo_ia = null } = req.body || {};
   const cat = await categoriaDe(id_tipo);
   if (!cat) return res.status(404).json({ detail: "Tipo inexistente" });
   if (!(await tienePermiso(u.id_rol, u.admin, cat, "crear"))) {
@@ -110,9 +110,9 @@ router.post("/", async (req, res, next) => {
   const area = u.admin && id_area ? id_area : u.id_area;
   const [r] = await pool.query(
     `INSERT INTO documentos
-     (folio, id_tipo, id_cliente, id_creador, id_area, estado, datos)
-     VALUES (?, ?, ?, ?, ?, 'borrador', ?)`,
-    [folio, id_tipo, id_cliente, u.id, area, JSON.stringify(datos)]
+     (folio, id_tipo, id_cliente, id_creador, id_area, estado, datos, contenido, modelo_ia)
+     VALUES (?, ?, ?, ?, ?, 'borrador', ?, ?, ?)`,
+    [folio, id_tipo, id_cliente, u.id, area, JSON.stringify(datos), contenido, modelo_ia]
   );
     await pool.query(
       `INSERT INTO documento_historial

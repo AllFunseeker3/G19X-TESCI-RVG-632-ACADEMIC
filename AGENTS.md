@@ -109,5 +109,23 @@ Lee este archivo antes de tocar código. La sesión original está en
 ## Pendientes conocidos
 
 - Seeds de documentos de prueba (tabla `documentos` vacía).
-- Conectar Generar → API (`crearDocumento` + `agregarAdjunto`) para que persista.
 - Portadas EADDRINUSE: matar árboles con `taskkill /PID /T /F`.
+
+## IA (redacción automática, en construcción)
+
+- Servicio `ai-service/` (FastAPI + LangChain + OpenRouter, puerto 8001).
+  Arranque: `python -m uvicorn main:app --host 127.0.0.1 --port 8001` desde `ai-service/`
+  (requiere `pip install -r requirements.txt`). Credenciales en `ai-service/.env`
+  (ignorado por git; plantilla en `.env.example`). `GET /salud`, `POST /redactar`.
+- Plantilla piloto: solo `carta-poder` (`PLANTILLAS` en `main.py`).
+  Otros tipos → 400. Modelo saturado → 429 limpio para reintentar.
+- Proxy Express con auth: `POST /api/ia/redactar` (`server/routes/ia.js`,
+  `IA_URL` default `http://127.0.0.1:8001`). El front nunca llama directo a la IA.
+- BD: migración `db/migracion_ia_contenido.sql` (`contenido MEDIUMTEXT`,
+  `modelo_ia VARCHAR(120)`); aplicador `server/aplicar-migracion-ia.js`.
+  `POST /api/documentos` acepta `contenido` + `modelo_ia` (borrador).
+- Front: `redactarConIA()` en `lib/api.js`; botón "Redactar con IA" en
+  `GenerarCarta.jsx` (solo carta-poder): valida, redacta, preview en Dialog,
+  "Guardar documento" persiste como borrador.
+- Tras cambiar `server/`, reiniciar la API (`npm run todo` de nuevo):
+  Node no recarga solo.

@@ -13,6 +13,7 @@ const catalogo = require("./routes/catalogo");
 const documentos = require("./routes/documentos");
 const usuarios = require("./routes/usuarios");
 const salud = require("./routes/salud");
+const ia = require("./routes/ia");
 
 const app = express();
 app.use(express.json());
@@ -29,6 +30,7 @@ app.use("/api/auth", auth);
 app.use("/api/catalogo", catalogo);
 app.use("/api/documentos", documentos);
 app.use("/api/usuarios", usuarios);
+app.use("/api/ia", ia);
 app.use("/api", salud);
 
 // GET / — info mínima (la salud real está en /api/salud).

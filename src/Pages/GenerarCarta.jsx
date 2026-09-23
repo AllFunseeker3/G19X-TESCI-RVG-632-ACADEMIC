@@ -10,11 +10,15 @@
 // ============================================================================
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Box, Typography, Button, Divider } from '@mui/material';
+import {
+  Box, Typography, Button, Divider, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
+} from '@mui/material';
 import {
   CATEGORIAS, tiposDeCategoria, nombreCategoria,
   nombreTipo, camposDeTipo,
 } from '../lib/tiposDocumentos';
+import { crearDocumento, redactarConIA } from '../lib/api.js';
 import PageHeader from '../Components/PageHeader';
 import CampoFormulario, { esFechaValida, formatearHoyDDMMAAAA } from '../Components/CampoFormulario';
 import SeccionFormulario from '../Components/SeccionFormulario';
@@ -65,6 +69,13 @@ export default function GenerarCarta() {
   const [errores, setErrores] = useState({});
   const [params] = useSearchParams();
   const [claveAplicada, setClaveAplicada] = useState('');
+  // IA: redacción automática (piloto: solo carta-poder).
+  const [iaAbierto, setIaAbierto] = useState(false);
+  const [iaTexto, setIaTexto] = useState('');
+  const [iaModelo, setIaModelo] = useState('');
+  const [iaCargando, setIaCargando] = useState(false);
+  const [iaError, setIaError] = useState('');
+  const [guardado, setGuardado] = useState(null); // id del documento guardado
 
   const claveParams = `${params.get('categoria') ?? ''}|${params.get('tipo') ?? ''}`;
   if (claveParams !== claveAplicada) {
@@ -252,8 +263,7 @@ export default function GenerarCarta() {
     }
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const validar = () => {
     const nuevosErrores = {};
     if (categoria === '') nuevosErrores.categoria = 'Seleccione la categoría';
     if (tipoDoc === '') nuevosErrores.tipoDoc = 'Seleccione el tipo de documento';
@@ -294,9 +304,66 @@ export default function GenerarCarta() {
     if (mostrarDestinatario && agregarDestinatario && !(datos.destinatario ?? '').toString().trim()) {
       nuevosErrores.destinatario = 'Este campo es obligatorio';
     }
+    return nuevosErrores;
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const nuevosErrores = validar();
     setErrores(nuevosErrores);
     if (Object.keys(nuevosErrores).length > 0) return;
     setResumenAbierto(true);
+  };
+
+  // Convierte datos a JSON seguro (File[] de fotos/anexos -> nombres).
+  const datosSerializables = () => {
+    const plano = {};
+    Object.entries(datos).forEach(([k, v]) => {
+      if (Array.isArray(v)) {
+        plano[k] = v.map((a) => (typeof a === 'string' ? a : a?.name ?? ''));
+      } else {
+        plano[k] = v;
+      }
+    });
+    return plano;
+  };
+
+  // IA: valida, redacta con el microservicio y abre el preview.
+  // Piloto: solo carta-poder tiene plantilla.
+  const handleRedactarIA = async () => {
+    const nuevosErrores = validar();
+    setErrores(nuevosErrores);
+    if (Object.keys(nuevosErrores).length > 0) return;
+    setIaError('');
+    setIaTexto('');
+    setIaCargando(true);
+    setIaAbierto(true);
+    try {
+      const r = await redactarConIA(tipoDoc, datosSerializables());
+      setIaTexto(r.contenido ?? '');
+      setIaModelo(r.modelo ?? '');
+    } catch (e) {
+      setIaError(e.message || 'No se pudo redactar');
+    } finally {
+      setIaCargando(false);
+    }
+  };
+
+  // Guarda el documento con la redacción IA como borrador.
+  const handleGuardarIA = async () => {
+    setIaError('');
+    try {
+      const r = await crearDocumento({
+        id_tipo: tipoDoc,
+        datos: datosSerializables(),
+        contenido: iaTexto,
+        modelo_ia: iaModelo,
+      });
+      setGuardado(r.id);
+      setIaAbierto(false);
+    } catch (e) {
+      setIaError(e.message || 'No se pudo guardar');
+    }
   };
 
   const campoPorId = (id) => campos.find((c) => c.id === id);
@@ -558,10 +625,21 @@ export default function GenerarCarta() {
               )}
             </Box>
 
-            <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+            {guardado && (
+              <Alert severity="success" sx={{ mt: 2 }} onClose={() => setGuardado(null)}>
+                Documento #{guardado} guardado como borrador (con redacción IA).
+              </Alert>
+            )}
+
+            <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap' }}>
               <Button type="submit" variant="contained" color="primary">
                 Generar documento
               </Button>
+              {tipoDoc === 'carta-poder' && (
+                <Button variant="contained" color="secondary" onClick={handleRedactarIA} sx={{ color: 'encabezado.main', fontWeight: 700 }}>
+                  Redactar con IA
+                </Button>
+              )}
               <Button variant="outlined" color="primary" onClick={handleLimpiar} sx={{ borderColor: 'encabezado.main', color: 'encabezado.main' }}>
                 Limpiar
               </Button>
@@ -582,6 +660,50 @@ export default function GenerarCarta() {
         datos={datos}
         onCerrar={() => setResumenAbierto(false)}
       />
+
+      {/* Preview de la redacción IA: valida primero, redacta, permite guardar */}
+      <Dialog open={iaAbierto} onClose={() => !iaCargando && setIaAbierto(false)} maxWidth="md" fullWidth>
+        <DialogTitle color="encabezado.main" fontWeight="bold">
+          Redacción con IA — {nombreTipo(categoria, tipoDoc)}
+        </DialogTitle>
+        <DialogContent dividers>
+          {iaCargando && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
+              <CircularProgress size={24} />
+              <Typography variant="body2">Redactando con {iaModelo || 'la IA'}…</Typography>
+            </Box>
+          )}
+          {iaError && (
+            <Alert severity="error" sx={{ mb: 2 }}>{iaError}</Alert>
+          )}
+          {iaTexto && (
+            <>
+              <Typography
+                variant="body1"
+                sx={{ whiteSpace: 'pre-wrap', mb: 2 }}
+              >
+                {iaTexto}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Modelo: {iaModelo} · Revisa el texto antes de guardar.
+              </Typography>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIaAbierto(false)} disabled={iaCargando} sx={{ color: 'encabezado.main' }}>
+            Cerrar
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleGuardarIA}
+            disabled={iaCargando || !iaTexto}
+          >
+            Guardar documento
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Box>
   );

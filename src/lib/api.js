@@ -136,5 +136,10 @@ export const actualizarPermisoRol = (idRol, categoria, accion, valor) =>
 export const bajaUsuario = (id) =>
   api(`/usuarios/${id}`, { metodo: "DELETE" });
 
+// --- IA (server/routes/ia.js -> ai-service FastAPI + OpenRouter) ---
+// Redacta el documento con IA a partir del tipo y los datos capturados.
+export const redactarConIA = (idTipo, datos) =>
+  api("/ia/redactar", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos } });
+
 // --- Salud (sin auth): ping a MariaDB + conteos ---
 export const getSalud = () => api("/salud");
