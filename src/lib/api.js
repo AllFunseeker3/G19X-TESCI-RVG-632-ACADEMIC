@@ -126,6 +126,8 @@ export const cambiarEstado = (id, estado, comentario) =>
   });
 export const agregarAdjunto = (id, adjunto) =>
   api(`/documentos/${id}/adjuntos`, { metodo: "POST", cuerpo: adjunto });
+export const eliminarDocumento = (id) =>
+  api(`/documentos/${id}`, { metodo: "DELETE" });
 // ============ AQUÍ TERMINA DOCUMENTOS ============
 
 // ============ AQUÍ EMPIEZA USUARIOS ============
@@ -157,8 +159,8 @@ export const bajaUsuario = (id) =>
 export const redactarConIA = (idTipo, datos) =>
   api("/ia/redactar", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos } });
 // Genera el PDF institucional en documentos/Sistema legal (+ adjunto si hay id).
-export const generarPDF = (idTipo, datos, idDocumento = null) =>
-  api("/ia/pdf", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos, id_documento: idDocumento } });
+export const generarPDF = (idTipo, datos, idDocumento = null, contenido = '') =>
+  api("/ia/pdf", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos, contenido, id_documento: idDocumento } });
 // Descarga el PDF generado (devuelve Blob para abrir/descargar).
 export const descargarPDF = async (archivo) => {
   const t = leerToken();

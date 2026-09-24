@@ -78,6 +78,8 @@ export default function GenerarCarta() {
   const [iaCargando, setIaCargando] = useState(false);
   const [iaError, setIaError] = useState('');
   const [guardado, setGuardado] = useState(null); // { id, archivo } del documento + PDF
+  const [guardando, setGuardando] = useState(false); // Confirmar está creando doc + PDF
+  const [errorGuardar, setErrorGuardar] = useState('');
   // ============ AQUÍ TERMINA ESTADOS FORMULARIO ============
 
   // ============ AQUÍ EMPIEZA SINCRONIZACIÓN POR URL ============
@@ -333,10 +335,8 @@ export default function GenerarCarta() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    const nuevosErrores = validar();
-    setErrores(nuevosErrores);
-    if (Object.keys(nuevosErrores).length > 0) return;
-    setResumenAbierto(true);
+    // Flujo único para los 11 tipos: siempre pasa por IA y luego a resumen.
+    handleRedactarIA();
   };
   // ============ AQUÍ TERMINA VALIDACIÓN Y SUBMIT ============
 
@@ -354,8 +354,7 @@ export default function GenerarCarta() {
     return plano;
   };
 
-  // IA: valida, redacta con el microservicio y abre el preview.
-  // Piloto: solo carta-poder tiene plantilla.
+  // IA: valida, redacta con el microservicio y abre el preview (11 tipos).
   const handleRedactarIA = async () => {
     const nuevosErrores = validar();
     setErrores(nuevosErrores);
@@ -375,28 +374,36 @@ export default function GenerarCarta() {
     }
   };
 
-  // Guarda el documento con la redacción IA como borrador y genera su PDF
-  // en documentos/Sistema legal (queda como adjunto del documento).
-  const handleGuardarIA = async () => {
-    setIaError('');
+  // Paso 2: desde el preview IA se continúa al resumen (CONFIRMAR genera).
+  const handleContinuarIA = () => {
+    if (iaCargando || !iaTexto) return;
+    setIaAbierto(false);
+    setResumenAbierto(true);
+  };
+
+  // Paso 3: CONFIRMAR del resumen crea el documento + PDF (usa la redacción IA si hay).
+  const handleConfirmarResumen = async () => {
+    setErrorGuardar('');
+    setGuardando(true);
     try {
       const r = await crearDocumento({
         id_tipo: tipoDoc,
         datos: datosSerializables(),
-        contenido: iaTexto,
-        modelo_ia: iaModelo,
+        ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
       });
       let archivo = null;
       try {
-        const pdf = await generarPDF(tipoDoc, datosSerializables(), r.id);
+        const pdf = await generarPDF(tipoDoc, datosSerializables(), r.id, iaTexto || '');
         archivo = pdf.archivo ?? null;
       } catch (ePdf) {
-        setIaError(`Documento #${r.id} guardado, pero el PDF falló: ${ePdf.message}`);
+        setErrorGuardar(`Documento #${r.id} guardado, pero el PDF falló: ${ePdf.message}`);
       }
       setGuardado({ id: r.id, archivo });
-      setIaAbierto(false);
+      setResumenAbierto(false);
     } catch (e) {
-      setIaError(e.message || 'No se pudo guardar');
+      setErrorGuardar(e.message || 'No se pudo guardar');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -705,14 +712,9 @@ export default function GenerarCarta() {
 
             {/* ============ AQUÍ EMPIEZA BOTONES ACCIÓN ============ */}
             <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap' }}>
-              <Button type="submit" variant="contained" color="primary">
-                Generar documento
+              <Button type="submit" variant="contained" color="primary" disabled={iaCargando || guardando}>
+                {iaCargando ? 'Redactando...' : 'Generar documento con IA'}
               </Button>
-              {tipoDoc === 'carta-poder' && (
-                <Button variant="contained" color="secondary" onClick={handleRedactarIA} sx={{ color: 'encabezado.main', fontWeight: 700 }}>
-                  Redactar con IA
-                </Button>
-              )}
               <Button variant="outlined" color="primary" onClick={handleLimpiar} sx={{ borderColor: 'encabezado.main', color: 'encabezado.main' }}>
                 Limpiar
               </Button>
@@ -735,7 +737,10 @@ export default function GenerarCarta() {
         destinatarioValor={datos.destinatario}
         campos={camposVisibles}
         datos={datos}
-        onCerrar={() => setResumenAbierto(false)}
+        onCerrar={() => !guardando && setResumenAbierto(false)}
+        onConfirmar={handleConfirmarResumen}
+        guardando={guardando}
+        errorGuardar={errorGuardar}
       />
       {/* ============ AQUÍ TERMINA RESUMEN DOCUMENTO ============ */}
 
@@ -776,10 +781,10 @@ export default function GenerarCarta() {
           <Button
             variant="contained"
             color="primary"
-            onClick={handleGuardarIA}
+            onClick={handleContinuarIA}
             disabled={iaCargando || !iaTexto}
           >
-            Guardar documento
+            Continuar
           </Button>
         </DialogActions>
       </Dialog>

@@ -108,6 +108,7 @@ export default function PermisosProvider({ children }) {
   const valor = useMemo(
     () => ({
       admin: datos ? Boolean(datos.admin) : true,
+      super: datos ? Boolean(datos.es_super) : false,
       listo,
       puede,
       algunaCon,

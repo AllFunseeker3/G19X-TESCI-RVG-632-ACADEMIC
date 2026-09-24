@@ -55,12 +55,12 @@ router.post("/redactar", async (req, res, next) => {
 // ============ AQUÍ TERMINA RUTA POST REDACTAR ============
 
 // ============ AQUÍ EMPIEZA RUTA POST PDF ============
-// POST /api/ia/pdf { id_tipo, datos, id_documento?, nombre_base? } ->
+// POST /api/ia/pdf { id_tipo, datos, contenido?, id_documento?, nombre_base? } ->
 // { archivo, bytes, id_adjunto? }. Genera el PDF en documentos/Sistema legal
 // y, si viene id_documento, lo registra en adjuntos (CHECK solo-PDF).
 router.post("/pdf", async (req, res, next) => {
   try {
-    const { id_tipo, datos, id_documento = null, nombre_base } = req.body || {};
+    const { id_tipo, datos, contenido = "", id_documento = null, nombre_base } = req.body || {};
     if (!id_tipo || typeof datos !== "object") {
       return res.status(400).json({ detail: "Faltan id_tipo y datos" });
     }
@@ -69,7 +69,7 @@ router.post("/pdf", async (req, res, next) => {
       r = await fetch(`${IA_URL}/pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_tipo, datos, nombre_base: nombre_base || id_tipo }),
+        body: JSON.stringify({ id_tipo, datos, contenido, nombre_base: nombre_base || id_tipo }),
       });
     } catch {
       return res.status(503).json({ detail: "Servicio IA apagado (ai-service en :8001)" });

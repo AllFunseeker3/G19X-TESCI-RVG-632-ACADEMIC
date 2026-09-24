@@ -27,7 +27,7 @@
  * No se cambió lógica ni JSX, solo comentarios e ids en <Box>.
  * ========================================================================== */
 import { useEffect, useState } from 'react';
-import {Box, Grid,Card, CardContent, Typography, List, ListItem, ListItemText, ListItemIcon, Button, TextField, InputLabel, Chip} from '@mui/material';
+import {Box, Grid,Card, CardContent, Typography, List, ListItem, ListItemText, ListItemIcon, Button, TextField, Chip} from '@mui/material';
 import { Link } from 'react-router-dom';
 // DATOS REALES: lista, actividad y usuario (server/routes/documentos.js + login).
 import { getActividad, getDocumentos, leerUsuario } from '../lib/api.js';
@@ -156,25 +156,27 @@ export default function Inicio() {
   // ============ AQUÍ TERMINA USUARIO Y NOTIFICACIONES ============
 
   // ============ AQUÍ EMPIEZA BUSCADOR Y TABLA ============
-  // ESTADO: texto del buscador por folio, tipo o cliente (filtra la lista real).
-  // QUÉ HACE: filtra `todos` y muestra hasta 5 resultados con link a Seguimiento.
-  // DÓNDE SE USA: sección id="Buscador de documentos".
-  // DATOS QUE SE MANDAN A Seguimiento.jsx para procesamiento: cada resultado linkea a "/Seguimiento".
+  // ESTADO: texto del buscador integrado a la tabla (folio, tipo o cliente).
+  // QUÉ HACE: filtra `todos` y la tabla muestra el resultado (máx 8 filas).
   const [busqueda, setBusqueda] = useState('');
-  const resultados = busqueda.trim() === ''
-    ? []
-    : todos
-      .filter((d) => `#${d.id} ${d.tipo} ${d.cliente ?? ''} ${d.folio ?? ''}`.toLowerCase().includes(busqueda.toLowerCase()))
-      .slice(0, 5);
+  const filtrados = busqueda.trim() === ''
+    ? todos
+    : todos.filter((d) => `#${d.id} ${d.tipo} ${d.cliente ?? ''} ${d.folio ?? ''}`.toLowerCase().includes(busqueda.toLowerCase()));
 
-  // TABLA inferior: últimos 6 reales con etiquetas visibles (ver TablaGeneral).
-  const tablaDocs = todos.slice(0, 6).map((d) => ({
+  // TABLA: reales con etiquetas visibles, filtrada por el buscador integrado.
+  const tablaDocs = filtrados.slice(0, 8).map((d) => ({
     id: `#${d.id}`,
     tipo: d.tipo,
     cliente: d.cliente ?? '—',
     fecha: String(d.creado_en ?? '').slice(0, 10),
     estado: estadoBonito(d.estado),
   }));
+
+  // KPIs REALES desde la lista (antes eran números fijos demo).
+  const kpiTotal = todos.length;
+  const kpiAprob = todos.filter((d) => d.estado === 'aprobado').length;
+  const kpiPorRev = todos.filter((d) => d.estado === 'por_revisar').length;
+  const kpiRech = todos.filter((d) => d.estado === 'rechazado').length;
   // ============ AQUÍ TERMINA BUSCADOR Y TABLA ============
 
   return (
@@ -186,7 +188,7 @@ export default function Inicio() {
 
       {/* SECCIÓN JSX: banner de bienvenida (id preexistente conservado).
           DATOS QUE SE MANDAN A Revision.jsx para procesamiento: botón "Ir a revisión" -> to="/Revision". */}
-      <Box id="Banner de bienvenida" sx={{width: '99%', mb: 4}}>
+      <Box id="Banner de bienvenida" sx={{width: '100%', mb: 3}}>
         <Card sx={{
           // Banner con el acento elegido (azul/rojo/verde/blanco); el degradado
           // usa primary.main -> primary.dark que MUI deriva solo.
@@ -218,7 +220,7 @@ export default function Inicio() {
       {/* SECCIÓN JSX: notificaciones REALES (reemplaza la campana de prueba).
           DATOS PROVENIENTES DE la lista real `todos` (filtrada a por_revisar)
           (ya filtrados por área y permiso). Máx 5 + link a /Revision. */}
-      <Box id="Box-Inicio-Notificaciones" sx={{width: '99%', mb: 4}}>
+      <Box id="Box-Inicio-Notificaciones" sx={{width: '100%', mb: 3}}>
         <Card sx={{ borderRadius: 2 }}>
           <CardContent>
             <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 1}}>
@@ -263,11 +265,11 @@ export default function Inicio() {
 
       {/* ============ AQUÍ EMPIEZA TARJETAS KPI ============ */}
       {/* SECCIÓN JSX: tarjetas KPI (id preexistente conservado). Valores fijos demo. */}
-      <Box id="ContenedorTarjetas" sx={{width: '99%'}}>
-      <Typography variant="h4" fontWeight="bold" sx={{mb:3}}>
+      <Box id="ContenedorTarjetas" sx={{width: '100%'}}>
+      <Typography variant="h4" fontWeight="bold" sx={{mb:2}}>
         Resumen operativo
       </Typography>
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{
             background:'linear-gradient(to right, #1e3c72, #2a5298)',
@@ -279,7 +281,7 @@ export default function Inicio() {
                 {/* SECCIÓN JSX: textos de la tarjeta Total. */}
                 <Box id="Box-Inicio-TarjetaTotalTexto">
                   <Typography variant="h6" fontWeight="bold">Total de cartas</Typography>
-                  <Typography variant="h4" fontWeight="bold">150</Typography>
+                  <Typography variant="h4" fontWeight="bold">{kpiTotal}</Typography>
                 </Box>
                 <InsertDriveFileIcon sx={{fontSize:50, opacity:0.8}} />
               </Box>
@@ -298,7 +300,7 @@ export default function Inicio() {
                 {/* SECCIÓN JSX: textos de la tarjeta Aprobadas. */}
                 <Box id="Box-Inicio-TarjetaAprobadasTexto">
                   <Typography variant="h6" fontWeight="bold">Aprobadas</Typography>
-                  <Typography variant="h4" fontWeight="bold">75</Typography>
+                  <Typography variant="h4" fontWeight="bold">{kpiAprob}</Typography>
                 </Box>
                 <CheckCircleIcon sx={{fontSize:50, opacity:0.8}} />
               </Box>
@@ -318,7 +320,7 @@ export default function Inicio() {
                 {/* SECCIÓN JSX: textos de la tarjeta Por revisar. */}
                 <Box id="Box-Inicio-TarjetaPorRevisarTexto">
                   <Typography variant="h6" fontWeight="bold">Por revisar</Typography>
-                  <Typography variant="h4" fontWeight="bold">75</Typography>
+                  <Typography variant="h4" fontWeight="bold">{kpiPorRev}</Typography>
                 </Box>
                 <PendingActionsIcon sx={{fontSize:50, opacity:0.8}} />
               </Box>
@@ -338,7 +340,7 @@ export default function Inicio() {
                 {/* SECCIÓN JSX: textos de la tarjeta Rechazadas. */}
                 <Box id="Box-Inicio-TarjetaRechazadasTexto">
                   <Typography variant="h6" fontWeight="bold">Rechazadas</Typography>
-                  <Typography variant="h4" fontWeight="bold">200</Typography>
+                  <Typography variant="h4" fontWeight="bold">{kpiRech}</Typography>
                 </Box>
                 <CancelIcon sx={{fontSize:50, opacity:0.8}} />
               </Box>
@@ -355,13 +357,13 @@ export default function Inicio() {
     {/* SECCIÓN JSX: accesos directos (id preexistente conservado).
         DATOS QUE SE MANDAN A GenerarCarta.jsx (/Menu), Revision.jsx, plantillas.jsx y Seguimiento.jsx
         para procesamiento: Card-Link con to={a.to}. */}
-    <Box id="Accesos directos" sx={{width: '99%', mt: 5}}>
+    <Box id="Accesos directos" sx={{width: '100%', mt: 3}}>
       <Typography variant="h6" fontWeight="bold" sx={{mb: 2, color:'text.secondary'}}>
         Accesos directos
       </Typography>
-      <Grid container spacing={3}>
+      <Grid container spacing={2} alignItems="stretch">
         {ACCESOS.map((a) => (
-          <Grid item xs={12} sm={6} md={3} key={a.to}>
+          <Grid item xs={12} sm={6} md={3} key={a.to} sx={{display: 'flex'}}>
             <Card
               component={Link}
               to={a.to}
@@ -369,6 +371,8 @@ export default function Inicio() {
                 borderRadius: 2,
                 textDecoration: 'none',
                 display: 'block',
+                width: '100%',
+                height: '100%',
                 border: '1px solid rgba(22, 49, 114, 0.12)',
                 transition: 'transform .15s, box-shadow .15s',
                 '&:hover': { transform: 'translateY(-3px)', boxShadow: 4 },
@@ -400,13 +404,13 @@ export default function Inicio() {
     {/* ============ AQUÍ TERMINA ACCESOS DIRECTOS (JSX) ============ */}
 
     {/* ============ AQUÍ EMPIEZA FILA ESTADÍSTICAS ============ */}
-    {/* SECCIÓN JSX: fila dona por estado + actividad reciente. */}
-    <Box id="Box-Inicio-FilaEstadisticas" sx={{width: '99%', mt: 5}}>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={5}>
+    {/* Opción 2 (5/7): dona compacta + actividad ancha, misma altura, sin huecos. */}
+    <Box id="Box-Inicio-FilaEstadisticas" sx={{width: '100%', mt: 3}}>
+      <Grid container spacing={2} alignItems="stretch">
+        <Grid item xs={12} md={5} sx={{display: 'flex'}}>
           {/* SECCIÓN JSX: dona por estado (id preexistente conservado). */}
-          <Box id="Resumen por estado">
-            <Card sx={{borderRadius: 2, height: '100%'}}>
+          <Box id="Resumen por estado" sx={{width: '100%', display: 'flex'}}>
+            <Card sx={{borderRadius: 2, height: '100%', minHeight: 360, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
               <CardContent>
                 <Typography variant="h6" fontWeight="bold" sx={{mb: 2, color:'text.secondary'}}>
                   Documentos por estado
@@ -449,16 +453,16 @@ export default function Inicio() {
             </Card>
           </Box>
         </Grid>
-        <Grid item xs={12} md={7}>
+        <Grid item xs={12} md={7} sx={{display: 'flex'}}>
           {/* SECCIÓN JSX: actividad reciente (id preexistente conservado).
               DATOS QUE SE MANDAN A Seguimiento.jsx para procesamiento: botón a "/Seguimiento". */}
-          <Box id="Actividad reciente">
-            <Card sx={{borderRadius: 2, height: '100%'}}>
-              <CardContent>
+          <Box id="Actividad reciente" sx={{width: '100%', display: 'flex'}}>
+            <Card sx={{borderRadius: 2, height: '100%', minHeight: 360, width: '100%', display: 'flex', flexDirection: 'column'}}>
+              <CardContent sx={{display: 'flex', flexDirection: 'column', flexGrow: 1}}>
                 <Typography variant="h6" fontWeight="bold" sx={{mb: 1, color:'text.secondary'}}>
                   Actividad reciente
                 </Typography>
-                <List dense>
+                <List dense sx={{flexGrow: 1, maxHeight: 250, overflow: 'auto'}}>
                   {actividad.map((a, i) => (
                     <ListItem key={i} disablePadding sx={{py: 0.5}}>
                       <ListItemIcon sx={{minWidth: 36}}>
@@ -475,7 +479,7 @@ export default function Inicio() {
                   component={Link}
                   to="/Seguimiento"
                   size="small"
-                  sx={{ mt: 1, color: 'encabezado.main' }}
+                  sx={{ mt: 1, color: 'encabezado.main', alignSelf: 'flex-start' }}
                 >
                   Ver trazabilidad completa
                 </Button>
@@ -487,78 +491,43 @@ export default function Inicio() {
     </Box>
     {/* ============ AQUÍ TERMINA FILA ESTADÍSTICAS ============ */}
 
-    {/* ============ AQUÍ EMPIEZA BUSCADOR DOCUMENTOS ============ */}
-    {/* SECCIÓN JSX: buscador sobre la lista real (id preexistente conservado). */}
-    <Box id="Box-Inicio-FilaBuscadorVencimientos" sx={{width: '99%', mt: 5}}>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          {/* SECCIÓN JSX: buscador (id preexistente conservado). Filtra `todos` en memoria. */}
-          <Box id="Buscador de documentos">
-            <Card sx={{borderRadius: 2, height: '100%'}}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" sx={{mb: 1, color:'text.secondary'}}>
-                  Buscar documento
-                </Typography>
-                <InputLabel
-                  shrink
-                  htmlFor="buscar-documento"
-                  sx={{ position: 'static', transform: 'none', fontSize: '0.75rem', display: 'block', mb: 0.5 }}
-                >
-                  Folio, tipo o cliente
-                </InputLabel>
-                <TextField
-                  id="buscar-documento"
-                  fullWidth
-                  variant="standard"
-                  placeholder="Ej. #101, Carta Poder, Tech Solutions…"
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  InputProps={{
-                    startAdornment: <SearchIcon sx={{ color: 'encabezado.main', mr: 1 }} />,
-                  }}
-                />
-                {busqueda.trim() !== '' && (
-                  <List dense sx={{mt: 1}}>
-                    {resultados.map((d) => (
-                      <ListItem
-                        key={d.id}
-                        button
-                        component={Link}
-                        to="/Seguimiento"
-                        sx={{borderRadius: 1}}
-                      >
-                        <ListItemText
-                          primary={`#${d.id} — ${d.tipo}`}
-                          secondary={`${d.cliente ?? '—'} · ${estadoBonito(d.estado)}`}
-                        />
-                      </ListItem>
-                    ))}
-                    {resultados.length === 0 && (
-                      <ListItem>
-                        <ListItemText primary="Sin resultados para esa búsqueda." />
-                      </ListItem>
-                    )}
-                  </List>
-                )}
-              </CardContent>
-            </Card>
+    {/* ============ AQUÍ EMPIEZA TABLA PROCESADOS CON BUSCADOR INTEGRADO ============ */}
+    {/* Buscador antes separado; ahora filtra la tabla directamente (sin huecos en blanco). */}
+    <Box id="ContenedorTabla" sx={{width: '100%', mt: 3}}>
+      <Card sx={{borderRadius: 2}}>
+        <CardContent sx={{pb: 1}}>
+          <Box sx={{display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2}}>
+            <Box>
+              <Typography variant="h6" fontWeight="bold" sx={{color:'text.secondary'}}>
+                Documentos procesados
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {filtrados.length} resultado(s){busqueda.trim() !== '' ? ` para "${busqueda.trim()}"` : ''}
+              </Typography>
+            </Box>
+            <TextField
+              id="buscar-documento"
+              size="small"
+              variant="outlined"
+              placeholder="Buscar por folio, tipo o cliente…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              sx={{minWidth: 260}}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ color: 'encabezado.main', mr: 1 }} />,
+              }}
+            />
           </Box>
-        </Grid>
-      </Grid>
+          <TablaGeneral datos={tablaDocs}/>
+          {tablaDocs.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{mt: 1}}>
+              Sin resultados para esa búsqueda.
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
     </Box>
-    {/* ============ AQUÍ TERMINA BUSCADOR DOCUMENTOS ============ */}
-
-    {/* ============ AQUÍ EMPIEZA TABLA PROCESADOS ============ */}
-    {/* SECCIÓN JSX: tabla de documentos procesados (id preexistente conservado).
-        DATOS QUE SE MANDAN A ../Components/TablaGeneral.jsx para procesamiento: datos={tablaDocs} (reales). */}
-    <Box id="ContenedorTabla" sx={{width: '99%'}}>
-      <Typography variant="h6" fontWeight="bold" sx={{mt:5,mb:3, color:'text.secondary'}}>
-        Documentos procesados
-      </Typography>
-    <TablaGeneral datos={tablaDocs}/>
-
-    </Box>
-    {/* ============ AQUÍ TERMINA TABLA PROCESADOS ============ */}
+    {/* ============ AQUÍ TERMINA TABLA PROCESADOS CON BUSCADOR INTEGRADO ============ */}
 
 
 

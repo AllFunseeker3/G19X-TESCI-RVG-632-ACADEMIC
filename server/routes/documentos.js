@@ -58,7 +58,7 @@ async function docVisible(idDoc, u, accion) {
   if (
     !u.admin &&
     (d.id_area !== u.id_area ||
-      !(await tienePermiso(u.id_rol, false, d.categoria, accion)))
+      !(u.es_super || (await tienePermiso(u.id_rol, false, d.categoria, accion))))
   ) {
     const e = new Error("Sin acceso al documento");
     e.status = 403;
@@ -209,6 +209,10 @@ router.patch("/:id/estado", async (req, res, next) => {
     const { estado, comentario = null } = req.body || {};
     if (!ESTADOS.has(estado))
       return res.status(400).json({ detail: "Estado inválido" });
+    // El rechazo exige motivos por escrito.
+    if (estado === "rechazado" && !(comentario ?? "").toString().trim()) {
+      return res.status(400).json({ detail: "El rechazo exige un comentario con los motivos" });
+    }
     const d = await docVisible(Number(req.params.id), req.usuario, "modificar");
     await pool.query("UPDATE documentos SET estado = ? WHERE id_documento = ?", [
       estado,
@@ -247,6 +251,20 @@ router.post("/:id/adjuntos", async (req, res, next) => {
   }
 });
 // ============ AQUÍ TERMINA RUTA POST ADJUNTO ============
+
+// ============ AQUÍ EMPIEZA RUTA DELETE DOCUMENTO ============
+// DELETE /api/documentos/:id — borra el documento (historial/adjuntos por CASCADE).
+// Permiso 'eliminar' en la categoría (admin siempre; super de su área).
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const d = await docVisible(Number(req.params.id), req.usuario, "eliminar");
+    await pool.query("DELETE FROM documentos WHERE id_documento = ?", [d.id_documento]);
+    return res.json({ id: d.id_documento, eliminado: true });
+  } catch (e) {
+    return next(e);
+  }
+});
+// ============ AQUÍ TERMINA RUTA DELETE DOCUMENTO ============
 
 // ============ AQUÍ EMPIEZA EXPORTS ============
 module.exports = router;

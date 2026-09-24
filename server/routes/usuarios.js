@@ -105,7 +105,7 @@ router.get("/yo/permisos", async (req, res) => {
       f[k] = f[k] === 1; // Normaliza TINYINT a booleano.
     }
   }
-  return res.json({ admin: u.admin, id_area: u.id_area, permisos: filas });
+  return res.json({ admin: u.admin, es_super: Boolean(u.es_super), id_area: u.id_area, permisos: filas });
 });
 // ============ AQUÍ TERMINA RUTA GET MIS PERMISOS ============
 

@@ -28,11 +28,12 @@ import {
   Alert,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DeleteIcon from '@mui/icons-material/Delete';
 import PageHeader from '../Components/PageHeader';
 // DATOS QUE SE MANDAN A ../Components/EstadoChip.jsx para procesamiento: estado={...}.
 import EstadoChip from '../Components/EstadoChip';
 // DATOS PROVENIENTES DE ../lib/api.js: bandeja real (ya filtrada por área/permiso).
-import { getDocumentos, getDocumento, cambiarEstado } from '../lib/api.js';
+import { getDocumentos, getDocumento, cambiarEstado, eliminarDocumento } from '../lib/api.js';
 // Conversión código API <-> etiqueta visible (ver ../lib/estados.js).
 import { estadoBonito } from '../lib/estados';
 // PERMISOS: dictaminar exige 'modificar' en la categoría de la fila.
@@ -78,8 +79,10 @@ export default function Revision() {
     const [seleccionado, setSeleccionado] = useState(null);
     // ESTADO: comentario del revisor capturado en el Dialog.
     const [comentario, setComentario] = useState('');
-    // PERMISOS: para habilitar Aprobar/Rechazar por categoría de la fila.
-    const { puede } = usePermisos();
+    // ESTADO: error de validación del dictamen (rechazo sin comentario).
+    const [errorDictamen, setErrorDictamen] = useState('');
+    // PERMISOS: admin/super dictaminan; eliminar exige permiso por categoría.
+    const { puede, admin, super: esSuper } = usePermisos();
     // ============ AQUÍ TERMINA ESTADOS REVISIÓN ============
 
     // ============ AQUÍ EMPIEZA CARGA BANDEJA ============
@@ -126,6 +129,7 @@ export default function Revision() {
     const cerrarDialogo = () => {
         setSeleccionado(null);
         setComentario('');
+        setErrorDictamen('');
     };
 
     // HANDLER: abre el Dialog trayendo detalle (datos + historial) de la BD.
@@ -142,9 +146,15 @@ export default function Revision() {
 
     // HANDLER: aplica el dictamen (persiste en BD + rastro en historial).
     // QUÉ HACE: PATCH estado y recarga la bandeja. El responsable lo pone el back.
-    // DÓNDE SE USA: botones Rechazar/Aprobar del Dialog (solo por_revisar + permiso).
+    // Rechazar exige comentario con motivos (también lo valida el back con 400).
+    // DÓNDE SE USA: botones Rechazar/Aprobar del Dialog (borrador/por_revisar + permiso).
     const dictaminar = async (nuevoEstado) => {
         if (!seleccionado) return;
+        if (nuevoEstado === 'rechazado' && !comentario.trim()) {
+            setErrorDictamen('El rechazo exige un comentario con los motivos');
+            return;
+        }
+        setErrorDictamen('');
         try {
             await cambiarEstado(seleccionado.id_documento ?? seleccionado.id, nuevoEstado, comentario);
             cerrarDialogo();
@@ -155,9 +165,24 @@ export default function Revision() {
         }
     };
 
-    // CÁLCULO: ¿puede dictaminar esta fila? (por_revisar + modificar en su categoría).
+    // HANDLER: borra el documento (admin o permiso eliminar en su categoría).
+    const borrar = async (doc) => {
+        if (!window.confirm(`¿Borrar el documento #${doc.id}? Esta acción no se puede deshacer.`)) return;
+        try {
+            await eliminarDocumento(doc.id);
+            setCargando(true);
+            await cargar();
+        } catch (e) {
+            setError(e.message);
+        }
+    };
+
+    // CÁLCULO: ¿puede dictaminar esta fila? (borrador/por_revisar + admin/super/modificar).
     const puedeDictaminar = (doc) =>
-        doc.estado === 'por_revisar' && puede(doc.categoria, 'modificar');
+        (doc.estado === 'por_revisar' || doc.estado === 'borrador')
+        && (admin || esSuper || puede(doc.categoria, 'modificar'));
+    // CÁLCULO: ¿puede borrar esta fila? (admin o eliminar en su categoría).
+    const puedeBorrar = (doc) => admin || puede(doc.categoria, 'eliminar');
     // ============ AQUÍ TERMINA HANDLERS DICTAMEN ============
 
     return (
@@ -221,6 +246,7 @@ export default function Revision() {
                                     {/* DATOS QUE SE MANDAN A ../Components/EstadoChip.jsx para procesamiento. */}
                                     <TableCell><EstadoChip estado={doc.estado} /></TableCell>
                                     <TableCell>
+                                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                         <Button
                                             size="small"
                                             variant="outlined"
@@ -229,6 +255,18 @@ export default function Revision() {
                                         >
                                             Revisar
                                         </Button>
+                                        {puedeBorrar(doc) && (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            color="error"
+                                            startIcon={<DeleteIcon />}
+                                            onClick={() => borrar(doc)}
+                                        >
+                                            Borrar
+                                        </Button>
+                                        )}
+                                        </Box>
                                     </TableCell>
                                 </TableRow>
                                 ))
@@ -275,14 +313,14 @@ export default function Revision() {
                                     </ListItem>
                                 ))}
                             </List>
-                            {/* SECCIÓN JSX: captura del comentario del revisor. */}
+                            {/* SECCIÓN JSX: captura del comentario del revisor (obligatorio al rechazar). */}
                             <Box id="Box-Revision-Comentario" sx={{ mt: 2 }}>
                                 <InputLabel
                                     shrink
                                     htmlFor="comentario-revision"
                                     sx={{ position: 'static', transform: 'none', fontSize: '0.75rem', display: 'block', mb: 0.5 }}
                                 >
-                                    Comentario del revisor
+                                    Comentario del revisor {puedeDictaminar(seleccionado) ? '(obligatorio para rechazar)' : ''}
                                 </InputLabel>
                                 <TextField
                                     id="comentario-revision"
@@ -290,10 +328,14 @@ export default function Revision() {
                                     variant="standard"
                                     multiline
                                     rows={3}
+                                    required
                                     placeholder="Escribe observaciones, correcciones o el motivo del dictamen…"
                                     value={comentario}
                                     onChange={(e) => setComentario(e.target.value)}
                                 />
+                                {errorDictamen && (
+                                    <Alert severity="error" sx={{ mt: 1 }}>{errorDictamen}</Alert>
+                                )}
                             </Box>
                         </DialogContent>
                         <DialogActions>
@@ -303,8 +345,8 @@ export default function Revision() {
                             <Button
                                 variant="contained"
                                 color="error"
-                                disabled={!puedeDictaminar(seleccionado)}
-                                title={puedeDictaminar(seleccionado) ? 'Rechazar' : 'Solo por revisar con permiso de modificar'}
+                                disabled={!puedeDictaminar(seleccionado) || !comentario.trim()}
+                                title={!puedeDictaminar(seleccionado) ? 'Solo borrador/por revisar con permiso (admin/super/modificar)' : (!comentario.trim() ? 'Escribe el motivo del rechazo' : 'Rechazar')}
                                 onClick={() => dictaminar('rechazado')}
                             >
                                 Rechazar
@@ -313,7 +355,7 @@ export default function Revision() {
                                 variant="contained"
                                 color="success"
                                 disabled={!puedeDictaminar(seleccionado)}
-                                title={puedeDictaminar(seleccionado) ? 'Aprobar' : 'Solo por revisar con permiso de modificar'}
+                                title={puedeDictaminar(seleccionado) ? 'Aprobar' : 'Solo borrador/por revisar con permiso (admin/super/modificar)'}
                                 onClick={() => dictaminar('aprobado')}
                             >
                                 Aprobar

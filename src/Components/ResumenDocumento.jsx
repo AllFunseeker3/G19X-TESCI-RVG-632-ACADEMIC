@@ -10,7 +10,7 @@
 // ============================================================================
 import {
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  Typography, List, ListItem, ListItemText,
+  Typography, List, ListItem, ListItemText, Alert, CircularProgress,
 } from '@mui/material';
 import { esFechaValida } from './CampoFormulario';
 
@@ -77,6 +77,9 @@ export default function ResumenDocumento({
   campos,
   datos,
   onCerrar,
+  onConfirmar,
+  guardando = false,
+  errorGuardar = '',
 }) {
   return (
     <Dialog open={abierto} onClose={onCerrar} maxWidth="sm" fullWidth>
@@ -112,13 +115,22 @@ export default function ResumenDocumento({
       {/* ============ AQUÍ TERMINA LISTA de campos ============ */}
       {/* ============ AQUÍ EMPIEZA ACCIONES cerrar/confirmar ============ */}
       <DialogActions>
-        <Button onClick={onCerrar} color="primary">
+        <Button onClick={onCerrar} color="primary" disabled={guardando}>
           Cerrar
         </Button>
-        <Button variant="contained" color="primary" onClick={onCerrar}>
-          Confirmar
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={onConfirmar ?? onCerrar}
+          disabled={guardando}
+          startIcon={guardando ? <CircularProgress size={18} /> : null}
+        >
+          {guardando ? 'Generando...' : 'Confirmar'}
         </Button>
       </DialogActions>
+      {errorGuardar && (
+        <Alert severity="error" sx={{ m: 2, mt: 0 }}>{errorGuardar}</Alert>
+      )}
       {/* ============ AQUÍ TERMINA ACCIONES cerrar/confirmar ============ */}
     </Dialog>
   );
