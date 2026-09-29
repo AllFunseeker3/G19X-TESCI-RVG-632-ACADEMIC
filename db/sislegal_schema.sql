@@ -6,7 +6,7 @@
 -- CÓMO EJECUTARLO EN DBEAVER:
 --   1) Conéctate a DBMaria y abre un "SQL Editor" (Ctrl+[).
 --   2) Pega este script o ábrelo con Archivo -> Abrir.
---   3) Ejecútalo completo (Alt+X). Crea la BD, las 14 tablas y los seeds.
+--   3) Ejecútalo completo (Alt+X). Crea la BD, las 15 tablas y los seeds.
 --   4) Verifica con las consultas del BLOQUE 4 (al final).
 --
 -- QUÉ GUARDA CADA TABLA:
@@ -220,6 +220,25 @@ CREATE TABLE IF NOT EXISTS adjuntos (
   CONSTRAINT fk_adj_user FOREIGN KEY (id_subido_por)
     REFERENCES usuarios (id_usuario)
 ) ENGINE=InnoDB;
+
+-- Campanita de avisos: una fila por destinatario (supers del área + admins)
+-- cada vez que se crea un documento. `leida` la apaga el front al abrir la campana.
+CREATE TABLE IF NOT EXISTS notificaciones (
+  id_notificacion INT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario      INT NOT NULL,
+  tipo            VARCHAR(40) NOT NULL DEFAULT 'documento_creado',
+  titulo          VARCHAR(200) NOT NULL,
+  detalle         VARCHAR(500) NULL,
+  id_documento    INT NULL,
+  leida           BOOLEAN NOT NULL DEFAULT FALSE,
+  creado_en       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_notif_user FOREIGN KEY (id_usuario)
+    REFERENCES usuarios (id_usuario) ON DELETE CASCADE,
+  CONSTRAINT fk_notif_doc FOREIGN KEY (id_documento)
+    REFERENCES documentos (id_documento) ON DELETE SET NULL
+) ENGINE=InnoDB;
+CREATE INDEX IF NOT EXISTS idx_notif_user
+  ON notificaciones (id_usuario, leida, creado_en);
 
 -- Consecutivos atómicos de folios por tipo y año. Formato: PREFIJO-AAAA-NNN
 -- (ej. OF-2026-001, RES-2026-012; el prefijo lo pone el back-end según el tipo).

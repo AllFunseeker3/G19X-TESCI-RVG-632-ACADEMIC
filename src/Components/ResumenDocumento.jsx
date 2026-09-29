@@ -80,6 +80,7 @@ export default function ResumenDocumento({
   onConfirmar,
   guardando = false,
   errorGuardar = '',
+  textoConfirmar = 'Confirmar',
 }) {
   return (
     <Dialog open={abierto} onClose={onCerrar} maxWidth="sm" fullWidth>
@@ -125,7 +126,7 @@ export default function ResumenDocumento({
           disabled={guardando}
           startIcon={guardando ? <CircularProgress size={18} /> : null}
         >
-          {guardando ? 'Generando...' : 'Confirmar'}
+          {guardando ? 'Generando...' : textoConfirmar}
         </Button>
       </DialogActions>
       {errorGuardar && (

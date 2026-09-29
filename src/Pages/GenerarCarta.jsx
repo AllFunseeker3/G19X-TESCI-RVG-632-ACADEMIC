@@ -4,22 +4,24 @@
 //   Campo 1 categoría -> Campo 2 tipo -> campos según tiposDocumentos.js.
 // FLUJO:
 //   - ENTRAN: lib/tiposDocumentos.js (CATEGORIAS, tipos, campos con mostrarSi).
-//   - SALEN: -> Components/ResumenDocumento.jsx (Dialog de confirmación).
+//   - PASO 1: ResumenDocumento.jsx verifica datos -> PASO 2: preview IA
+//     (solo lectura + retro) -> PASO 3: Confirmar guarda doc + PDF.
 // QUÉ MODIFICAR SI hay cambios: Box por tipo abajo; mostrarDestinatario excluye
 //   9 tipos con destinatario fijo; solo id==='fecha' lleva hoy auto.
 // ============================================================================
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Box, Typography, Button, Divider, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
+  Box, Typography, Button, Divider, Alert, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
   CATEGORIAS, tiposDeCategoria, nombreCategoria,
-  nombreTipo, camposDeTipo,
+  nombreTipo, camposDeTipo, categoriaDeTipo,
 } from '../lib/tiposDocumentos';
-import { crearDocumento, descargarPDF, generarPDF, redactarConIA } from '../lib/api.js';
+import { crearDocumento, actualizarDocumento, getDocumento, descargarPDF, generarPDF, redactarConIA, corregirConIA } from '../lib/api.js';
 import PageHeader from '../Components/PageHeader';
+import ProgresoIA from '../Components/ProgresoIA';
 import CampoFormulario, { esFechaValida, formatearHoyDDMMAAAA } from '../Components/CampoFormulario';
 import SeccionFormulario from '../Components/SeccionFormulario';
 import SelectorCategoriaTipo from '../Components/SelectorCategoriaTipo';
@@ -77,9 +79,21 @@ export default function GenerarCarta() {
   const [iaModelo, setIaModelo] = useState('');
   const [iaCargando, setIaCargando] = useState(false);
   const [iaError, setIaError] = useState('');
+  const [iaRetro, setIaRetro] = useState(''); // Retro del usuario: qué corregir del texto
+  const [iaCorrigiendo, setIaCorrigiendo] = useState(false); // Corrigiendo con IA en curso
   const [guardado, setGuardado] = useState(null); // { id, archivo } del documento + PDF
   const [guardando, setGuardando] = useState(false); // Confirmar está creando doc + PDF
   const [errorGuardar, setErrorGuardar] = useState('');
+  // Progreso por fases (estimado por timer: el back es 1 petición sin eventos).
+  const [iaFases, setIaFases] = useState([]);
+  const [iaFase, setIaFase] = useState(0);
+  const [iaProgreso, setIaProgreso] = useState(0);
+  const [iaSegundos, setIaSegundos] = useState(0);
+  const progresoTimer = useRef(null);
+  // Modo corrección (?editar=id): precarga un borrador/rechazado propio.
+  const [editandoId, setEditandoId] = useState(null);
+  const [editandoMotivo, setEditandoMotivo] = useState('');
+  const [editandoCargando, setEditandoCargando] = useState(false);
   // ============ AQUÍ TERMINA ESTADOS FORMULARIO ============
 
   // ============ AQUÍ EMPIEZA SINCRONIZACIÓN POR URL ============
@@ -101,6 +115,41 @@ export default function GenerarCarta() {
   }
 
   // ============ AQUÍ TERMINA SINCRONIZACIÓN POR URL ============
+
+  // ============ AQUÍ EMPIEZA MODO CORRECCIÓN ?editar= ============
+  // Precarga categoría/tipo/datos del documento a corregir (una sola vez).
+  // El motivo del rechazo (si hay) se muestra como banner para guiar la corrección.
+  useEffect(() => {
+    const id = params.get('editar');
+    if (!id || editandoId === Number(id)) return;
+    let vivo = true;
+    (async () => {
+      setEditandoCargando(true);
+      try {
+        const det = await getDocumento(id);
+        if (!vivo) return;
+        const cat = categoriaDeTipo(det.id_tipo);
+        if (!cat) throw new Error('Tipo de documento desconocido');
+        setCategoria(cat);
+        setTipoDoc(det.id_tipo);
+        setDatos(det.datos ?? {});
+        setAgregarDestinatario(Boolean((det.datos ?? {}).destinatario));
+        setErrores({});
+        setEditandoId(det.id_documento ?? det.id);
+        const ultimoRechazo = (Array.isArray(det.historial) ? det.historial : [])
+          .filter((h) => h.estado_nuevo === 'rechazado').slice(-1)[0];
+        setEditandoMotivo(ultimoRechazo?.comentario ?? '');
+        setErrorGuardar('');
+      } catch (e) {
+        if (vivo) setErrorGuardar(e.message || 'No se pudo cargar el documento a corregir');
+      } finally {
+        if (vivo) setEditandoCargando(false);
+      }
+    })();
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+  // ============ AQUÍ TERMINA MODO CORRECCIÓN ?editar= ============
 
   // ============ AQUÍ EMPIEZA CAMPOS VISIBLES ============
   // Tipos y campos del catálogo filtrados por mostrarSi y destinatario opcional.
@@ -335,8 +384,12 @@ export default function GenerarCarta() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    // Flujo único para los 11 tipos: siempre pasa por IA y luego a resumen.
-    handleRedactarIA();
+    // Paso 1: valida y abre el Resumen para verificar datos antes de redactar.
+    const nuevosErrores = validar();
+    setErrores(nuevosErrores);
+    if (Object.keys(nuevosErrores).length > 0) return;
+    setErrorGuardar('');
+    setResumenAbierto(true);
   };
   // ============ AQUÍ TERMINA VALIDACIÓN Y SUBMIT ============
 
@@ -354,55 +407,125 @@ export default function GenerarCarta() {
     return plano;
   };
 
-  // IA: valida, redacta con el microservicio y abre el preview (11 tipos).
-  const handleRedactarIA = async () => {
-    const nuevosErrores = validar();
-    setErrores(nuevosErrores);
-    if (Object.keys(nuevosErrores).length > 0) return;
+  // ============ AQUÍ EMPIEZA PROGRESO ESTIMADO IA ============
+  // El back es una petición HTTP sin progreso real: se estima 0→90% por timer
+  // y se completa a 100% al resolver. Fases textuales por operación.
+  const detenerProgreso = () => {
+    if (progresoTimer.current) clearInterval(progresoTimer.current);
+    progresoTimer.current = null;
+  };
+  const iniciarProgreso = (fases, estimadoSeg = 60) => {
+    detenerProgreso();
+    setIaFases(fases);
+    setIaFase(0);
+    setIaProgreso(2);
+    setIaSegundos(0);
+    const t0 = Date.now();
+    progresoTimer.current = setInterval(() => {
+      const s = (Date.now() - t0) / 1000;
+      setIaSegundos(Math.floor(s));
+      setIaProgreso(Math.min(90, 2 + (s / estimadoSeg) * 88));
+      setIaFase(Math.min(fases.length - 1, Math.floor((s / estimadoSeg) * fases.length)));
+    }, 500);
+  };
+  // Limpia el timer al desmontar.
+  useEffect(() => () => detenerProgreso(), []);
+  // ============ AQUÍ TERMINA PROGRESO ESTIMADO IA ============
+
+  // Paso 2: desde el Resumen verificado se redacta con IA (11 tipos).
+  const handleConfirmarDatosParaIA = async () => {
+    setResumenAbierto(false);
     setIaError('');
     setIaTexto('');
+    setIaRetro('');
     setIaCargando(true);
     setIaAbierto(true);
+    const esPoder = tipoDoc === 'carta-poder';
+    iniciarProgreso(
+      esPoder
+        ? ['Conectando con IA', 'Formalizando lenguaje jurídico', 'Redactando documento', 'Recibiendo texto']
+        : ['Conectando con IA', 'Redactando documento', 'Recibiendo texto'],
+      esPoder ? 75 : 50,
+    );
     try {
       const r = await redactarConIA(tipoDoc, datosSerializables());
       setIaTexto(r.contenido ?? '');
       setIaModelo(r.modelo ?? '');
+      setIaProgreso(100);
+      setIaFase(esPoder ? 3 : 2);
     } catch (e) {
       setIaError(e.message || 'No se pudo redactar');
     } finally {
+      detenerProgreso();
       setIaCargando(false);
     }
   };
 
-  // Paso 2: desde el preview IA se continúa al resumen (CONFIRMAR genera).
-  const handleContinuarIA = () => {
-    if (iaCargando || !iaTexto) return;
+  // Retro: corrige el texto del preview con la IA (conserva formato, solo aplica la instrucción).
+  const handleCorregirIA = async () => {
+    if (!iaTexto || !(iaRetro ?? '').trim() || iaCorrigiendo) return;
+    setIaError('');
+    setIaCorrigiendo(true);
+    iniciarProgreso(['Enviando corrección', 'Aplicando cambios con IA', 'Recibiendo texto corregido'], 45);
+    try {
+      const r = await corregirConIA(iaTexto, iaRetro.trim(), tipoDoc);
+      setIaTexto(r.contenido ?? '');
+      if (r.modelo) setIaModelo(r.modelo);
+      setIaRetro('');
+      setIaProgreso(100);
+      setIaFase(2);
+    } catch (e) {
+      setIaError(e.message || 'No se pudo corregir');
+    } finally {
+      detenerProgreso();
+      setIaCorrigiendo(false);
+    }
+  };
+
+  // Paso 3b: Volver del preview IA al Resumen para corregir datos.
+  const handleVolverADatos = () => {
+    if (iaCargando || iaCorrigiendo || guardando) return;
     setIaAbierto(false);
     setResumenAbierto(true);
   };
 
-  // Paso 3: CONFIRMAR del resumen crea el documento + PDF (usa la redacción IA si hay).
-  const handleConfirmarResumen = async () => {
+  // Paso 4: CONFIRMAR final desde el preview IA crea el documento + PDF.
+  // En modo ?editar= actualiza el documento (vuelve a borrador) en vez de crear.
+  const handleGuardarFinal = async () => {
+    if (iaCargando || !iaTexto || guardando) return;
     setErrorGuardar('');
     setGuardando(true);
+    iniciarProgreso(editandoId
+      ? ['Guardando corrección', 'Generando PDF institucional']
+      : ['Guardando borrador', 'Generando PDF institucional'], 20);
     try {
-      const r = await crearDocumento({
+      const idDoc = editandoId ?? (await crearDocumento({
         id_tipo: tipoDoc,
         datos: datosSerializables(),
         ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
-      });
+      })).id;
+      if (editandoId) {
+        await actualizarDocumento(editandoId, {
+          datos: datosSerializables(),
+          ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
+        });
+      }
+      setIaFase(1);
+      setIaProgreso(60);
       let archivo = null;
       try {
-        const pdf = await generarPDF(tipoDoc, datosSerializables(), r.id, iaTexto || '');
+        const pdf = await generarPDF(tipoDoc, datosSerializables(), idDoc, iaTexto || '');
         archivo = pdf.archivo ?? null;
       } catch (ePdf) {
-        setErrorGuardar(`Documento #${r.id} guardado, pero el PDF falló: ${ePdf.message}`);
+        setErrorGuardar(`Documento #${idDoc} guardado, pero el PDF falló: ${ePdf.message}`);
       }
-      setGuardado({ id: r.id, archivo });
-      setResumenAbierto(false);
+      setGuardado({ id: idDoc, archivo });
+      setIaProgreso(100);
+      setIaAbierto(false);
     } catch (e) {
       setErrorGuardar(e.message || 'No se pudo guardar');
     } finally {
+      detenerProgreso();
       setGuardando(false);
     }
   };
@@ -462,10 +585,23 @@ export default function GenerarCarta() {
       {/* ============ AQUÍ EMPIEZA ENCABEZADO GENERAR CARTA ============ */}
       <PageHeader
         id="Box-GenerarCarta-Encabezado"
-        titulo="Generar notificación legal"
-        subtitulo="Seleccione la categoría, el tipo de documento y capture sus datos."
+        titulo={editandoId ? `Corregir documento #${editandoId}` : 'Generar notificación legal'}
+        subtitulo={editandoId
+          ? 'Corrige los datos observados y vuelve a generar: regresa a borrador y avisa a revisión.'
+          : 'Seleccione la categoría, el tipo de documento y capture sus datos.'}
       />
       {/* ============ AQUÍ TERMINA ENCABEZADO GENERAR CARTA ============ */}
+
+      {/* ============ AQUÍ EMPIEZA BANNER MODO CORRECCIÓN ============ */}
+      {editandoCargando && (
+        <Alert severity="info" sx={{ mt: 2 }}>Cargando documento a corregir…</Alert>
+      )}
+      {editandoMotivo && (
+        <Alert severity="warning" sx={{ mt: 2 }}>
+          Motivo del rechazo: {editandoMotivo}
+        </Alert>
+      )}
+      {/* ============ AQUÍ TERMINA BANNER MODO CORRECCIÓN ============ */}
 
       {/* ============ AQUÍ EMPIEZA FORMULARIO GENERAR CARTA ============ */}
       <Box id="Box-GenerarCarta-Form" component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
@@ -699,7 +835,7 @@ export default function GenerarCarta() {
             {/* ============ AQUÍ EMPIEZA ALERTA GUARDADO ============ */}
             {guardado && (
               <Alert severity="success" sx={{ mt: 2 }} onClose={() => setGuardado(null)}>
-                Documento #{guardado.id} guardado como borrador (con redacción IA
+                Documento #{guardado.id} {editandoId ? 'corregido (regresó a borrador con redacción IA' : 'guardado como borrador (con redacción IA'}
                 {guardado.archivo ? ' y PDF' : ''}).
                 {guardado.archivo && (
                   <Button size="small" onClick={handleDescargarPDF} sx={{ ml: 1, color: 'encabezado.main' }}>
@@ -713,7 +849,7 @@ export default function GenerarCarta() {
             {/* ============ AQUÍ EMPIEZA BOTONES ACCIÓN ============ */}
             <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap' }}>
               <Button type="submit" variant="contained" color="primary" disabled={iaCargando || guardando}>
-                {iaCargando ? 'Redactando...' : 'Generar documento con IA'}
+                {iaCargando ? 'Redactando...' : 'Generar documento'}
               </Button>
               <Button variant="outlined" color="primary" onClick={handleLimpiar} sx={{ borderColor: 'encabezado.main', color: 'encabezado.main' }}>
                 Limpiar
@@ -728,6 +864,7 @@ export default function GenerarCarta() {
       {/* ============ AQUÍ TERMINA FORMULARIO GENERAR CARTA ============ */}
 
       {/* ============ AQUÍ EMPIEZA RESUMEN DOCUMENTO ============ */}
+      {/* Paso 1: verifica datos antes de redactar con IA. */}
       <ResumenDocumento
         abierto={resumenAbierto}
         categoriaNombre={nombreCategoria(categoria)}
@@ -737,28 +874,35 @@ export default function GenerarCarta() {
         destinatarioValor={datos.destinatario}
         campos={camposVisibles}
         datos={datos}
-        onCerrar={() => !guardando && setResumenAbierto(false)}
-        onConfirmar={handleConfirmarResumen}
-        guardando={guardando}
-        errorGuardar={errorGuardar}
+        onCerrar={() => setResumenAbierto(false)}
+        onConfirmar={handleConfirmarDatosParaIA}
+        guardando={false}
+        errorGuardar=""
+        textoConfirmar="Redactar"
       />
       {/* ============ AQUÍ TERMINA RESUMEN DOCUMENTO ============ */}
 
-      {/* Preview de la redacción IA: valida primero, redacta, permite guardar */}
+      {/* Preview de la redacción IA (solo lectura + retro para corregir) */}
       {/* ============ AQUÍ EMPIEZA DIÁLOGO IA ============ */}
-      <Dialog open={iaAbierto} onClose={() => !iaCargando && setIaAbierto(false)} maxWidth="md" fullWidth>
+      <Dialog open={iaAbierto} onClose={() => !iaCargando && !guardando && setIaAbierto(false)} maxWidth="md" fullWidth>
         <DialogTitle color="encabezado.main" fontWeight="bold">
-          Redacción con IA — {nombreTipo(categoria, tipoDoc)}
+          Generando redacción: {nombreTipo(categoria, tipoDoc)}
         </DialogTitle>
         <DialogContent dividers>
-          {iaCargando && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-              <CircularProgress size={24} />
-              <Typography variant="body2">Redactando con {iaModelo || 'la IA'}…</Typography>
-            </Box>
+          {(iaCargando || iaCorrigiendo || guardando) && (
+            <ProgresoIA
+              fases={iaFases}
+              indice={iaFase}
+              progreso={iaProgreso}
+              segundos={iaSegundos}
+              modelo={iaModelo}
+            />
           )}
           {iaError && (
             <Alert severity="error" sx={{ mb: 2 }}>{iaError}</Alert>
+          )}
+          {errorGuardar && (
+            <Alert severity="error" sx={{ mb: 2 }}>{errorGuardar}</Alert>
           )}
           {iaTexto && (
             <>
@@ -768,23 +912,46 @@ export default function GenerarCarta() {
               >
                 {iaTexto}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                 Modelo: {iaModelo} · Revisa el texto antes de guardar.
               </Typography>
+              <TextField
+                label="¿Algo está mal? Describe qué corregir (ej. cambia la vigencia a 1 año, agrega el folio...)"
+                multiline
+                minRows={2}
+                fullWidth
+                value={iaRetro}
+                onChange={(e) => setIaRetro(e.target.value)}
+                disabled={iaCargando || iaCorrigiendo || guardando}
+                sx={{ mb: 1 }}
+              />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleCorregirIA}
+                  disabled={iaCargando || iaCorrigiendo || guardando || !iaTexto || !(iaRetro ?? '').trim()}
+                  sx={{ borderColor: 'encabezado.main', color: 'encabezado.main' }}
+                >
+                  {iaCorrigiendo ? 'Corrigiendo...' : 'Corregir'}
+                </Button>
+              </Box>
             </>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIaAbierto(false)} disabled={iaCargando} sx={{ color: 'encabezado.main' }}>
+          <Button onClick={handleVolverADatos} disabled={iaCargando || iaCorrigiendo || guardando} sx={{ color: 'encabezado.main' }}>
+            Volver a datos
+          </Button>
+          <Button onClick={() => setIaAbierto(false)} disabled={iaCargando || iaCorrigiendo || guardando} sx={{ color: 'encabezado.main' }}>
             Cerrar
           </Button>
           <Button
             variant="contained"
             color="primary"
-            onClick={handleContinuarIA}
-            disabled={iaCargando || !iaTexto}
+            onClick={handleGuardarFinal}
+            disabled={iaCargando || iaCorrigiendo || guardando || !iaTexto}
           >
-            Continuar
+            {guardando ? 'Generando...' : 'Confirmar y guardar'}
           </Button>
         </DialogActions>
       </Dialog>

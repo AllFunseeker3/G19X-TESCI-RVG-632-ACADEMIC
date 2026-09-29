@@ -54,6 +54,33 @@ router.post("/redactar", async (req, res, next) => {
 });
 // ============ AQUÍ TERMINA RUTA POST REDACTAR ============
 
+// ============ AQUÍ EMPIEZA RUTA POST CORREGIR ============
+// POST /api/ia/corregir { contenido, instruccion, id_tipo? } -> { contenido, modelo }.
+// Aplica la retro del usuario al texto del preview sin regenerar desde cero.
+router.post("/corregir", async (req, res, next) => {
+  try {
+    const { contenido, instruccion, id_tipo = "" } = req.body || {};
+    if (!contenido || !instruccion) {
+      return res.status(400).json({ detail: "Faltan contenido e instruccion" });
+    }
+    let r;
+    try {
+      r = await fetch(`${IA_URL}/corregir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contenido, instruccion, id_tipo }),
+      });
+    } catch {
+      return res.status(503).json({ detail: "Servicio IA apagado (ai-service en :8001)" });
+    }
+    const cuerpo = await r.json().catch(() => ({}));
+    return res.status(r.status).json(cuerpo);
+  } catch (e) {
+    return next(e);
+  }
+});
+// ============ AQUÍ TERMINA RUTA POST CORREGIR ============
+
 // ============ AQUÍ EMPIEZA RUTA POST PDF ============
 // POST /api/ia/pdf { id_tipo, datos, contenido?, id_documento?, nombre_base? } ->
 // { archivo, bytes, id_adjunto? }. Genera el PDF en documentos/Sistema legal

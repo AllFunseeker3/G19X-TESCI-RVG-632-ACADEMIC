@@ -3,13 +3,14 @@
  * FUNCIÓN GENERAL: Dashboard principal ("Resumen operativo").
  *   - Banner de saludo por hora con el NOMBRE del logueado + conteos reales.
  *   - Tarjeta Notificaciones (documentos por revisar desde la BD, funcional).
- *   - 4 tarjetas KPI (total/aprobadas/por revisar/rechazadas, valores fijos demo).
+ *   - 4 tarjetas KPI reales (total/aprobadas/por revisar/rechazadas desde BD).
  *   - Accesos directos (Generar / Revisar / Plantillas / Seguimiento).
- *   - Gráfica dona por estado + actividad reciente (GET actividad/reciente)
- *     + buscador sobre la lista real + tabla de procesados (TablaGeneral).
+ *   - Buscador sobre la lista real + tabla de procesados (TablaGeneral).
+ *   - NOTA: dona por estado y actividad reciente eliminadas (2026-09-28,
+ *     sin utilidad); no reintroducir sin pedirlo.
  * FLUJO DE DATOS:
  *   - ENTRAN (DATOS PROVENIENTES DE):
- *     -> ../lib/api.js: getDocumentos(), getActividad(), leerUsuario().
+ *     -> ../lib/api.js: getDocumentos(), leerUsuario().
  *        Todo filtrado por área y permiso en server/routes/documentos.js.
  *     -> ../lib/estados.js: estadoBonito() para etiquetas visibles.
  *     -> app.jsx: monta esta página en "/Inicio" dentro de DashBoardLayout.
@@ -21,16 +22,15 @@
  *     -> GenerarCarta.jsx vía ruta /Menu (acceso "Generar documento").
  *     -> plantillas.jsx vía ruta /Plantillas (acceso "Plantillas").
  * QUÉ MODIFICAR SI hay cambios:
- *   - KPIs: hoy son números fijos (150/75/75/200); calcúlalos del back.
+ *   - KPIs: se calculan de `todos` (lista real del back).
  *   - Estilos: cada <Box> tiene id (los preexistentes con espacios se
  *     conservaron tal cual; los nuevos usan id="Box-Inicio-*").
- * No se cambió lógica ni JSX, solo comentarios e ids en <Box>.
  * ========================================================================== */
 import { useEffect, useState } from 'react';
-import {Box, Grid,Card, CardContent, Typography, List, ListItem, ListItemText, ListItemIcon, Button, TextField, Chip} from '@mui/material';
+import {Box, Grid,Card, CardContent, Typography, List, ListItem, ListItemText, Button, TextField, Chip} from '@mui/material';
 import { Link } from 'react-router-dom';
-// DATOS REALES: lista, actividad y usuario (server/routes/documentos.js + login).
-import { getActividad, getDocumentos, leerUsuario } from '../lib/api.js';
+// DATOS REALES: lista y usuario (server/routes/documentos.js + login).
+import { getDocumentos, leerUsuario } from '../lib/api.js';
 // Etiquetas visibles de estados (código API -> texto).
 import { estadoBonito } from '../lib/estados.js';
 import SearchIcon from '@mui/icons-material/Search';
@@ -42,7 +42,6 @@ import PostAddIcon from '@mui/icons-material/PostAdd';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import GridViewIcon from '@mui/icons-material/GridView';
 import TimelineIcon from '@mui/icons-material/Timeline';
-import HistoryIcon from '@mui/icons-material/History';
 // DATOS PROVENIENTES DE ../Components/TablaGeneral.jsx: tabla reutilizable del resumen.
 import TablaGeneral from '../Components/TablaGeneral';
 
@@ -60,30 +59,15 @@ const ACCESOS = [
 ];
 // ============ AQUÍ TERMINA ACCESOS DIRECTOS ============
 
-// ============ AQUÍ EMPIEZA COLORES DONA ============
-// CONSTANTE: color hex por estado para la dona y leyenda.
-// QUÉ HACE: mapea estado -> color CSS del conic-gradient.
-// DÓNDE SE USA: cálculo de `dona` y puntos de leyenda.
-// QUÉ MODIFICAR SI: agregas un estado nuevo en ../lib/estados.js, añade su color aquí.
-const COLOR_HEX = {
-  Aprobado: '#2e7d32',
-  Rechazado: '#d32f2f',
-  'Por revisar': '#ed6c02',
-  Notificado: '#0288d2',
-  Borrador: '#9e9e9e',
-};
-// ============ AQUÍ TERMINA COLORES DONA ============
-
 // ============ AQUÍ EMPIEZA PÁGINA INICIO ============
-// QUÉ HACE: página dashboard con resumen, accesos, dona, actividad, buscador y tabla.
+// QUÉ HACE: página dashboard con resumen, accesos, buscador y tabla.
 // DÓNDE SE USA: ruta "/Inicio" en app.jsx (dentro de DashBoardLayout).
 export default function Inicio() {
   // ============ AQUÍ EMPIEZA CARGA DATOS INICIO ============
-  // DATOS REALES: lista completa (dona/buscador/tabla) + actividad del back.
+  // DATOS REALES: lista completa (buscador/tabla/KPIs/notificaciones).
   // (server/routes/documentos.js, ya filtrados por área y permiso).
   // Si el servidor cae, api.js dispara el evento y app.jsx regresa al login.
   const [todos, setTodos] = useState([]);
-  const [actividad, setActividad] = useState([]);
   useEffect(() => {
     let vivo = true;
     getDocumentos()
@@ -91,49 +75,11 @@ export default function Inicio() {
         if (vivo) setTodos(Array.isArray(filas) ? filas : []);
       })
       .catch(() => {});
-    getActividad(6)
-      .then((acts) => {
-        if (vivo) {
-          setActividad(
-            (Array.isArray(acts) ? acts : []).map((a) => ({
-              docId: `#${a.docId}`,
-              tipo: a.tipo,
-              etapa: estadoBonito(a.etapa),
-              fecha: String(a.fecha ?? '').slice(0, 16).replace('T', ' '),
-              responsable: a.responsable ?? '—',
-              comentario: a.comentario ?? '',
-            }))
-          );
-        }
-      })
-      .catch(() => {});
     return () => {
       vivo = false;
     };
   }, []);
   // ============ AQUÍ TERMINA CARGA DATOS INICIO ============
-
-  // ============ AQUÍ EMPIEZA CÁLCULOS DONA ============
-  // CÁLCULO: conteo por estado para la gráfica (etiquetas visibles).
-  // DÓNDE SE USA: segmentos/dona + leyenda de "Documentos por estado".
-  const conteo = {};
-  todos.forEach((d) => {
-    const e = estadoBonito(d.estado);
-    conteo[e] = (conteo[e] ?? 0) + 1;
-  });
-  const estados = Object.keys(conteo);
-  const total = todos.length;
-  let acumulado = 0;
-  const segmentos = estados.map((e) => {
-    const inicio = total === 0 ? 0 : (acumulado / total) * 100;
-    acumulado += conteo[e];
-    const fin = total === 0 ? 0 : (acumulado / total) * 100;
-    return `${COLOR_HEX[e] ?? '#9e9e9e'} ${inicio}% ${fin}%`;
-  });
-  const dona = total === 0
-    ? '#e0e0e0'
-    : `conic-gradient(${segmentos.join(', ')})`;
-  // ============ AQUÍ TERMINA CÁLCULOS DONA ============
 
   // ============ AQUÍ EMPIEZA USUARIO Y NOTIFICACIONES ============
   // USUARIO LOGUEADO: nombre para el saludo (lo guarda Ingreso.jsx al login).
@@ -403,93 +349,7 @@ export default function Inicio() {
     </Box>
     {/* ============ AQUÍ TERMINA ACCESOS DIRECTOS (JSX) ============ */}
 
-    {/* ============ AQUÍ EMPIEZA FILA ESTADÍSTICAS ============ */}
-    {/* Opción 2 (5/7): dona compacta + actividad ancha, misma altura, sin huecos. */}
-    <Box id="Box-Inicio-FilaEstadisticas" sx={{width: '100%', mt: 3}}>
-      <Grid container spacing={2} alignItems="stretch">
-        <Grid item xs={12} md={5} sx={{display: 'flex'}}>
-          {/* SECCIÓN JSX: dona por estado (id preexistente conservado). */}
-          <Box id="Resumen por estado" sx={{width: '100%', display: 'flex'}}>
-            <Card sx={{borderRadius: 2, height: '100%', minHeight: 360, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" sx={{mb: 2, color:'text.secondary'}}>
-                  Documentos por estado
-                </Typography>
-                {/* SECCIÓN JSX: layout dona + leyenda. */}
-                <Box id="Box-Inicio-DonaLayout" sx={{display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap'}}>
-                  {/* SECCIÓN JSX: círculo de la dona (conic-gradient). */}
-                  <Box id="Box-Inicio-DonaGrafica" sx={{position: 'relative', width: 150, height: 150, flexShrink: 0}}>
-                    {/* SECCIÓN JSX: anillo de color con el gradiente calculado. */}
-                    <Box id="Box-Inicio-DonaAnillo" sx={{
-                      width: '100%', height: '100%', borderRadius: '50%',
-                      background: dona,
-                    }} />
-                    {/* SECCIÓN JSX: centro de la dona (usa papel del tema para oscuro/claro). */}
-                    <Box id="Box-Inicio-DonaCentro" sx={{
-                      position: 'absolute', inset: '22px', borderRadius: '50%',
-                      bgcolor: 'background.paper', display: 'grid', placeItems: 'center',
-                    }}>
-                      {/* SECCIÓN JSX: total de documentos al centro. */}
-                      <Box id="Box-Inicio-DonaTotalTexto" sx={{textAlign: 'center'}}>
-                        <Typography variant="h5" fontWeight="bold" color="encabezado.main">{total}</Typography>
-                        <Typography variant="caption" color="text.secondary">docs</Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-                  {/* SECCIÓN JSX: leyenda estado -> conteo. */}
-                  <Box id="Box-Inicio-DonaLeyenda" sx={{flexGrow: 1, minWidth: 140}}>
-                    {estados.map((e) => (
-                      // SECCIÓN JSX: fila de leyenda (id único por estado).
-                      <Box key={e} id={`Box-Inicio-DonaLeyenda-${e}`} sx={{display: 'flex', alignItems: 'center', gap: 1, mb: 1}}>
-                        {/* SECCIÓN JSX: punto de color del estado. */}
-                        <Box id={`Box-Inicio-DonaPunto-${e}`} sx={{width: 12, height: 12, borderRadius: '50%', bgcolor: COLOR_HEX[e]}} />
-                        <Typography variant="body2" sx={{flexGrow: 1}}>{e}</Typography>
-                        <Typography variant="body2" fontWeight="bold">{conteo[e]}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-        </Grid>
-        <Grid item xs={12} md={7} sx={{display: 'flex'}}>
-          {/* SECCIÓN JSX: actividad reciente (id preexistente conservado).
-              DATOS QUE SE MANDAN A Seguimiento.jsx para procesamiento: botón a "/Seguimiento". */}
-          <Box id="Actividad reciente" sx={{width: '100%', display: 'flex'}}>
-            <Card sx={{borderRadius: 2, height: '100%', minHeight: 360, width: '100%', display: 'flex', flexDirection: 'column'}}>
-              <CardContent sx={{display: 'flex', flexDirection: 'column', flexGrow: 1}}>
-                <Typography variant="h6" fontWeight="bold" sx={{mb: 1, color:'text.secondary'}}>
-                  Actividad reciente
-                </Typography>
-                <List dense sx={{flexGrow: 1, maxHeight: 250, overflow: 'auto'}}>
-                  {actividad.map((a, i) => (
-                    <ListItem key={i} disablePadding sx={{py: 0.5}}>
-                      <ListItemIcon sx={{minWidth: 36}}>
-                        <HistoryIcon sx={{ color: 'encabezado.main' }} fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={`${a.docId} ${a.tipo} — ${a.etapa}`}
-                        secondary={`${a.responsable} · ${a.fecha}`}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-                <Button
-                  component={Link}
-                  to="/Seguimiento"
-                  size="small"
-                  sx={{ mt: 1, color: 'encabezado.main', alignSelf: 'flex-start' }}
-                >
-                  Ver trazabilidad completa
-                </Button>
-              </CardContent>
-            </Card>
-          </Box>
-        </Grid>
-      </Grid>
-    </Box>
-    {/* ============ AQUÍ TERMINA FILA ESTADÍSTICAS ============ */}
+
 
     {/* ============ AQUÍ EMPIEZA TABLA PROCESADOS CON BUSCADOR INTEGRADO ============ */}
     {/* Buscador antes separado; ahora filtra la tabla directamente (sin huecos en blanco). */}

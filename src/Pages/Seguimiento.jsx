@@ -19,17 +19,21 @@
  *   - Estilos: ids "Box-Seguimiento-*" (preexistentes conservados).
  * ========================================================================== */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Box, Typography, NativeSelect, InputLabel, Card, CardContent,
+  Box, Typography, NativeSelect, InputLabel, Card, CardContent, Button,
   Grid, Stepper, Step, StepLabel, StepContent, Alert,
 } from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
 import PageHeader from '../Components/PageHeader';
 // DATOS QUE SE MANDAN A ../Components/EstadoChip.jsx para procesamiento: estado={doc.estado}.
 import EstadoChip from '../Components/EstadoChip';
 // DATOS PROVENIENTES DE ../lib/api.js: lista y detalle reales (área/permiso del back).
-import { getDocumentos, getDocumento } from '../lib/api.js';
+import { getDocumentos, getDocumento, leerUsuario } from '../lib/api.js';
 // Etiquetas legibles de etapas (código API -> visible).
 import { estadoBonito } from '../lib/estados';
+// PERMISOS: el admin también puede corregir (el back lo revalida).
+import { usePermisos } from '../Components/PermisosProvider';
 
 // ============ AQUÍ EMPIEZA PÁGINA SEGUIMIENTO ============
 // QUÉ HACE: página de trazabilidad con selector + ficha + línea de tiempo.
@@ -92,6 +96,16 @@ export default function Seguimiento() {
 
     // Historial normalizado a arreglo (el Stepper lo recorre).
     const historial = Array.isArray(doc?.historial) ? doc.historial : [];
+    // Último rechazo (motivo destacado) y última aprobación del historial.
+    const ultimoRechazo = historial.filter((h) => h.estado_nuevo === 'rechazado').slice(-1)[0];
+    const ultimaAprobacion = historial.filter((h) => h.estado_nuevo === 'aprobado').slice(-1)[0];
+    // Editar: solo borrador/rechazado y solo el creador o el admin.
+    // El back lo revalida (403/400); aquí solo se muestra/oculta el botón.
+    const yo = leerUsuario();
+    const { admin } = usePermisos();
+    const puedeEditar = Boolean(doc)
+        && (doc.estado === 'borrador' || doc.estado === 'rechazado')
+        && (admin || yo?.id === doc.id_creador);
 
     return (
         // SECCIÓN JSX: contenedor raíz (id preexistente conservado).
@@ -159,6 +173,33 @@ export default function Seguimiento() {
                                 <Box id="Box-Seguimiento-Estado" sx={{ mt: 2 }}>
                                     <EstadoChip estado={doc.estado} />
                                 </Box>
+                                {/* SECCIÓN JSX: motivo del dictamen destacado + corrección. */}
+                                {doc.estado === 'rechazado' && ultimoRechazo && (
+                                    <Alert severity="error" sx={{ mt: 2 }}>
+                                        Motivo del rechazo ({ultimoRechazo.responsable ?? 'revisor'}
+                                        {ultimoRechazo.creado_en ? ` · ${String(ultimoRechazo.creado_en).slice(0, 16).replace('T', ' ')}` : ''}):
+                                        {' '}{ultimoRechazo.comentario ?? 'sin motivo indicado'}
+                                    </Alert>
+                                )}
+                                {doc.estado === 'aprobado' && ultimaAprobacion && (
+                                    <Alert severity="success" sx={{ mt: 2 }}>
+                                        Aprobada por {ultimaAprobacion.responsable ?? 'revisión'}
+                                        {ultimoRechazo?.comentario || ultimaAprobacion.comentario
+                                            ? `: ${ultimaAprobacion.comentario ?? ''}` : ''}.
+                                    </Alert>
+                                )}
+                                {puedeEditar && (
+                                    <Button
+                                        component={Link}
+                                        to={`/Menu?editar=${doc.id_documento ?? doc.id}`}
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<EditIcon />}
+                                        sx={{ mt: 2 }}
+                                    >
+                                        Editar y corregir
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
                     </Box>

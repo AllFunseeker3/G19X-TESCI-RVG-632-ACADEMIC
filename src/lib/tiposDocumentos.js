@@ -229,4 +229,9 @@ export const nombreTipo = (idCategoria, idTipo) =>
   tiposDeCategoria(idCategoria).find((t) => t.id === idTipo)?.nombre ?? '';
 
 export const camposDeTipo = (idTipo) => CAMPOS_POR_TIPO[idTipo] ?? [];
+
+// Categoría a la que pertenece un tipo (búsqueda inversa; '' si no existe).
+// Lo usa GenerarCarta en modo ?editar= para precargar categoría + tipo.
+export const categoriaDeTipo = (idTipo) =>
+  CATEGORIAS.find((c) => (TIPOS_POR_CATEGORIA[c.id] ?? []).some((t) => t.id === idTipo))?.id ?? '';
 // ============ AQUÍ TERMINA HELPERS DE VISTA ============

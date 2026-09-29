@@ -76,9 +76,11 @@ router.get("/", async (req, res, next) => {
   let q = `SELECT d.id_documento AS id, d.folio, d.id_tipo, t.nombre AS tipo,
                   d.id_cliente, c.nombre AS cliente, d.estado, d.id_area,
                   d.creado_en, d.actualizado_en,
+                  u.nombre AS creador,
                   t.id_categoria AS categoria
            FROM documentos d JOIN tipos_documento t ON t.id_tipo = d.id_tipo
            LEFT JOIN clientes c ON c.id_cliente = d.id_cliente
+           LEFT JOIN usuarios u ON u.id_usuario = d.id_creador
            WHERE 1 = 1`; // Base para concatenar filtros.
   const args = [];
   if (!u.admin) {
@@ -110,6 +112,70 @@ router.get("/", async (req, res, next) => {
 });
 // ============ AQUÍ TERMINA RUTA GET LISTA ============
 
+// ============ AQUÍ EMPIEZA HELPER NOTIFICAR NUEVO/CORREGIDO ============
+// QUÉ HACE: fan-out de campanita a supers del área + admins (sin el creador).
+// `verbo`: 'creó' (nuevo) o 'corrigió' (editado tras rechazo).
+// Nunca rompe la operación principal (errores solo a consola).
+async function notificarNuevoDoc({ idDoc, idTipo, folio, area, creadorId, creadorNombre, verbo }) {
+  try {
+    const [[t]] = await pool.query(
+      "SELECT nombre FROM tipos_documento WHERE id_tipo = ?",
+      [idTipo]
+    );
+    const tipoNombre = t ? t.nombre : idTipo;
+    const [dests] = await pool.query(
+      `SELECT u.id_usuario AS id FROM usuarios u
+       JOIN roles r ON r.id_rol = u.id_rol
+       WHERE u.activo AND u.id_usuario <> ?
+         AND (r.nombre = 'Administrador' OR (r.es_super AND u.id_area = ?))`,
+      [creadorId, area]
+    );
+    const titulo = verbo === "corrigió"
+      ? `Documento #${idDoc} corregido — ${tipoNombre}`
+      : `Nuevo documento #${idDoc} — ${tipoNombre}`;
+    const detalle = `${creadorNombre} ${verbo} ${tipoNombre}${folio ? ` (folio ${folio})` : ""}`;
+    for (const d of dests) {
+      await pool.query(
+        `INSERT INTO notificaciones
+         (id_usuario, tipo, titulo, detalle, id_documento)
+         VALUES (?, 'documento_creado', ?, ?, ?)`,
+        [d.id, titulo, detalle, idDoc]
+      );
+    }
+  } catch (eNotif) {
+    console.error("Aviso campanita:", eNotif.message);
+  }
+}
+// ============ AQUÍ TERMINA HELPER NOTIFICAR NUEVO/CORREGIDO ============
+
+// ============ AQUÍ EMPIEZA HELPER NOTIFICAR DICTAMEN ============
+// QUÉ HACE: avisa SOLO al creador cuando su documento es aprobado/rechazado
+// (con el motivo del revisor). No avisa si el revisor es el propio creador.
+async function notificarDictamen({ idDoc, idTipo, creadorId, revisorId, revisorNombre, estado, comentario }) {
+  if (creadorId === revisorId) return;
+  try {
+    const [[t]] = await pool.query(
+      "SELECT nombre FROM tipos_documento WHERE id_tipo = ?",
+      [idTipo]
+    );
+    const tipoNombre = t ? t.nombre : idTipo;
+    const esAprobado = estado === "aprobado";
+    const titulo = `Documento #${idDoc} ${esAprobado ? "aprobado" : "rechazado"} — ${tipoNombre}`;
+    const detalle = esAprobado
+      ? `${revisorNombre} aprobó tu ${tipoNombre}.`
+      : `${revisorNombre} rechazó tu ${tipoNombre}. Motivo: ${(comentario ?? "").toString().trim() || "sin motivo indicado"}`;
+    await pool.query(
+      `INSERT INTO notificaciones
+       (id_usuario, tipo, titulo, detalle, id_documento)
+       VALUES (?, ?, ?, ?, ?)`,
+      [creadorId, esAprobado ? "documento_aprobado" : "documento_rechazado", titulo, detalle, idDoc]
+    );
+  } catch (eNotif) {
+    console.error("Aviso dictamen:", eNotif.message);
+  }
+}
+// ============ AQUÍ TERMINA HELPER NOTIFICAR DICTAMEN ============
+
 // ============ AQUÍ EMPIEZA RUTA POST CREAR ============
 // POST /api/documentos — crea en 'borrador' + historial inicial.
 router.post("/", async (req, res, next) => {
@@ -136,6 +202,11 @@ router.post("/", async (req, res, next) => {
        VALUES (?, NULL, 'borrador', ?, 'Creación del documento')`,
       [r.insertId, u.id]
     );
+    // Campanita: avisa a supers del área + admins (sin incluir al creador).
+    await notificarNuevoDoc({
+      idDoc: r.insertId, idTipo: id_tipo, folio, area,
+      creadorId: u.id, creadorNombre: u.nombre, verbo: "creó",
+    });
     return res.status(201).json({ id: r.insertId, estado: "borrador" });
   } catch (e) {
     return next(e);
@@ -224,6 +295,14 @@ router.patch("/:id/estado", async (req, res, next) => {
        VALUES (?, ?, ?, ?, ?)`,
       [d.id_documento, d.estado, estado, req.usuario.id, comentario]
     );
+    // Campanita: avisa SOLO al creador (aprobado o rechazado + motivo).
+    if (estado === "aprobado" || estado === "rechazado") {
+      await notificarDictamen({
+        idDoc: d.id_documento, idTipo: d.id_tipo, creadorId: d.id_creador,
+        revisorId: req.usuario.id, revisorNombre: req.usuario.nombre,
+        estado, comentario,
+      });
+    }
     return res.json({ id: d.id_documento, estado });
   } catch (e) {
     return next(e);
@@ -251,6 +330,45 @@ router.post("/:id/adjuntos", async (req, res, next) => {
   }
 });
 // ============ AQUÍ TERMINA RUTA POST ADJUNTO ============
+
+// ============ AQUÍ EMPIEZA RUTA PATCH CORREGIR DATOS ============
+// PATCH /api/documentos/:id/datos — el creador (o admin) corrige un documento
+// en 'borrador' o 'rechazado'. Vuelve a 'borrador' + rastro + avisa a supers/admin.
+router.patch("/:id/datos", async (req, res, next) => {
+  try {
+    const d = await docVisible(Number(req.params.id), req.usuario, "ver");
+    if (!(req.usuario.admin || d.id_creador === req.usuario.id)) {
+      return res.status(403).json({ detail: "Solo el creador o un admin pueden corregir" });
+    }
+    if (!["borrador", "rechazado"].includes(d.estado)) {
+      return res.status(400).json({ detail: "Solo borrador o rechazado se pueden corregir" });
+    }
+    const { datos = {}, contenido = null, modelo_ia = null } = req.body || {};
+    if (typeof datos !== "object" || Array.isArray(datos)) {
+      return res.status(400).json({ detail: "Faltan los datos corregidos" });
+    }
+    await pool.query(
+      `UPDATE documentos SET datos = ?, contenido = ?, modelo_ia = ?, estado = 'borrador'
+       WHERE id_documento = ?`,
+      [JSON.stringify(datos), contenido, modelo_ia, d.id_documento]
+    );
+    await pool.query(
+      `INSERT INTO documento_historial
+       (id_documento, estado_anterior, estado_nuevo, id_responsable, comentario)
+       VALUES (?, ?, 'borrador', ?, 'Corrección del creador')`,
+      [d.id_documento, d.estado, req.usuario.id]
+    );
+    // Campanita: el corregido vuelve a revisión (avisa a supers/admin).
+    await notificarNuevoDoc({
+      idDoc: d.id_documento, idTipo: d.id_tipo, folio: d.folio, area: d.id_area,
+      creadorId: d.id_creador, creadorNombre: req.usuario.nombre, verbo: "corrigió",
+    });
+    return res.json({ id: d.id_documento, estado: "borrador" });
+  } catch (e) {
+    return next(e);
+  }
+});
+// ============ AQUÍ TERMINA RUTA PATCH CORREGIR DATOS ============
 
 // ============ AQUÍ EMPIEZA RUTA DELETE DOCUMENTO ============
 // DELETE /api/documentos/:id — borra el documento (historial/adjuntos por CASCADE).

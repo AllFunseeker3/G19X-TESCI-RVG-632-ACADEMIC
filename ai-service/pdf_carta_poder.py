@@ -151,10 +151,13 @@ def generar_carta_poder(datos: dict, nombre_base: str = "carta-poder") -> dict:
         Spacer(1, 0.4 * cm),
         # Párrafo Asimismo CONTEXTUAL (viene de IA según facultades/límites).
         Paragraph(parrafo, e["jus"]),
-        Spacer(1, 0.8 * cm),
-        Paragraph("Atentamente", e["cen"]),
-        Spacer(1, 1.2 * cm),
+        Spacer(1, 0.6 * cm),
+        # Bloque de firmas SIEMPRE junto en la misma hoja: Atentamente +
+        # OTORGO/ACEPTO + TESTIGOS en un solo KeepTogether para que
+        # reportlab lo mueva completo a la siguiente página si no cabe.
         KeepTogether([
+            Paragraph("Atentamente", e["cen"]),
+            Spacer(1, 0.8 * cm),
             Table(
                 [[
                     _bloque_firma(
@@ -168,10 +171,9 @@ def generar_carta_poder(datos: dict, nombre_base: str = "carta-poder") -> dict:
                 ]],
                 colWidths=[7.5 * cm, 7.5 * cm],
                 style=estilo_tabla,
+                splitByRow=0,
             ),
-        ]),
-        Spacer(1, 1.2 * cm),
-        KeepTogether([
+            Spacer(1, 0.8 * cm),
             Table(
                 [[
                     _bloque_firma(
@@ -187,6 +189,7 @@ def generar_carta_poder(datos: dict, nombre_base: str = "carta-poder") -> dict:
                 ]],
                 colWidths=[7.5 * cm, 7.5 * cm],
                 style=estilo_tabla,
+                splitByRow=0,
             ),
         ]),
     ]
@@ -242,10 +245,13 @@ def generar_pdf_generico(titulo: str, datos: dict, contenido: str, nombre_base: 
         historia += [Paragraph(b.replace("\n", "<br/>"), e["jus"]), Spacer(1, 0.3 * cm)]
     historia += [
         Spacer(1, 0.5 * cm),
-        Paragraph("Atentamente", e["cen"]),
-        Spacer(1, 1.2 * cm),
-        HRFlowable(width="55%", thickness=1, hAlign="CENTER", spaceAfter=4),
-        Paragraph("Firma", e["firma"]),
+        # Firma genérica siempre junta con "Atentamente" en la misma hoja.
+        KeepTogether([
+            Paragraph("Atentamente", e["cen"]),
+            Spacer(1, 0.8 * cm),
+            HRFlowable(width="55%", thickness=1, hAlign="CENTER", spaceAfter=4),
+            Paragraph("Firma", e["firma"]),
+        ]),
     ]
     doc.build(historia)
     return {"archivo": archivo, "ruta": str(ruta), "bytes": ruta.stat().st_size}

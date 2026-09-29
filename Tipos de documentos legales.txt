@@ -1,6 +1,5 @@
 Campo 1: Categoría General
 Este será el primer menú desplegable. Sus opciones deben ser estrictamente las clasificaciones principales de la estructura legal:
-
 Cartas
 
 Oficios
@@ -8,7 +7,6 @@ Oficios
 Avisos
 
 Notificaciones Legales
-
 Campo 2: Tipo de Documento Específico
 Este segundo menú permanecerá inactivo hasta que el usuario seleccione una opción en el Campo 1. Sus elementos se actualizarán dinámicamente según la elección anterior:
 
@@ -20,7 +18,6 @@ Si el usuario selecciona "Oficios": El menú mostrará Oficio de Petición, Ofic
 
 Alternativa de un solo campo: Menú Agrupado
 Si el diseño de la interfaz requiere mantener un único elemento desplegable para ahorrar espacio, puedes estructurar las opciones utilizando categorías visuales (etiquetas de agrupación que no son seleccionables por el usuario) dentro del mismo menú:
-
 — CARTAS —
 
 Carta Poder

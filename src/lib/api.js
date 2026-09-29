@@ -115,10 +115,11 @@ export const getDocumentos = (params = {}) => {
   return api(`/documentos${q ? `?${q}` : ""}`);
 };
 export const getDocumento = (id) => api(`/documentos/${id}`);
-export const getActividad = (limite = 6) =>
-  api(`/documentos/actividad/reciente?limite=${limite}`);
 export const crearDocumento = (payload) =>
   api("/documentos", { metodo: "POST", cuerpo: payload });
+// Corrige los datos de un doc propio en borrador/rechazado (vuelve a borrador).
+export const actualizarDocumento = (id, payload) =>
+  api(`/documentos/${id}/datos`, { metodo: "PATCH", cuerpo: payload });
 export const cambiarEstado = (id, estado, comentario) =>
   api(`/documentos/${id}/estado`, {
     metodo: "PATCH",
@@ -158,6 +159,9 @@ export const bajaUsuario = (id) =>
 // Redacta el documento con IA a partir del tipo y los datos capturados.
 export const redactarConIA = (idTipo, datos) =>
   api("/ia/redactar", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos } });
+// Corrige el texto del preview con la retro del usuario (sin regenerar desde cero).
+export const corregirConIA = (contenido, instruccion, idTipo = "") =>
+  api("/ia/corregir", { metodo: "POST", cuerpo: { contenido, instruccion, id_tipo: idTipo } });
 // Genera el PDF institucional en documentos/Sistema legal (+ adjunto si hay id).
 export const generarPDF = (idTipo, datos, idDocumento = null, contenido = '') =>
   api("/ia/pdf", { metodo: "POST", cuerpo: { id_tipo: idTipo, datos, contenido, id_documento: idDocumento } });
@@ -171,6 +175,20 @@ export const descargarPDF = async (archivo) => {
   return res.blob();
 };
 // ============ AQUÍ TERMINA IA Y PDF ============
+
+// ============ AQUÍ EMPIEZA NOTIFICACIONES ============
+// --- Campanita (server/routes/notificaciones.js): avisos de creación para
+// supers del área + admins. El badge cuenta las no leídas.
+export const getNotificaciones = (limite = 10, soloNoLeidas = false) => {
+  const q = new URLSearchParams({ limite: String(limite) });
+  if (soloNoLeidas) q.set("solo_no_leidas", "1");
+  return api(`/notificaciones?${q.toString()}`);
+};
+export const marcarNotificacionLeida = (id) =>
+  api(`/notificaciones/${id}/leida`, { metodo: "PATCH" });
+export const marcarTodasLeidas = () =>
+  api("/notificaciones/leer-todas", { metodo: "PATCH" });
+// ============ AQUÍ TERMINA NOTIFICACIONES ============
 
 // ============ AQUÍ EMPIEZA SALUD ============
 // --- Salud (sin auth): ping a MariaDB + conteos ---

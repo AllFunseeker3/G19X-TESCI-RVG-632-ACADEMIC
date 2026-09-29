@@ -30,6 +30,9 @@ PORT = int(os.getenv("IA_PORT", "8001"))
 # Nuevo proveedor: openrouter (default) | google (Gemini directo).
 IA_PROVIDER = os.getenv("IA_PROVIDER", "openrouter").strip().lower()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+# Pre-formaliza facultades/límites con 1 llamada extra antes del machote
+# (preview = PDF). 1 = sí (default), 0 = solo prompt duro (más rápido).
+IA_PRE_FORMALIZAR = os.getenv("IA_PRE_FORMALIZAR", "1").strip() != "0"
 # ============ AQUÍ TERMINA CONFIGURACIÓN ============
 
 # ============ AQUÍ EMPIEZA APP Y CORS ============
@@ -54,6 +57,12 @@ class PdfIn(BaseModel):
     datos: dict
     nombre_base: str = "carta-poder"
     contenido: str = ""  # Redacción IA (si el front la manda, el PDF genérico la usa como cuerpo).
+
+
+class CorregirIn(BaseModel):
+    contenido: str  # Texto actual generado por la IA (el que ve el usuario en el preview).
+    instruccion: str  # Retro del usuario: qué está mal y cómo corregirlo.
+    id_tipo: str = ""  # Opcional: da contexto del tipo para no romper el formato.
 # ============ AQUÍ TERMINA MODELOS DE ENTRADA ============
 
 # ============ AQUÍ EMPIEZA PLANTILLAS ============
@@ -101,6 +110,13 @@ PROMPT_CARTA_PODER = PromptTemplate.from_template(
     "Vigencia: {vigencia}\n"
     "Lugar: {lugar}\nFecha: {fecha}\n\n"
     "Reglas: usa EXCLUSIVAMENTE estos datos (si un opcional falta, omítelo sin inventar). "
+    "PROHIBIDO copiar facultades/límites tal cual: reescríbelos como oración jurídica "
+    "completa, solemne, con mayúscula inicial y punto final. "
+    "Ejemplos obligatorios: 'Hacer uso de mi cuenta bancaria' -> 'La administración, "
+    "disposición y manejo integral de la cuenta bancaria de mi titularidad, incluyendo "
+    "retiros, depósitos, transferencias, disposición de fondos, consulta de saldos y "
+    "movimientos, solicitud de estados de cuenta y contratación de servicios vinculados'. "
+    "'Ninguno'/'Ninguna'/'Ningún' -> 'Sin limitación alguna'. "
     "OBLIGATORIO formalizar: si facultades/límites vienen en lenguaje coloquial "
     "('lana', 'clavarse', 'sacar', faltas de ortografía o minúsculas), tradúcelos a "
     "lenguaje jurídico mexicano solemne ('recursos económicos', 'apropiarse', 'retirar/disponer'), "
@@ -144,8 +160,13 @@ PROMPT_GENERICO = PromptTemplate.from_template(
     "Eres un abogado mexicano experto en redacción de documentos legales. "
     "Redacta en español formal y solemne el documento {tipo_nombre} con esta estructura: {estructura}\n\n"
     "Datos (usa EXCLUSIVAMENTE estos, si un opcional falta omítelo sin inventar):\n{datos_txt}\n\n"
-    "Reglas: formaliza coloquialismos a jurídico ('lana'->'recursos económicos', 'clavarse'->'apropiarse', "
-    "'sacar'->'retirar/disponer', 'meter lana'->'invertir recursos'), corrige ortografía y mayúsculas. "
+    "Reglas: PROHIBIDO copiar los datos tal cual: reescribe cada campo como prosa jurídica "
+    "completa, solemne, con mayúscula inicial y punto final. "
+    "'Ninguno'/'Ninguna' -> 'Sin limitación alguna'. "
+    "Formaliza coloquialismos a jurídico ('lana'->'recursos económicos', 'clavarse'->'apropiarse', "
+    "'sacar'->'retirar/disponer', 'meter lana'->'invertir recursos', 'hacer uso de mi cuenta'->"
+    "'la administración, disposición y manejo integral de la cuenta bancaria de mi titularidad'), "
+    "corrige ortografía y mayúsculas. "
     "Coherente con el objeto del documento, sin meter juicios/amparos/embargos salvo que los datos sean judiciales. "
     "Devuelve SOLO el texto del documento, sin explicaciones."
 )
@@ -189,6 +210,14 @@ def salud():
 # ============ AQUÍ TERMINA ENDPOINT GET SALUD ============
 
 # ============ AQUÍ EMPIEZA HELPERS REDACCIÓN ============
+def _normalizar_limites(valor: str) -> str:
+    """Normalización local sin IA: 'ninguno/ninguna/n/a/--' -> 'Sin limitación alguna'."""
+    v = (valor or "").strip()
+    if v.lower().rstrip(" .") in ("ninguno", "ninguna", "ningun", "ningún", "n/a", "na", "--", "-", "sin limite", "sin límite", "sin limites", "sin límites"):
+        return "Sin limitación alguna."
+    return v
+
+
 def _datos_txt(datos: dict) -> str:
     """Convierte el dict de datos a texto 'clave: valor' para el prompt genérico."""
     lineas = []
@@ -235,7 +264,18 @@ def redactar(body: RedactarIn):
         )
     d = body.datos or {}
     # Carta poder mantiene su machote específico con formato exacto.
+    # Pre-formaliza facultades/límites para que el preview ya salga técnico
+    # (misma formalización que usa /pdf; evita que el machote copie verbatim).
     if body.id_tipo == "carta-poder":
+        fac_raw = (d.get("facultades") or "").strip()
+        lim_raw = _normalizar_limites(d.get("limites", ""))
+        if IA_PRE_FORMALIZAR and (fac_raw or lim_raw):
+            try:
+                fac_for, lim_for, _par = _formalizar_campos(fac_raw, lim_raw)
+            except Exception:
+                fac_for, lim_for = fac_raw, lim_raw
+        else:
+            fac_for, lim_for = fac_raw, lim_raw
         plantilla = PLANTILLAS.get("carta-poder")
         prompt = plantilla.format(
             destinatario=(d.get("destinatario") or "").strip() or "A quien corresponda",
@@ -245,8 +285,8 @@ def redactar(body: RedactarIn):
             apoderado=d.get("apoderado", ""),
             tipoDocApoderado=d.get("tipoDocApoderado", ""),
             idApoderado=d.get("idApoderado", ""),
-            facultades=d.get("facultades", ""),
-            limites=d.get("limites", ""),
+            facultades=fac_for or fac_raw,
+            limites=lim_for or lim_raw,
             testigo1Nombre=d.get("testigo1Nombre", ""),
             testigo1TipoDoc=d.get("testigo1TipoDoc", ""),
             testigo1Id=d.get("testigo1Id", ""),
@@ -267,12 +307,38 @@ def redactar(body: RedactarIn):
     return {"contenido": contenido, "modelo": modelo_ok, "id_tipo": body.id_tipo}
 # ============ AQUÍ TERMINA ENDPOINT POST REDACTAR ============
 
+# ============ AQUÍ EMPIEZA ENDPOINT POST CORREGIR ============
+@app.post("/corregir")
+def corregir(body: CorregirIn):
+    """Aplica la retro del usuario al texto ya generado y devuelve el texto corregido.
+    No re-genera desde cero: conserva formato y solo aplica la instrucción."""
+    texto = (body.contenido or "").strip()
+    inst = (body.instruccion or "").strip()
+    if not texto:
+        raise HTTPException(status_code=400, detail="Falta el texto a corregir (contenido)")
+    if not inst:
+        raise HTTPException(status_code=400, detail="Describe qué corregir (instruccion)")
+    tipo_ctx = TIPOS_IA.get((body.id_tipo or "").strip(), "") if body.id_tipo else ""
+    prompt = (
+        "Eres un abogado mexicano experto en redacción de documentos legales. "
+        f"{'Estás revisando: ' + tipo_ctx + '. ' if tipo_ctx else ''}"
+        "Revisa el DOCUMENTO actual y aplica EXACTAMENTE la CORRECCIÓN pedida, "
+        "sin cambiar nada más, sin agregar ni quitar secciones, sin explicaciones fuera del documento. "
+        "Mantén el tono formal y solemne mexicano.\n\n"
+        f"DOCUMENTO ACTUAL:\n{texto}\n\n"
+        f"CORRECCIÓN PEDIDA:\n{inst}\n\n"
+        "Devuelve SOLO el texto completo del documento ya corregido."
+    )
+    contenido, modelo_ok = _invocar_con_fallback(prompt)
+    return {"contenido": contenido, "modelo": modelo_ok}
+# ============ AQUÍ TERMINA ENDPOINT POST CORREGIR ============
+
 # ============ AQUÍ EMPIEZA ENDPOINT POST PDF ============
 def _formalizar_campos(facultades: str, limites: str) -> tuple:
     """Formaliza facultades/límites + genera párrafo Asimismo contextual en 1 llamada.
     Devuelve (facultades, limites, parrafo). Si falla, devuelve originales + fallback coherente."""
     f = (facultades or "").strip()
-    li = (limites or "").strip()
+    li = _normalizar_limites(limites or "")
     fallback_parrafo = (
         f"Asimismo, para que realice todos los actos y gestiones necesarios para {f}, "
         f"dentro de los siguientes límites: {li}, ratificando desde hoy todo lo que haga sobre este particular."

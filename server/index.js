@@ -19,6 +19,7 @@ const documentos = require("./routes/documentos");
 const usuarios = require("./routes/usuarios");
 const salud = require("./routes/salud");
 const ia = require("./routes/ia");
+const notificaciones = require("./routes/notificaciones");
 // ============ AQUÍ TERMINA IMPORTS ============
 
 // ============ AQUÍ EMPIEZA CONFIGURACIÓN APP ============
@@ -40,6 +41,7 @@ app.use("/api/catalogo", catalogo);
 app.use("/api/documentos", documentos);
 app.use("/api/usuarios", usuarios);
 app.use("/api/ia", ia);
+app.use("/api/notificaciones", notificaciones);
 app.use("/api", salud);
 // ============ AQUÍ TERMINA MONTAJE DE RUTAS ============
 

@@ -29,11 +29,12 @@ import {
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import PageHeader from '../Components/PageHeader';
 // DATOS QUE SE MANDAN A ../Components/EstadoChip.jsx para procesamiento: estado={...}.
 import EstadoChip from '../Components/EstadoChip';
 // DATOS PROVENIENTES DE ../lib/api.js: bandeja real (ya filtrada por área/permiso).
-import { getDocumentos, getDocumento, cambiarEstado, eliminarDocumento } from '../lib/api.js';
+import { getDocumentos, getDocumento, cambiarEstado, eliminarDocumento, descargarPDF } from '../lib/api.js';
 // Conversión código API <-> etiqueta visible (ver ../lib/estados.js).
 import { estadoBonito } from '../lib/estados';
 // PERMISOS: dictaminar exige 'modificar' en la categoría de la fila.
@@ -81,6 +82,16 @@ export default function Revision() {
     const [comentario, setComentario] = useState('');
     // ESTADO: error de validación del dictamen (rechazo sin comentario).
     const [errorDictamen, setErrorDictamen] = useState('');
+    // ESTADO: visor PDF del supervisor (Blob autenticado -> iframe).
+    const [pdfUrl, setPdfUrl] = useState(null);
+    const [pdfNombre, setPdfNombre] = useState('');
+    const [pdfAbierto, setPdfAbierto] = useState(false);
+    const [pdfCargando, setPdfCargando] = useState(false);
+    const [pdfError, setPdfError] = useState('');
+    // ESTADO: confirmación de borrado (Dialog propio; window.confirm se bloquea
+    // en el navegador tras varios usos seguidos y ya no deja borrar).
+    const [borrarCandidato, setBorrarCandidato] = useState(null);
+    const [borrando, setBorrando] = useState(false);
     // PERMISOS: admin/super dictaminan; eliminar exige permiso por categoría.
     const { puede, admin, super: esSuper } = usePermisos();
     // ============ AQUÍ TERMINA ESTADOS REVISIÓN ============
@@ -127,6 +138,7 @@ export default function Revision() {
     // HANDLER: cierra el Dialog y limpia el comentario.
     // DÓNDE SE USA: onClose del Dialog y botón "Cerrar".
     const cerrarDialogo = () => {
+        cerrarPDF();
         setSeleccionado(null);
         setComentario('');
         setErrorDictamen('');
@@ -142,6 +154,36 @@ export default function Revision() {
         } catch (e) {
             setError(e.message);
         }
+    };
+
+    // HANDLER: abre el visor PDF del supervisor (Blob autenticado -> iframe).
+    // QUÉ HACE: descarga el adjunto con token y lo muestra en un Dialog con iframe.
+    // DÓNDE SE USA: botón "Ver PDF" de la sección Documentos PDF del dictamen.
+    const verPDF = async (nombre) => {
+        if (!nombre || pdfCargando) return;
+        setPdfError('');
+        setPdfCargando(true);
+        try {
+            const blob = await descargarPDF(nombre);
+            if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+            const url = URL.createObjectURL(blob);
+            setPdfUrl(url);
+            setPdfNombre(nombre);
+            setPdfAbierto(true);
+        } catch (e) {
+            setPdfError(e.message || 'No se pudo abrir el PDF');
+        } finally {
+            setPdfCargando(false);
+        }
+    };
+
+    // HANDLER: cierra el visor PDF y libera el Blob.
+    const cerrarPDF = () => {
+        setPdfAbierto(false);
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        setPdfUrl(null);
+        setPdfNombre('');
+        setPdfError('');
     };
 
     // HANDLER: aplica el dictamen (persiste en BD + rastro en historial).
@@ -166,14 +208,20 @@ export default function Revision() {
     };
 
     // HANDLER: borra el documento (admin o permiso eliminar en su categoría).
-    const borrar = async (doc) => {
-        if (!window.confirm(`¿Borrar el documento #${doc.id}? Esta acción no se puede deshacer.`)) return;
+    // Usa Dialog propio en vez de window.confirm (el navegador lo suprime tras
+    // varios diálogos seguidos y el 4to borrado ya no pedía confirmación).
+    const borrar = async () => {
+        if (!borrarCandidato || borrando) return;
+        setBorrando(true);
         try {
-            await eliminarDocumento(doc.id);
+            await eliminarDocumento(borrarCandidato.id);
+            setBorrarCandidato(null);
             setCargando(true);
             await cargar();
         } catch (e) {
             setError(e.message);
+        } finally {
+            setBorrando(false);
         }
     };
 
@@ -226,6 +274,7 @@ export default function Revision() {
                                 <TableCell sx={{ color: 'primary.contrastText', fontWeight: 'bold' }}>ID</TableCell>
                                 <TableCell sx={{ color: 'primary.contrastText', fontWeight: 'bold' }}>Tipo de documento</TableCell>
                                 <TableCell sx={{ color: 'primary.contrastText', fontWeight: 'bold' }}>Cliente/Destino</TableCell>
+                                <TableCell sx={{ color: 'primary.contrastText', fontWeight: 'bold' }}>Creado por</TableCell>
                                 <TableCell sx={{ color: 'primary.contrastText', fontWeight: 'bold' }}>Fecha de creación</TableCell>
                                 <TableCell sx={{ color: 'primary.contrastText', fontWeight: 'bold' }}>Estado juridico</TableCell>
                                 <TableCell sx={{ color: 'primary.contrastText', fontWeight: 'bold' }}>Acción</TableCell>
@@ -234,7 +283,7 @@ export default function Revision() {
                         <TableBody>
                             {cargando ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center">Cargando...</TableCell>
+                                    <TableCell colSpan={7} align="center">Cargando...</TableCell>
                                 </TableRow>
                             ) : (
                                 visibles.map((doc) => (
@@ -242,6 +291,7 @@ export default function Revision() {
                                     <TableCell>#{doc.id}</TableCell>
                                     <TableCell>{doc.tipo}</TableCell>
                                     <TableCell>{doc.cliente ?? '—'}</TableCell>
+                                    <TableCell>{doc.creador ?? '—'}</TableCell>
                                     <TableCell>{String(doc.creado_en ?? '').slice(0, 10)}</TableCell>
                                     {/* DATOS QUE SE MANDAN A ../Components/EstadoChip.jsx para procesamiento. */}
                                     <TableCell><EstadoChip estado={doc.estado} /></TableCell>
@@ -261,7 +311,7 @@ export default function Revision() {
                                             variant="outlined"
                                             color="error"
                                             startIcon={<DeleteIcon />}
-                                            onClick={() => borrar(doc)}
+                                            onClick={() => setBorrarCandidato(doc)}
                                         >
                                             Borrar
                                         </Button>
@@ -273,7 +323,7 @@ export default function Revision() {
                             )}
                             {!cargando && visibles.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center">
+                                    <TableCell colSpan={7} align="center">
                                         No hay documentos en este estado.
                                     </TableCell>
                                 </TableRow>
@@ -313,6 +363,45 @@ export default function Revision() {
                                     </ListItem>
                                 ))}
                             </List>
+                            {/* SECCIÓN JSX: PDFs del documento (visor para supervisores). */}
+                            <Box id="Box-Revision-PDFs" sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+                                    Documentos PDF
+                                </Typography>
+                                {(!seleccionado.adjuntos || seleccionado.adjuntos.length === 0) ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                        Sin PDF generado para este documento.
+                                    </Typography>
+                                ) : (
+                                    <List dense>
+                                        {seleccionado.adjuntos.map((a) => (
+                                            <ListItem key={a.id} disablePadding sx={{ py: 0.5 }}>
+                                                <ListItemText
+                                                    primary={a.nombre_archivo}
+                                                    secondary={a.subido_en ? String(a.subido_en).slice(0, 16).replace('T', ' ') : ''}
+                                                />
+                                                {(admin || esSuper || puedeDictaminar(seleccionado)) && (
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        startIcon={<PictureAsPdfIcon />}
+                                                        disabled={pdfCargando}
+                                                        onClick={() => verPDF(a.nombre_archivo)}
+                                                        sx={{ ml: 1, flexShrink: 0 }}
+                                                    >
+                                                        {pdfCargando ? 'Abriendo…' : 'Ver PDF'}
+                                                    </Button>
+                                                )}
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                )}
+                                {pdfError && (
+                                    <Alert severity="error" sx={{ mt: 1 }} onClose={() => setPdfError('')}>
+                                        {pdfError}
+                                    </Alert>
+                                )}
+                            </Box>
                             {/* SECCIÓN JSX: captura del comentario del revisor (obligatorio al rechazar). */}
                             <Box id="Box-Revision-Comentario" sx={{ mt: 2 }}>
                                 <InputLabel
@@ -365,6 +454,59 @@ export default function Revision() {
                 )}
             </Dialog>
             {/* ============ AQUÍ TERMINA DIÁLOGO DICTAMEN ============ */}
+
+            {/* ============ AQUÍ EMPIEZA VISOR PDF SUPERVISOR ============ */}
+            {/* SECCIÓN JSX: Dialog modal bloqueante con el PDF (iframe 70vh). */}
+            <Dialog open={pdfAbierto} onClose={cerrarPDF} maxWidth="lg" fullWidth>
+                <DialogTitle color="encabezado.main" fontWeight="bold">
+                    {pdfNombre || 'Documento PDF'}
+                </DialogTitle>
+                <DialogContent dividers>
+                    {pdfUrl && (
+                        <Box
+                            component="iframe"
+                            src={pdfUrl}
+                            title={pdfNombre}
+                            sx={{ width: '100%', height: '70vh', border: 'none' }}
+                        />
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cerrarPDF} color="primary">
+                        Cerrar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* ============ AQUÍ TERMINA VISOR PDF SUPERVISOR ============ */}
+
+            {/* ============ AQUÍ EMPIEZA CONFIRMACIÓN BORRADO ============ */}
+            {/* SECCIÓN JSX: confirma el borrado sin window.confirm (no lo bloquea el navegador). */}
+            <Dialog open={Boolean(borrarCandidato)} onClose={() => !borrando && setBorrarCandidato(null)} maxWidth="xs" fullWidth>
+                <DialogTitle color="encabezado.main" fontWeight="bold">
+                    Borrar documento
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="body2">
+                        ¿Borrar el documento #{borrarCandidato?.id}
+                        {borrarCandidato?.tipo ? ` (${borrarCandidato.tipo})` : ''}?
+                        Esta acción no se puede deshacer.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setBorrarCandidato(null)} disabled={borrando} color="primary">
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={borrar}
+                        disabled={borrando}
+                    >
+                        {borrando ? 'Borrando…' : 'Borrar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* ============ AQUÍ TERMINA CONFIRMACIÓN BORRADO ============ */}
         </Box>
         // ============ AQUÍ TERMINA CONTENEDOR REVISIÓN ============
     );
