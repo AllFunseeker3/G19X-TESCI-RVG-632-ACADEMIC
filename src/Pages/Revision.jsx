@@ -1,7 +1,7 @@
 /* ============================================================================
  * ARCHIVO: src/Pages/Revision.jsx
  * FUNCIÓN GENERAL: Bandeja de revisión (aprobar/rechazar) con datos REALES.
- *   - Tabs de filtro por estado (Todos/Por revisar/Aprobado/Rechazado).
+ *   - Tabs de filtro por estado (Todos/En revisión/Aprobado/Rechazado).
  *   - Tabla desde GET /api/documentos (filtrada por área y permiso en el back).
  *   - Dialog de dictamen: trae el detalle (datos + historial) y persiste con
  *     PATCH /api/documentos/:id/estado (el back deja rastro en historial).
@@ -25,7 +25,7 @@ import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Paper, Button, Tabs, Tab, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, InputLabel, List, ListItem, ListItemText, Divider,
-  Alert,
+  Alert, Chip,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -45,7 +45,8 @@ import { usePermisos } from '../Components/PermisosProvider';
 // QUÉ HACE: define los valores del Tabs y del filtro `visibles`.
 // DÓNDE SE USA: sección id="Filtros por estado".
 // QUÉ MODIFICAR SI: agregas un estado, añádelo aquí (y en ../lib/estados.js).
-const FILTROS = ['Todos', 'Por revisar', 'Aprobado', 'Rechazado'];
+// 'En revisión' filtra el código 'borrador' (estadoBonito lo mapea).
+const FILTROS = ['Todos', 'En revisión', 'Aprobado', 'Rechazado'];
 // ============ AQUÍ TERMINA FILTROS REVISIÓN ============
 
 // ============ AQUÍ EMPIEZA FORMATO VALOR ============
@@ -357,7 +358,8 @@ export default function Revision() {
                                 Datos capturados
                             </Typography>
                             <List dense>
-                                {Object.entries(seleccionado.datos ?? {}).map(([k, v]) => (
+                                {/* id_cliente es vínculo técnico (columna Cliente/Destino); no se lista. */}
+                                {Object.entries(seleccionado.datos ?? {}).filter(([k]) => k !== 'id_cliente').map(([k, v]) => (
                                     <ListItem key={k} disablePadding sx={{ py: 0.5 }}>
                                         <ListItemText primary={k} secondary={formatoValor(v)} />
                                     </ListItem>
@@ -374,12 +376,16 @@ export default function Revision() {
                                     </Typography>
                                 ) : (
                                     <List dense>
-                                        {seleccionado.adjuntos.map((a) => (
+                                        {seleccionado.adjuntos.map((a, idx) => {
+                                            // ADJ-01: el back ordena vigente primero; si falta el flag (API sin reiniciar), el primero es el actual.
+                                            const esVigente = (a.vigente === undefined || a.vigente === null) ? idx === 0 : Boolean(Number(a.vigente));
+                                            return (
                                             <ListItem key={a.id} disablePadding sx={{ py: 0.5 }}>
                                                 <ListItemText
                                                     primary={a.nombre_archivo}
                                                     secondary={a.subido_en ? String(a.subido_en).slice(0, 16).replace('T', ' ') : ''}
                                                 />
+                                                <Chip size="small" label={esVigente ? 'Actual' : 'Versión anterior'} color={esVigente ? 'success' : 'default'} sx={{ mr: 1, flexShrink: 0 }} />
                                                 {(admin || esSuper || puedeDictaminar(seleccionado)) && (
                                                     <Button
                                                         size="small"
@@ -393,7 +399,8 @@ export default function Revision() {
                                                     </Button>
                                                 )}
                                             </ListItem>
-                                        ))}
+                                            );
+                                        })}
                                     </List>
                                 )}
                                 {pdfError && (
@@ -435,7 +442,7 @@ export default function Revision() {
                                 variant="contained"
                                 color="error"
                                 disabled={!puedeDictaminar(seleccionado) || !comentario.trim()}
-                                title={!puedeDictaminar(seleccionado) ? 'Solo borrador/por revisar con permiso (admin/super/modificar)' : (!comentario.trim() ? 'Escribe el motivo del rechazo' : 'Rechazar')}
+                                title={!puedeDictaminar(seleccionado) ? 'Solo en revisión con permiso (admin/super/modificar)' : (!comentario.trim() ? 'Escribe el motivo del rechazo' : 'Rechazar')}
                                 onClick={() => dictaminar('rechazado')}
                             >
                                 Rechazar
@@ -444,7 +451,7 @@ export default function Revision() {
                                 variant="contained"
                                 color="success"
                                 disabled={!puedeDictaminar(seleccionado)}
-                                title={puedeDictaminar(seleccionado) ? 'Aprobar' : 'Solo borrador/por revisar con permiso (admin/super/modificar)'}
+                                title={puedeDictaminar(seleccionado) ? 'Aprobar' : 'Solo en revisión con permiso (admin/super/modificar)'}
                                 onClick={() => dictaminar('aprobado')}
                             >
                                 Aprobar

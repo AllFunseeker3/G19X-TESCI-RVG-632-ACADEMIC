@@ -20,7 +20,7 @@ export default function EstadoChip({ estado }) {
         <Chip
             label={etiqueta}
             color={COLOR_POR_ESTADO[codigo] ?? 'default'}
-            sx={{ fontWeight: 'bold', color: codigo === 'borrador' ? undefined : 'white' }}
+            sx={{ fontWeight: 'bold', color: 'white' }}
         />
     );
 }

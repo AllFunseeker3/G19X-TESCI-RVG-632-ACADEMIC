@@ -123,6 +123,10 @@ function MenuInterior({ children }) {
                             <ListItemButton sx={{ pl: 4 }} component={Link} to="/Seguimiento">
                                 <ListItemText primary="Seguimiento" />
                             </ListItemButton>
+
+                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Clientes">
+                                <ListItemText primary="Clientes" />
+                            </ListItemButton>
                         </List>
                     </Collapse>
 

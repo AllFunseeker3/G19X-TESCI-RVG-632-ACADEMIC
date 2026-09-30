@@ -119,6 +119,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
 
 -- Clientes / contrapartes (destinatarios, empresas, dependencias).
 -- tipo_cliente distingue persona 'fisica' de 'moral'; curp solo aplica a físicas.
+-- verificado: TRUE si lo dio de alta admin/super; los de otros usuarios
+-- quedan pendientes hasta que un admin/super los verifique.
 CREATE TABLE IF NOT EXISTS clientes (
   id_cliente INT AUTO_INCREMENT PRIMARY KEY,
   tipo_cliente ENUM('fisica','moral') NOT NULL DEFAULT 'moral',
@@ -130,6 +132,7 @@ CREATE TABLE IF NOT EXISTS clientes (
   correo     VARCHAR(150) NULL,
   telefono   VARCHAR(40) NULL,
   activo     BOOLEAN NOT NULL DEFAULT TRUE,
+  verificado BOOLEAN NOT NULL DEFAULT FALSE,
   creado_en  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -168,7 +171,9 @@ CREATE TABLE IF NOT EXISTS campos_tipo (
 
 -- Documentos generados. `datos` = JSON con todos los valores del formulario
 -- (el front hoy los tiene en tiposDocumentos.js; misma estructura de claves).
--- `folio` = número de oficio/resolución (solo tipos que lo piden).
+-- `folio` = folio del sistema PREFIJO-AAAA-NNN (auto FOL-01 si no viene; UNIQUE por tipo).
+-- OJO: no confundir con los campos de formulario `folio`/`folioEntrega`/`folioRecibe`
+-- (números de oficio/identificación que escribe el usuario y viven dentro de `datos`).
 CREATE TABLE IF NOT EXISTS documentos (
   id_documento INT AUTO_INCREMENT PRIMARY KEY,
   folio        VARCHAR(50) NULL,
@@ -221,6 +226,7 @@ CREATE TABLE IF NOT EXISTS adjuntos (
   tipo_mime    VARCHAR(100) NULL,
   tamano_bytes BIGINT NULL,
   ruta         TEXT NOT NULL,
+  vigente      BOOLEAN NOT NULL DEFAULT TRUE, -- ADJ-01: solo el más reciente es vigente.
   id_subido_por INT NOT NULL,
   subido_en    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_adj_solo_pdf CHECK (tipo_mime IS NULL OR tipo_mime = 'application/pdf'),
@@ -229,6 +235,7 @@ CREATE TABLE IF NOT EXISTS adjuntos (
   CONSTRAINT fk_adj_user FOREIGN KEY (id_subido_por)
     REFERENCES usuarios (id_usuario)
 ) ENGINE=InnoDB;
+CREATE INDEX IF NOT EXISTS idx_adj_doc_vig ON adjuntos (id_documento, vigente);
 
 -- Campanita de avisos: una fila por destinatario (supers del área + admins)
 -- cada vez que se crea un documento. `leida` la apaga el front al abrir la campana.
@@ -250,9 +257,9 @@ CREATE INDEX IF NOT EXISTS idx_notif_user
   ON notificaciones (id_usuario, leida, creado_en);
 
 -- Consecutivos atómicos de folios por tipo y año. Formato: PREFIJO-AAAA-NNN
--- (ej. OF-2026-001, RES-2026-012; el prefijo lo pone el back-end según el tipo).
--- El back-end hace: UPDATE folios SET ultimo_numero = LAST_INSERT_ID(ultimo_numero+1)
--- y luego SELECT LAST_INSERT_ID() para no duplicar folios.
+-- (ej. CP-2026-001; el prefijo lo pone el back-end según el tipo con PREFIJOS).
+-- El back-end usa transacción + SELECT ... FOR UPDATE (siguienteFolio en
+-- server/routes/documentos.js) para no duplicar folios.
 CREATE TABLE IF NOT EXISTS folios (
   id_tipo       VARCHAR(40) NOT NULL,
   anio          INT NOT NULL,
@@ -630,8 +637,9 @@ INSERT INTO usuarios (nombre, correo, hash_contrasena, id_rol, id_area) VALUES
 ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
 
 -- 3.8 Cliente de ejemplo (bórralo o edítalo cuando cargues los reales).
-INSERT INTO clientes (tipo_cliente, nombre, rfc, domicilio, contacto, correo) VALUES
-  ('moral', 'EJEMPLO - Acme S.A. de C.V.', 'ACM010101AAA', 'Av. Ejemplo 123, CDMX', 'Juan Pérez', 'contacto@ejemplo.mx')
+-- Semilla del sistema: nace verificada.
+INSERT INTO clientes (tipo_cliente, nombre, rfc, domicilio, contacto, correo, verificado) VALUES
+  ('moral', 'EJEMPLO - Acme S.A. de C.V.', 'ACM010101AAA', 'Av. Ejemplo 123, CDMX', 'Juan Pérez', 'contacto@ejemplo.mx', TRUE)
 ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
 
 -- ================= BLOQUE 4: VERIFICACIÓN ==================================

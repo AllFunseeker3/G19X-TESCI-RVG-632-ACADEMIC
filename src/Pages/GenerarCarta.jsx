@@ -12,14 +12,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Box, Typography, Button, Divider, Alert, TextField,
+  Box, Typography, Button, Divider, Alert, TextField, Autocomplete, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
   CATEGORIAS, tiposDeCategoria, nombreCategoria,
   nombreTipo, camposDeTipo, categoriaDeTipo,
 } from '../lib/tiposDocumentos';
-import { crearDocumento, actualizarDocumento, getDocumento, descargarPDF, generarPDF, redactarConIA, corregirConIA } from '../lib/api.js';
+import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descargarPDF, generarPDF, redactarConIA, corregirConIA } from '../lib/api.js';
 import PageHeader from '../Components/PageHeader';
 import ProgresoIA from '../Components/ProgresoIA';
 import CampoFormulario, { esFechaValida, formatearHoyDDMMAAAA } from '../Components/CampoFormulario';
@@ -27,6 +27,21 @@ import SeccionFormulario from '../Components/SeccionFormulario';
 import SelectorCategoriaTipo from '../Components/SelectorCategoriaTipo';
 import DestinatarioOpcional from '../Components/DestinatarioOpcional';
 import ResumenDocumento from '../Components/ResumenDocumento';
+
+// Mapa cliente -> campo nombre por tipo (autorrelleno). Solo rellena vacíos.
+// carta-renuncia es especial: persona->empleado, empresa->empresa.
+// oficio-comision no tiene contraparte: solo vincula id_cliente.
+const MAPA_CLIENTE_NOMBRE = {
+  'carta-poder': ['destinatario'],
+  'carta-responsiva': ['quienRecibe'],
+  'carta-intencion': ['receptoraNombre'],
+  'oficio-peticion': ['nombreDestinatario'],
+  'oficio-resolucion': ['interesado'],
+  'aviso-privacidad': ['razonSocial'],
+  'aviso-rescision': ['trabajador'],
+  'aviso-funcionamiento': ['establecimiento'],
+  'notificacion-general': ['destinatario'],
+};
 
 // Tipos con destinatario fijo (sin checkbox opcional). Solo carta-poder y
 // carta-intencion usan destinatario opcional ("A quien corresponda").
@@ -81,7 +96,7 @@ export default function GenerarCarta() {
   const [iaError, setIaError] = useState('');
   const [iaRetro, setIaRetro] = useState(''); // Retro del usuario: qué corregir del texto
   const [iaCorrigiendo, setIaCorrigiendo] = useState(false); // Corrigiendo con IA en curso
-  const [guardado, setGuardado] = useState(null); // { id, archivo } del documento + PDF
+  const [guardado, setGuardado] = useState(null); // { id, archivo, folio } del documento + PDF
   const [guardando, setGuardando] = useState(false); // Confirmar está creando doc + PDF
   const [errorGuardar, setErrorGuardar] = useState('');
   // Progreso por fases (estimado por timer: el back es 1 petición sin eventos).
@@ -90,10 +105,13 @@ export default function GenerarCarta() {
   const [iaProgreso, setIaProgreso] = useState(0);
   const [iaSegundos, setIaSegundos] = useState(0);
   const progresoTimer = useRef(null);
-  // Modo corrección (?editar=id): precarga un borrador/rechazado propio.
+  // Modo corrección (?editar=id): precarga un documento en revisión o rechazado propio.
   const [editandoId, setEditandoId] = useState(null);
   const [editandoMotivo, setEditandoMotivo] = useState('');
   const [editandoCargando, setEditandoCargando] = useState(false);
+  // Cliente existente (directorio): lista + seleccionado para autorrelleno.
+  const [clientes, setClientes] = useState([]);
+  const [clienteSel, setClienteSel] = useState(null);
   // ============ AQUÍ TERMINA ESTADOS FORMULARIO ============
 
   // ============ AQUÍ EMPIEZA SINCRONIZACIÓN POR URL ============
@@ -151,6 +169,72 @@ export default function GenerarCarta() {
   }, [params]);
   // ============ AQUÍ TERMINA MODO CORRECCIÓN ?editar= ============
 
+  // ============ AQUÍ EMPIEZA CLIENTE EXISTENTE ============
+  // Directorio para autorrelleno (una carga al montar).
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const lista = await getClientes();
+        if (vivo) setClientes(Array.isArray(lista) ? lista : []);
+      } catch {
+        if (vivo) setClientes([]);
+      }
+    })();
+    return () => { vivo = false; };
+  }, []);
+
+  // En modo ?editar=, el vinculado se deriva de datos + lista (sin efecto).
+  const clienteMostrado = clienteSel
+    ?? (datos.id_cliente ? (clientes.find((c) => c.id === datos.id_cliente) ?? null) : null);
+
+  // Aplica el cliente: vincula id_cliente + rellena vacíos según el tipo.
+  // Al limpiar (null) solo desvincula; conserva lo ya escrito.
+  const aplicarCliente = (cli) => {
+    if (!cli) {
+      setClienteSel(null);
+      setDatos((prev) => {
+        const copia = { ...prev };
+        delete copia.id_cliente;
+        return copia;
+      });
+      return;
+    }
+    setClienteSel(cli);
+    const ids = new Set(camposDeTipo(tipoDoc).map((c) => c.id));
+    // 'destinatario' vive en el checkbox opcional (no en camposDeTipo).
+    const conDestinatario = tipoDoc !== '' && !TIPOS_SIN_DESTINATARIO_OPCIONAL.has(tipoDoc);
+    const existe = (f) => (f === 'destinatario' ? conDestinatario : ids.has(f));
+    const vacio = (v) => !(v ?? '').toString().trim();
+    setDatos((prev) => {
+      const copia = { ...prev, id_cliente: cli.id };
+      let destinos = MAPA_CLIENTE_NOMBRE[tipoDoc] ?? [];
+      if (tipoDoc === 'carta-renuncia') {
+        destinos = cli.tipo_cliente === 'fisica' ? ['empleado'] : ['empresa'];
+      }
+      for (const f of destinos) {
+        if (existe(f) && vacio(copia[f])) { copia[f] = cli.nombre; break; }
+      }
+      if (ids.has('domicilio') && vacio(copia.domicilio) && cli.domicilio) {
+        copia.domicilio = cli.domicilio;
+      }
+      if (ids.has('rfc') && vacio(copia.rfc) && cli.tipo_cliente === 'moral' && cli.rfc) {
+        copia.rfc = cli.rfc;
+      }
+      return copia;
+    });
+    setErrores((prev) => {
+      const copia = { ...prev };
+      delete copia.id_cliente;
+      return copia;
+    });
+    if ((tipoDoc === 'carta-poder' || tipoDoc === 'carta-intencion')
+      && (MAPA_CLIENTE_NOMBRE[tipoDoc] ?? []).includes('destinatario')) {
+      setAgregarDestinatario(true);
+    }
+  };
+  // ============ AQUÍ TERMINA CLIENTE EXISTENTE ============
+
   // ============ AQUÍ EMPIEZA CAMPOS VISIBLES ============
   // Tipos y campos del catálogo filtrados por mostrarSi y destinatario opcional.
   const tiposDisponibles = tiposDeCategoria(categoria);
@@ -190,6 +274,7 @@ export default function GenerarCarta() {
     setCategoria(e.target.value);
     setTipoDoc('');
     setDatos({});
+    setClienteSel(null);
     setCampoEnfocado(null);
     setAgregarDestinatario(false);
     setErrores({});
@@ -199,6 +284,7 @@ export default function GenerarCarta() {
     const t = e.target.value;
     setTipoDoc(t);
     setDatos(datosInicialesPorTipo(camposDeTipo(t)));
+    setClienteSel(null);
     setCampoEnfocado(null);
     setAgregarDestinatario(false);
     setErrores({});
@@ -313,6 +399,7 @@ export default function GenerarCarta() {
     setCategoria('');
     setTipoDoc('');
     setDatos({});
+    setClienteSel(null);
     setCampoEnfocado(null);
     setAgregarDestinatario(false);
     setErrores({});
@@ -490,25 +577,34 @@ export default function GenerarCarta() {
   };
 
   // Paso 4: CONFIRMAR final desde el preview IA crea el documento + PDF.
-  // En modo ?editar= actualiza el documento (vuelve a borrador) en vez de crear.
+  // En modo ?editar= actualiza el documento (vuelve a revisión) en vez de crear.
   const handleGuardarFinal = async () => {
     if (iaCargando || !iaTexto || guardando) return;
     setErrorGuardar('');
     setGuardando(true);
     iniciarProgreso(editandoId
       ? ['Guardando corrección', 'Generando PDF institucional']
-      : ['Guardando borrador', 'Generando PDF institucional'], 20);
+      : ['Guardando en revisión', 'Generando PDF institucional'], 20);
     try {
-      const idDoc = editandoId ?? (await crearDocumento({
-        id_tipo: tipoDoc,
-        datos: datosSerializables(),
-        ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
-      })).id;
+      // El back genera el folio automático (PREFIJO-AAAA-NNN) y lo devuelve.
+      let idDoc = editandoId;
+      let folioDoc = null;
       if (editandoId) {
-        await actualizarDocumento(editandoId, {
+        const act = await actualizarDocumento(editandoId, {
           datos: datosSerializables(),
+          id_cliente: datos.id_cliente ?? null,
           ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
         });
+        folioDoc = act.folio ?? null;
+      } else {
+        const creado = await crearDocumento({
+          id_tipo: tipoDoc,
+          datos: datosSerializables(),
+          id_cliente: datos.id_cliente ?? null,
+          ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
+        });
+        idDoc = creado.id;
+        folioDoc = creado.folio ?? null;
       }
       setIaFase(1);
       setIaProgreso(60);
@@ -519,7 +615,7 @@ export default function GenerarCarta() {
       } catch (ePdf) {
         setErrorGuardar(`Documento #${idDoc} guardado, pero el PDF falló: ${ePdf.message}`);
       }
-      setGuardado({ id: idDoc, archivo });
+      setGuardado({ id: idDoc, archivo, folio: folioDoc });
       setIaProgreso(100);
       setIaAbierto(false);
     } catch (e) {
@@ -587,7 +683,7 @@ export default function GenerarCarta() {
         id="Box-GenerarCarta-Encabezado"
         titulo={editandoId ? `Corregir documento #${editandoId}` : 'Generar notificación legal'}
         subtitulo={editandoId
-          ? 'Corrige los datos observados y vuelve a generar: regresa a borrador y avisa a revisión.'
+          ? 'Corrige los datos observados y vuelve a generar: el documento regresa a revisión.'
           : 'Seleccione la categoría, el tipo de documento y capture sus datos.'}
       />
       {/* ============ AQUÍ TERMINA ENCABEZADO GENERAR CARTA ============ */}
@@ -628,6 +724,40 @@ export default function GenerarCarta() {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Complete la información con la que se generará el documento.
             </Typography>
+
+            {/* ============ AQUÍ EMPIEZA CLIENTE EXISTENTE ============ */}
+            {/* Autocompletado opcional: vincula id_cliente + rellena vacíos. */}
+            <Autocomplete
+              options={clientes}
+              value={clienteMostrado}
+              onChange={(_, v) => aplicarCliente(v)}
+              getOptionLabel={(c) => (typeof c === 'string' ? c : `${c.nombre} — ${c.tipo_cliente === 'fisica' ? 'Persona' : 'Empresa'}`)}
+              isOptionEqualToValue={(a, b) => a?.id === b?.id}
+              renderOption={(props, c) => (
+                <li {...props} key={c.id}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Typography variant="body2">{c.nombre}</Typography>
+                    <Chip size="small" label={c.tipo_cliente === 'fisica' ? 'Persona' : 'Empresa'} />
+                    {!c.verificado && <Chip size="small" label="Sin verificar" color="warning" />}
+                  </Box>
+                </li>
+              )}
+              renderInput={(p) => (
+                <TextField
+                  {...p}
+                  label="Cliente existente (opcional)"
+                  helperText="Autocompleta nombre, domicilio y RFC con un cliente del directorio."
+                  variant="standard"
+                />
+              )}
+              sx={{ mb: 2, maxWidth: 560 }}
+            />
+            {clienteMostrado && !clienteMostrado.verificado && (
+              <Alert severity="warning" sx={{ mb: 2, maxWidth: 560 }}>
+                Cliente sin verificar por un admin o super. Revisa bien los datos antes de generar.
+              </Alert>
+            )}
+            {/* ============ AQUÍ TERMINA CLIENTE EXISTENTE ============ */}
 
             {mostrarDestinatario && (
               <DestinatarioOpcional
@@ -835,7 +965,7 @@ export default function GenerarCarta() {
             {/* ============ AQUÍ EMPIEZA ALERTA GUARDADO ============ */}
             {guardado && (
               <Alert severity="success" sx={{ mt: 2 }} onClose={() => setGuardado(null)}>
-                Documento #{guardado.id} {editandoId ? 'corregido (regresó a borrador con redacción IA' : 'guardado como borrador (con redacción IA'}
+                Documento #{guardado.id}{guardado.folio ? ` (folio ${guardado.folio})` : ''} {editandoId ? 'corregido (regresó a revisión con redacción IA' : 'guardado en revisión (con redacción IA'}
                 {guardado.archivo ? ' y PDF' : ''}).
                 {guardado.archivo && (
                   <Button size="small" onClick={handleDescargarPDF} sx={{ ml: 1, color: 'encabezado.main' }}>

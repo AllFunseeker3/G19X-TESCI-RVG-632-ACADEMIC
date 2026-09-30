@@ -27,6 +27,26 @@ const PDF_DIR =
   path.join(__dirname, "..", "..", "documentos", "Sistema legal");
 // ============ AQUÍ TERMINA ROUTER Y CONFIG ============
 
+// ============ AQUÍ EMPIEZA HELPER ENRIQUECER DESTINATARIO ============
+// QUÉ HACE: si carta-poder viene sin destinatario pero con cliente vinculado,
+// usa el nombre del cliente (así la empresa sí aparece en el machote).
+// Solo carta-poder: en otros tipos el destinatario tiene otro sentido.
+async function enriquecerDestinatario(idTipo, datos) {
+  try {
+    if (idTipo !== "carta-poder" || typeof datos !== "object" || !datos) return datos;
+    if ((datos.destinatario ?? "").toString().trim() || !datos.id_cliente) return datos;
+    const [[c]] = await pool.query(
+      "SELECT nombre FROM clientes WHERE id_cliente = ? AND activo = TRUE",
+      [datos.id_cliente]
+    );
+    if (c?.nombre) return { ...datos, destinatario: c.nombre };
+    return datos;
+  } catch {
+    return datos; // Si falla, la IA usa "A quien corresponda" como antes.
+  }
+}
+// ============ AQUÍ TERMINA HELPER ENRIQUECER DESTINATARIO ============
+
 // ============ AQUÍ EMPIEZA RUTA POST REDACTAR ============
 // POST /api/ia/redactar { id_tipo, datos } -> { contenido, modelo, id_tipo }.
 // Pasa el código de estado del servicio IA (400 plantilla, 429 saturado, 502).
@@ -36,12 +56,13 @@ router.post("/redactar", async (req, res, next) => {
     if (!id_tipo || typeof datos !== "object") {
       return res.status(400).json({ detail: "Faltan id_tipo y datos" });
     }
+    const datosFinal = await enriquecerDestinatario(id_tipo, datos);
     let r;
     try {
       r = await fetch(`${IA_URL}/redactar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_tipo, datos }),
+        body: JSON.stringify({ id_tipo, datos: datosFinal }),
       });
     } catch {
       return res.status(503).json({ detail: "Servicio IA apagado (ai-service en :8001)" });
@@ -91,12 +112,13 @@ router.post("/pdf", async (req, res, next) => {
     if (!id_tipo || typeof datos !== "object") {
       return res.status(400).json({ detail: "Faltan id_tipo y datos" });
     }
+    const datosFinal = await enriquecerDestinatario(id_tipo, datos);
     let r;
     try {
       r = await fetch(`${IA_URL}/pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_tipo, datos, contenido, nombre_base: nombre_base || id_tipo }),
+        body: JSON.stringify({ id_tipo, datos: datosFinal, contenido, nombre_base: nombre_base || id_tipo }),
       });
     } catch {
       return res.status(503).json({ detail: "Servicio IA apagado (ai-service en :8001)" });
@@ -105,13 +127,25 @@ router.post("/pdf", async (req, res, next) => {
     if (!r.ok) return res.status(r.status).json(cuerpo); // Propaga error de la IA.
     let idAdjunto = null;
     if (id_documento) {
-      const [ins] = await pool.query(
-        `INSERT INTO adjuntos
-         (id_documento, nombre_archivo, tipo_mime, tamano_bytes, ruta, id_subido_por)
-         VALUES (?, ?, 'application/pdf', ?, ?, ?)`,
-        [id_documento, cuerpo.archivo, cuerpo.bytes ?? null, cuerpo.ruta, req.usuario.id] // ?? tolera falta de bytes.
-      );
-      idAdjunto = ins.insertId;
+      // ADJ-01 versionado: anteriores a histórico + nuevo como vigente, en transacción.
+      const connex = await pool.getConnection();
+      try {
+        await connex.beginTransaction();
+        await connex.query("UPDATE adjuntos SET vigente = FALSE WHERE id_documento = ?", [id_documento]);
+        const [ins] = await connex.query(
+          `INSERT INTO adjuntos
+           (id_documento, nombre_archivo, tipo_mime, tamano_bytes, ruta, vigente, id_subido_por)
+           VALUES (?, ?, 'application/pdf', ?, ?, TRUE, ?)`,
+          [id_documento, cuerpo.archivo, cuerpo.bytes ?? null, cuerpo.ruta, req.usuario.id] // ?? tolera falta de bytes.
+        );
+        await connex.commit();
+        idAdjunto = ins.insertId;
+      } catch (eTx) {
+        await connex.rollback();
+        throw eTx;
+      } finally {
+        connex.release();
+      }
     }
     return res.json({ ...cuerpo, id_adjunto: idAdjunto });
   } catch (e) {

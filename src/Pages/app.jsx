@@ -16,6 +16,7 @@ import Inicio from './Inicio';
 import Ingreso from './Ingreso';
 import Revision from './Revision';
 import Seguimiento from './Seguimiento';
+import Clientes from './Clientes';
 import Configuracion from './Configuracion';
 import Usuarios from './Usuarios';
 import { leerToken } from '../lib/api.js';
@@ -61,6 +62,7 @@ function App() {
           <Route path="/Plantillas" element={<RutaProtegida><Plantillas /></RutaProtegida>} />
           <Route path="/Revision" element={<RutaProtegida><Revision /></RutaProtegida>} />
           <Route path="/Seguimiento" element={<RutaProtegida><Seguimiento /></RutaProtegida>} />
+          <Route path="/Clientes" element={<RutaProtegida><Clientes /></RutaProtegida>} />
           <Route path="/Menu" element={<RutaProtegida><Menu /></RutaProtegida>} />
           <Route path="/Configuracion" element={<RutaProtegida><Configuracion /></RutaProtegida>} />
           <Route path="/Usuarios" element={<RutaProtegida><Usuarios /></RutaProtegida>} />

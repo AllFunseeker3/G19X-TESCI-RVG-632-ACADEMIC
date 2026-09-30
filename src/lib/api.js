@@ -117,7 +117,7 @@ export const getDocumentos = (params = {}) => {
 export const getDocumento = (id) => api(`/documentos/${id}`);
 export const crearDocumento = (payload) =>
   api("/documentos", { metodo: "POST", cuerpo: payload });
-// Corrige los datos de un doc propio en borrador/rechazado (vuelve a borrador).
+// Corrige los datos de un doc propio en revisión/rechazado (vuelve a revisión).
 export const actualizarDocumento = (id, payload) =>
   api(`/documentos/${id}/datos`, { metodo: "PATCH", cuerpo: payload });
 export const cambiarEstado = (id, estado, comentario) =>
@@ -175,6 +175,21 @@ export const descargarPDF = async (archivo) => {
   return res.blob();
 };
 // ============ AQUÍ TERMINA IA Y PDF ============
+
+// ============ AQUÍ EMPIEZA CLIENTES ============
+// --- Directorio (server/routes/clientes.js): personas/empresas con verificación.
+// Alta/edición de cualquiera con escritura; verificar/baja solo admin/super.
+export const getClientes = (soloPendientes = false) =>
+  api(`/clientes${soloPendientes ? "?solo_pendientes=1" : ""}`);
+export const crearCliente = (payload) =>
+  api("/clientes", { metodo: "POST", cuerpo: payload });
+export const actualizarCliente = (id, payload) =>
+  api(`/clientes/${id}`, { metodo: "PATCH", cuerpo: payload });
+export const verificarCliente = (id, verificado = true) =>
+  api(`/clientes/${id}/verificar`, { metodo: "PATCH", cuerpo: { verificado } });
+export const bajaCliente = (id) =>
+  api(`/clientes/${id}`, { metodo: "DELETE" });
+// ============ AQUÍ TERMINA CLIENTES ============
 
 // ============ AQUÍ EMPIEZA NOTIFICACIONES ============
 // --- Campanita (server/routes/notificaciones.js): avisos de creación para

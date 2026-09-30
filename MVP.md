@@ -1,107 +1,116 @@
-# MVP — Sistema de Cartas y Notificaciones Legales
+# MVP — SisLegal (foto real de lo entregado 30/09/2026)
 
-**Repo:** `proyecto_resi` (React + Vite + MUI)
-**Base:** `PRD.md`, `Requerimientos.pdf`, `Tipos de documentos legales.txt`
-**Versión:** 1.0 — 14/09/2026
-**Objetivo MVP:** pasar del frontend con mocks a un flujo usable de punta a punta que genere, revise y trace documentos reales.
+**Repo:** `proyecto_resi` — React 19 + Vite 8 + MUI 9 / Express 4 + MariaDB / FastAPI + LangChain + OpenRouter
+**Base:** `PRD_A.md` / `PRD_BPluri.md` (misma funcionalidad), `Requerimientos.pdf` puntos 3-7, `Tipos de documentos legales.txt`
+**Documentos viejos `PRD.md`/`MVP.md` v1.0 del 14/09/2026:** borrados por obsoletos (hablaban de mocks, sin backend, sin IA).
+**Estado:** usable de punta a punta en local con 3 servicios arriba.
+
+---
+
+## 1. Qué es y qué no es
+
+**ES:** lo que hoy corre con `npm run todo` (API :8000 + web :5173) más IA `:8001` (`uvicorn main:app` desde `ai-service/`). Un residente crea cualquiera de los 11 tipos, la IA redacta y formaliza, se genera PDF institucional, un revisor dictamina con motivo, el autor corrige con `?editar=`, todo queda trazado y notificado.
+
+**NO ES:** un SaaS multiempresa, ni un sistema con SSO, ni OCR, ni firma e.firma, ni despliegue Docker/CI. Es un MVP local monousuario por sesión con RBAC por área.
 
 ---
 
-## 1. Qué es y qué no es el MVP
+## 2. HACE (P0 entregado y probado en vivo)
 
-**Es:** la versión mínima que un residente puede usar para crear 1 de las 11 plantillas, enviarla a revisión, que un revisor la apruebe/rechace con comentario, y consultar su historial. Con persistencia real.
-
-**No es:** no incluye IA generativa real, ni firma electrónica, ni OCR, ni SSO completo. Esos van en V1/V2.
-
-## 2. Alcance del MVP (P0 obligatorio)
-
-### Incluido
-1. **Auth mínima funcional** (`Ingreso.jsx`): validación email/pass, sesión en localStorage, ruta protegida, logout real. Mock de 2 usuarios: residente / revisor.
-2. **Generar documento** (`GenerarCarta.jsx`): Campo 1 + Campo 2 dependiente + formulario dinámico para las 11 plantillas ya definidas en `tiposDocumentos.js`. Guardar Borrador + Enviar a revisión. Validación required + email + fecha. Folio auto `DOC-AAAA-####`.
-3. **Plantillas** (`plantillas.jsx`): galería actual + contador real de campos. `Usar plantilla` con preselección por query (ya funciona, mantener).
-4. **Revisión** (`Revision.jsx`): filtros, tabla, dialog con datos + comentario obligatorio al rechazar. Solo `Por revisar` dictaminable. Cambio de estado persistente.
-5. **Seguimiento** (`Seguimiento.jsx`): selector + ficha + stepper desde datos reales (no solo `DOCUMENTOS` estáticos).
-6. **Inicio** (`Inicio.jsx`): KPIs, dona, actividad, buscador y vencimientos calculados desde store real. Eliminar `documentosBD` hardcodeado (150/75/75/200) y unificar con única fuente.
-7. **Persistencia local primero:** Context + `localStorage` (o IndexedDB) con seed de `documentosDemo.js` (6 docs #101-#106). Prepara interfaz para migrar a FastAPI + PostgreSQL sin cambiar páginas.
-8. **Notificaciones mínimas:** campanita actual pero alimentada por eventos reales (enviado, aprobado, rechazado).
-9. **Trazabilidad:** todo cambio agrega `{etapa, fecha, responsable, comentario}`. Nunca se borra historial.
-
-### Excluido del MVP (pasa a V1/V2)
-- Azure OpenAI, LangChain, Document Intelligence (dejar `slots` en código con feature flag `IA_ENABLED=false`).
-- Entra ID / SSO, RBAC fino, auditoría inmutable en servidor.
-- Exportar PDF/DOCX real (MVP: resumen imprimible con `window.print()`).
-- Backend FastAPI, PostgreSQL, Docker, GitHub Actions (diseñar contratos API en paralelo, no bloquear MVP).
-- Firma, acuse, OCR, móvil.
-
-## 3. Historias de usuario MVP
-
-| ID | Historia | Criterios de aceptación |
-|----|----------|-------------------------|
-| HU-01 | Como residente quiero elegir categoría y tipo para que solo vea opciones válidas | Campo 2 disabled sin Campo 1; al cambiar Campo 1 se resetea Tipo+Datos; 11 tipos disponibles |
-| HU-02 | Como residente quiero capturar datos dinámicos y ver resumen antes de confirmar | Todos los campos `requerido` validan; Dialog muestra `Categoría — Tipo` + etiqueta/valor; Confirmar guarda |
-| HU-03 | Como residente quiero guardar Borrador y Enviar a revisión | Borrador no sale en Revisión; Enviar cambia a `Por revisar` + crea historial + notificación |
-| HU-04 | Como revisor quiero filtrar y dictaminar con comentario | Tabs Todos/Por revisar/Aprobado/Rechazado filtran; Aprobar/Rechazar solo si `Por revisar`; Rechazar exige comentario |
-| HU-05 | Como usuario quiero trazabilidad por folio | Seguimiento muestra ficha + stepper ordenado; tras recargar se conserva |
-| HU-06 | Como residente quiero dashboard útil | KPIs = conteo real; dona suma 100%; buscador top 5 por folio/tipo/cliente; vencimientos por `limite` con chips correctos |
-| HU-07 | Como usuario quiero sesión básica | Login inválido muestra error; login válido entra a `/Inicio`; rutas internas exigen sesión; Cerrar sesión vuelve a `/Ingreso` |
-
-## 4. Backlog MVP priorizado (orden de ejecución)
-
-1. **Store global + persistencia:** crear `src/store/DocumentosContext.jsx` (CRUD + historial + notificaciones) con `localStorage key=residencias_v1`. Migrar `Revision`, `Seguimiento`, `Inicio`, `CentroNotificaciones` a usarlo. Eliminar `documentosBD` duplicado. [2-3 días]
-2. **Generar → guardar real:** conectar `GenerarCarta.jsx` al store. Botones: `Guardar borrador` + `Enviar a revisión` (hoy solo `Generar` abre Dialog). Limpiar resetea + query params. [2 días]
-3. **Revisión persistente:** `dictaminar()` escribe en store, no solo `useState` local. Comentario obligatorio al rechazar. [1 día]
-4. **Inicio real:** KPIs, dona, actividad, buscador, vencimientos desde store. Quitar números 150/75/75/200 fijos. Unificar `COLOR_HEX` + `COLOR_POR_ESTADO`. [1-2 días]
-5. **Auth mínima + rutas protegidas:** `AuthContext`, `ProtectedRoute` en `app.jsx`, seed residente/revisor, Drawer muestra rol, fix `ml:15px` → layout con `Drawer` + `Toolbar` correcto, responsive. [1-2 días]
-6. **QA + pulido:** `vite build`, `eslint`, prueba manual de las 11 plantillas, prueba recarga (persistencia), accesibilidad labels/foco, empty states. [1 día]
-
-Total estimado: **2 semanas, 1 dev**.
-
-## 5. Contratos API (para no retrabajar al meter backend)
-
-Diseñar desde MVP aunque se mockee:
-```
-POST /auth/login {email, password} → {token, user}
-GET /documentos?estado=&q= → [...]
-POST /documentos {categoria, tipo, datos, limite} → {folio}
-PATCH /documentos/{folio} {estado, comentario} → {documento}
-GET /documentos/{folio}/historial → [...]
-GET /plantillas → [{categoria, tipo, numCampos, version}]
-```
-El `DocumentosContext` debe exponer mismos métodos (`listar, crear, dictaminar, obtenerHistorial`) para swap por `fetch` después.
-
-## 6. Definición de Listo (DoD) del MVP
-
-- [ ] Las 11 plantillas crean folio que aparece en Revisión y Seguimiento tras recargar.
-- [ ] No se puede aprobar/rechazar fuera de `Por revisar`.
-- [ ] Rechazar sin comentario está bloqueado.
-- [ ] KPIs y dona cuadran con tabla (0 datos fijos).
-- [ ] Login/logout + rutas protegidas funcionan.
-- [ ] `npm run build` y `npm run lint` en verde.
-- [ ] Probado en Chrome/Edge 1280px y 390px sin traslapes.
-- [ ] README actualizado con cómo correr MVP + credenciales demo.
-
-## 7. Riesgos MVP y mitigación
-
-- **Divergencia de datos (Inicio vs Revisión):** causa = dos fuentes (`documentosBD` vs `DOCUMENTOS`). Mitigación = store único (tarea 1).
-- **Set-state durante render en `GenerarCarta`:** funciona pero es frágil. En MVP mantener patrón documentado; en V1 migrar a `useEffect`.
-- **Notificaciones Legales sin subtipos:** mantener `notificacion-general` y agendar spike legal antes de V1.
-- **Tablas duplicadas:** unificar `TablaGeneral` + tabla de `Revision` en un solo componente con prop `accion`.
-
-## 8. Después del MVP
-
-**V1 (backend real):** FastAPI + PostgreSQL + Entra ID + subida PDF + versionado plantillas + GitHub Actions + Docker.
-**V2 (IA):** Azure OpenAI (redacción/validación) + LangChain + Document Intelligence + export PDF con folio QR + acuse.
-**V3:** firma, buzón, analítica, móvil.
-
-## 9. Cómo probar el MVP (manual, 10 min)
-
-1. `npm install; npm run dev` → `/Ingreso` → login demo.
-2. `/Plantillas` → Usar `Carta Poder` → verifica preselección en `/Menu`.
-3. Captura datos → Enviar a revisión → verifica Dialog resumen.
-4. `/Revision` → filtra Por revisar → Revisar → Rechazar sin comentario (debe bloquear) → Rechazar con comentario.
-5. `/Seguimiento` → elige folio → verifica nuevo paso Rechazado.
-6. Recarga página → todo sigue ahí (localStorage).
-7. `/Inicio` → KPIs, dona, buscador `#101`, vencimientos coherentes.
+1. **Auth real:** `Ingreso.jsx → POST /api/auth/login` bcrypt+JWT 8h, `localStorage`, `RutaProtegida`+`VigilanteSesion`, heartbeat 30s. Usuarios: `admin/Legal123*/SuperLegal123*/Operativo123*/SuperOp123*` (`admin@sislegal.mx/Admin123*`).
+2. **Catálogo 11/137:** 4 categorías, carta-poder 17, responsiva 19, renuncia 9, intención 14, petición 14, comisión 14, resolución 13, privacidad 9, rescisión 10, funcionamiento 9, notificación-general 9. Tipos de campo texto/area/fecha/email/seleccion/moneda/fotos/check/switch/anexos + `mostrarSi`.
+3. **Generar → Resumen → IA → PDF:** valida→Resumen verifica→Redactar (`POST /api/ia/redactar`)→preview solo-lectura + `ProgresoIA` + Corregir (`POST /api/ia/corregir`)→Confirmar crea (`POST /api/documentos`) + PDF (`POST /api/ia/pdf`, reportlab). Poder con machote exacto + formalización; otros 10 con prompt genérico + firma única. Firmas poder en un `KeepTogether` indivisible.
+4. **Revisión:** bandeja real, Creado por, En revisión, dictamen con comentario obligatorio al rechazar (400 si falta), visor PDF iframe 70vh, borrado con Dialog MUI, `DELETE CASCADE`.
+5. **Seguimiento:** timeline historial+adjuntos+responsable, motivo + Editar y corregir.
+6. **Clientes verificado + autorrelleno:** tabla, chips, tabs, verificar (admin/super), Persona/CURP vs Empresa/RFC, autocomplete en Generar que solo rellena vacíos.
+7. **Usuarios/supers:** alta con email auto + `SisLegal2026*`, matriz edita ROL, baja lógica. `PATCH /roles/:id/permisos`.
+8. **Notificaciones:** campanita, badge, hace-cuánto, fan-out crear (supers+admins) y dictamen (creador+motivo), refresco 30s.
+9. **Inicio/Plantillas/Config:** KPIs/buscador/dona/actividad reales, galería 11 con deep-link `/Menu?categoria=&tipo=`, Config con 4 acentos + oscuro.
+10. **Persistencia real:** MariaDB `sislegal` 15 tablas (`maestro.sql` fuente de verdad), `documentos/Sistema legal/*.pdf`, historial y auditoría. Sin `documentosDemo.js`, sin cifras fijas.
+11. **Folios auto FOL-01 + PDFs versionados ADJ-01 + BD con `sislegal`:** folio `PREFIJO-AAAA-NNN` atómico si no viene (manual se respeta; respuesta lo incluye y el front lo muestra); `adjuntos.vigente` con badge Actual/Versión anterior y DELETE que borra físicos; conexión rotada de root a `sislegal` el 30/09.
 
 ---
-*Si se aprueba este MVP, el siguiente paso es implementar el store global (tarea 1) sin cambiar la UI existente.*
+
+## 3. NO HACE / NO HARÁ en este MVP
+
+- SSO Entra, refresh-token, 2FA, bloqueo intentos. JWT 8 h sin refresh (conexión BD ya rotada a `sislegal` el 30/09).
+- OCR / Document Intelligence, embeddings, streaming IA, fine-tuning.
+- Firma e.firma, buzón tributario, Poder Judicial.
+- Subida real de fotos/anexos al servidor (viven en memoria del form; solo el PDF final persiste).
+- Vencimientos en Inicio, versionado semántico plantillas, PWA/móvil, Docker/CI, Postgres/Azure, tests auto, soporte 24/7.
+
+> `[PENDIENTE USUARIO: elige 1-2 para fase 2 con fecha si tu asesor lo pide. Recomendado: manual de usuario + subida real de anexos.]`
+
+---
+
+## 4. Historias cumplidas (evidencia)
+
+| ID | Historia | Evidencia |
+|---|---|---|
+| HU-01 | Elegir categoría/tipo válidos | `SelectorCategoriaTipo.jsx`, Tipo disabled sin categoría, 11 tipos |
+| HU-02 | Capturar + ver resumen + IA + corregir | `GenerarCarta→ResumenDocumento→ProgresoIA`, preview + retro |
+| HU-03 | Guardar en revisión + PDF | `POST /documentos` borrador + `POST /api/ia/pdf` + Descargar PDF |
+| HU-04 | Dictaminar con motivo | `Revision.jsx`, 400 sin comentario, visor PDF |
+| HU-05 | Trazabilidad | `Seguimiento.jsx`, `documento_historial` |
+| HU-06 | Dashboard útil | `Inicio.jsx` KPIs/buscador reales |
+| HU-07 | Sesión + roles | JWT + `PermisosProvider.puede()` + `Usuarios.jsx` |
+| HU-08 | Clientes verificados | `Clientes.jsx`, `verificado BOOLEAN`, autorrelleno |
+| HU-09 | Avisos | Campanita + `notificaciones`, hace-cuánto |
+
+---
+
+## 5. Contratos API reales (ya no mock)
+
+```
+POST /api/auth/login {correo, contrasena} → {token, usuario}
+GET /api/salud → {version DB, 11 tipos, 137 campos}
+GET /api/catalogo/categorias|tipos|campos?id_tipo=
+POST /api/documentos {folio? (auto si vacío), id_tipo, datos, contenido, modelo_ia, id_cliente} → {id, estado, folio} en borrador
+PATCH /api/documentos/:id/datos {datos, id_cliente} (borrador/rechazado, vuelve a borrador)
+PATCH /api/documentos/:id/estado {estado, comentario} (rechazo exige comentario)
+DELETE /api/documentos/:id
+GET /api/documentos/:id (detalle + historial + adjuntos)
+POST /api/ia/redactar {id_tipo, datos} → {contenido, modelo}
+POST /api/ia/corregir {contenido, instruccion, id_tipo} → {contenido}
+POST /api/ia/pdf {id_tipo, datos, contenido, id_documento} → {archivo}
+GET /api/ia/pdf/:archivo → Blob PDF (con login)
+GET /api/clientes (?solo_pendientes=1) / POST / PATCH /:id/verificar / DELETE
+GET /api/notificaciones / PATCH /:id/leida / PATCH /leer-todas
+GET /api/usuarios/yo/permisos → {permisos, admin, super}
+```
+
+---
+
+## 6. DoD del MVP (verificado 30/09)
+
+- [x] 11 tipos crean folio visible en Revisión/Seguimiento tras recargar
+- [x] Rechazo sin comentario bloqueado
+- [x] Borrado sin `window.confirm`, con Dialog
+- [x] KPIs/dona sin fijos
+- [x] Login/logout + rutas protegidas
+- [x] `npm run build` OK (warning chunk preexistente), `npx eslint .` limpio, `node --check` OK, `py_compile` OK, `db:test` OK (MariaDB 12.3.3, 11/137/20)
+- [x] 1280px y 390px sin traslapes (labels fijos, escala 87.5%)
+- [ ] README actualizado con cómo correr + credenciales demo `[PENDIENTE USUARIO: ¿lo actualizo yo o lo redactas tú?]`
+- [ ] Manual usuario + acta capacitación + informe cierre `[PENDIENTE USUARIO: fechas y asistentes]`
+
+---
+
+## 7. Cómo probar (10 min)
+
+1. `npm run todo` (API :8000 + web :5173) + aparte `cd ai-service; python -m uvicorn main:app --host 127.0.0.1 --port 8001`.
+2. `/Ingreso` → `admin@sislegal.mx / Admin123*`.
+3. `/Plantillas` → Usar Carta Poder → verifica preselección en `/Menu`.
+4. Elige cliente Acme (verificado), captura, `Generar documento con IA` → verifica Resumen → Redactar → espera 20-90s free → pide una corrección → Confirmar y guardar → Descargar PDF.
+5. `/Revision` → En revisión → dictamina Rechazar sin comentario (debe bloquear) → Rechazar con motivo.
+6. `/Seguimiento` → verifica motivo + Editar y corregir → corrige → vuelve a revisión.
+7. Campanita: verifica avisos en creador y supers. Recarga: todo persiste.
+
+Si IA da `Servicio IA apagado` prende `:8001`. Si da `Modelo saturado (429)` espera 1 min o cambia `IA_MODEL` en `ai-service/.env`.
+
+---
+
+## 8. Después del MVP (fase 2 sugerida)
+
+V1: subida real anexos + README/manual + refresh-token.
+V2: key de paga (3-15s, sin 429, streaming, `IA_PRE_FORMALIZAR=0`), validación jurídica asistida, QR en PDF.
+V3: firma, buzón, Docker/CI, Postgres/Azure solo si lo exige la escuela (re-plan).

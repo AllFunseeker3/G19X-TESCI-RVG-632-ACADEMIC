@@ -11,6 +11,8 @@
 // ============================================================================
 // ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
+const path = require("path");
+const fs = require("fs");
 const pool = require("../db");
 const { conAuth, tienePermiso } = require("../middleware");
 // ============ AQUÍ TERMINA IMPORTS ============
@@ -18,6 +20,11 @@ const { conAuth, tienePermiso } = require("../middleware");
 // ============ AQUÍ EMPIEZA ROUTER Y CONSTANTES ============
 const router = express.Router();
 router.use(conAuth); // Todas exigen login.
+
+// Carpeta de PDFs (misma que en routes/ia.js): el borrado físico nunca sale de aquí.
+const PDF_DIR =
+  process.env.PDF_DIR ||
+  path.join(__dirname, "..", "..", "documentos", "Sistema legal");
 
 const ESTADOS = new Set([
   "borrador",
@@ -176,8 +183,56 @@ async function notificarDictamen({ idDoc, idTipo, creadorId, revisorId, revisorN
 }
 // ============ AQUÍ TERMINA HELPER NOTIFICAR DICTAMEN ============
 
+// ============ AQUÍ EMPIEZA HELPER FOLIO AUTOMÁTICO ============
+// QUÉ HACE: consecutivo atómico PREFIJO-AAAA-NNN por tipo y año (tabla folios).
+// El prefijo lo pone el back según el tipo; si el cliente manda folio se respeta.
+// OJO: no confundir con los campos de formulario 'folio'/'folioEntrega' de oficios
+// (esos son números de oficio que escribe el usuario, no el folio del sistema).
+const PREFIJOS = {
+  "carta-poder": "CP", "carta-responsiva": "CR", "carta-renuncia": "REN",
+  "carta-intencion": "CI", "oficio-peticion": "PET", "oficio-comision": "COM",
+  "oficio-resolucion": "RES", "aviso-privacidad": "PRI", "aviso-rescision": "RLA",
+  "aviso-funcionamiento": "FUN", "notificacion-general": "NOT",
+};
+async function siguienteFolio(idTipo) {
+  const anio = new Date().getFullYear();
+  // Transacción + FOR UPDATE: dos peticiones simultáneas nunca repiten número.
+  const connex = await pool.getConnection();
+  try {
+    await connex.beginTransaction();
+    const [[f]] = await connex.query(
+      "SELECT ultimo_numero AS n FROM folios WHERE id_tipo = ? AND anio = ? FOR UPDATE",
+      [idTipo, anio]
+    );
+    let n;
+    if (!f) {
+      await connex.query(
+        "INSERT INTO folios (id_tipo, anio, ultimo_numero) VALUES (?, ?, 1)",
+        [idTipo, anio]
+      );
+      n = 1;
+    } else {
+      n = f.n + 1;
+      await connex.query(
+        "UPDATE folios SET ultimo_numero = ? WHERE id_tipo = ? AND anio = ?",
+        [n, idTipo, anio]
+      );
+    }
+    await connex.commit();
+    const pref = PREFIJOS[idTipo] || "DOC";
+    return `${pref}-${anio}-${String(n).padStart(3, "0")}`;
+  } catch (eTx) {
+    await connex.rollback();
+    throw eTx;
+  } finally {
+    connex.release();
+  }
+}
+// ============ AQUÍ TERMINA HELPER FOLIO AUTOMÁTICO ============
+
 // ============ AQUÍ EMPIEZA RUTA POST CREAR ============
 // POST /api/documentos — crea en 'borrador' + historial inicial.
+// Folio: si no viene (caso normal del front) se genera automático.
 router.post("/", async (req, res, next) => {
   try {
     const u = req.usuario;
@@ -189,12 +244,13 @@ router.post("/", async (req, res, next) => {
       .status(403)
       .json({ detail: `Sin permiso de crear en '${cat}'` });
   }
+  const folioFinal = (folio ?? "").toString().trim() || (await siguienteFolio(id_tipo));
   const area = u.admin && id_area ? id_area : u.id_area; // Solo admin puede forzar área.
   const [r] = await pool.query(
     `INSERT INTO documentos
      (folio, id_tipo, id_cliente, id_creador, id_area, estado, datos, contenido, modelo_ia)
      VALUES (?, ?, ?, ?, ?, 'borrador', ?, ?, ?)`,
-    [folio, id_tipo, id_cliente, u.id, area, JSON.stringify(datos), contenido, modelo_ia]
+    [folioFinal, id_tipo, id_cliente, u.id, area, JSON.stringify(datos), contenido, modelo_ia]
   );
     await pool.query(
       `INSERT INTO documento_historial
@@ -204,10 +260,10 @@ router.post("/", async (req, res, next) => {
     );
     // Campanita: avisa a supers del área + admins (sin incluir al creador).
     await notificarNuevoDoc({
-      idDoc: r.insertId, idTipo: id_tipo, folio, area,
+      idDoc: r.insertId, idTipo: id_tipo, folio: folioFinal, area,
       creadorId: u.id, creadorNombre: u.nombre, verbo: "creó",
     });
-    return res.status(201).json({ id: r.insertId, estado: "borrador" });
+    return res.status(201).json({ id: r.insertId, estado: "borrador", folio: folioFinal });
   } catch (e) {
     return next(e);
   }
@@ -259,8 +315,8 @@ router.get("/:id", async (req, res, next) => {
     );
     const [adj] = await pool.query(
       `SELECT id_adjunto AS id, nombre_archivo, tipo_mime,
-              tamano_bytes, ruta, subido_en FROM adjuntos
-       WHERE id_documento = ? ORDER BY id_adjunto`,
+              tamano_bytes, ruta, vigente, subido_en FROM adjuntos
+       WHERE id_documento = ? ORDER BY vigente DESC, id_adjunto DESC`,
       [d.id_documento]
     );
     d.datos = typeof d.datos === "string" ? JSON.parse(d.datos) : d.datos; // mysql2 devuelve TEXT.
@@ -343,14 +399,26 @@ router.patch("/:id/datos", async (req, res, next) => {
     if (!["borrador", "rechazado"].includes(d.estado)) {
       return res.status(400).json({ detail: "Solo borrador o rechazado se pueden corregir" });
     }
-    const { datos = {}, contenido = null, modelo_ia = null } = req.body || {};
+    const { datos = {}, contenido = null, modelo_ia = null, id_cliente } = req.body || {};
     if (typeof datos !== "object" || Array.isArray(datos)) {
       return res.status(400).json({ detail: "Faltan los datos corregidos" });
     }
+    // Vinculación de cliente: si viene en el cuerpo se actualiza, si no se conserva.
+    let idCliente = d.id_cliente;
+    if (id_cliente !== undefined) {
+      if (id_cliente !== null) {
+        const [[cli]] = await pool.query(
+          "SELECT id_cliente FROM clientes WHERE id_cliente = ? AND activo = TRUE", [id_cliente]);
+        if (!cli) return res.status(404).json({ detail: "Cliente inexistente" });
+        idCliente = cli.id_cliente;
+      } else {
+        idCliente = null;
+      }
+    }
     await pool.query(
-      `UPDATE documentos SET datos = ?, contenido = ?, modelo_ia = ?, estado = 'borrador'
+      `UPDATE documentos SET datos = ?, contenido = ?, modelo_ia = ?, id_cliente = ?, estado = 'borrador'
        WHERE id_documento = ?`,
-      [JSON.stringify(datos), contenido, modelo_ia, d.id_documento]
+      [JSON.stringify(datos), contenido, modelo_ia, idCliente, d.id_documento]
     );
     await pool.query(
       `INSERT INTO documento_historial
@@ -363,12 +431,30 @@ router.patch("/:id/datos", async (req, res, next) => {
       idDoc: d.id_documento, idTipo: d.id_tipo, folio: d.folio, area: d.id_area,
       creadorId: d.id_creador, creadorNombre: req.usuario.nombre, verbo: "corrigió",
     });
-    return res.json({ id: d.id_documento, estado: "borrador" });
+    return res.json({ id: d.id_documento, estado: "borrador", folio: d.folio });
   } catch (e) {
     return next(e);
   }
 });
 // ============ AQUÍ TERMINA RUTA PATCH CORREGIR DATOS ============
+
+// ============ AQUÍ EMPIEZA HELPER BORRAR ARCHIVOS FÍSICOS ============
+// QUÉ HACE: elimina del disco los PDF del documento (ADJ-01: evita huérfanos).
+// Nunca sale de PDF_DIR (basename anti path-traversal); si un archivo falla,
+// solo se registra en consola y no rompe el borrado lógico.
+function borrarArchivosDoc(nombres) {
+  for (const n of nombres || []) {
+    try {
+      const base = path.basename(String(n || ""));
+      if (!/^[\w][\w\-.]*\.pdf$/i.test(base)) continue;
+      const ruta = path.join(PDF_DIR, base);
+      if (fs.existsSync(ruta)) fs.unlinkSync(ruta);
+    } catch (eFs) {
+      console.error("Borrado físico:", eFs.message);
+    }
+  }
+}
+// ============ AQUÍ TERMINA HELPER BORRAR ARCHIVOS FÍSICOS ============
 
 // ============ AQUÍ EMPIEZA RUTA DELETE DOCUMENTO ============
 // DELETE /api/documentos/:id — borra el documento (historial/adjuntos por CASCADE).
@@ -376,7 +462,12 @@ router.patch("/:id/datos", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const d = await docVisible(Number(req.params.id), req.usuario, "eliminar");
+    const [adj] = await pool.query(
+      "SELECT nombre_archivo FROM adjuntos WHERE id_documento = ?",
+      [d.id_documento]
+    );
     await pool.query("DELETE FROM documentos WHERE id_documento = ?", [d.id_documento]);
+    borrarArchivosDoc(adj.map((a) => a.nombre_archivo)); // Limpia huérfanos del disco.
     return res.json({ id: d.id_documento, eliminado: true });
   } catch (e) {
     return next(e);

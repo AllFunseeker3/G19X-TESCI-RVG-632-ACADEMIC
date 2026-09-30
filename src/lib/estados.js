@@ -2,7 +2,8 @@
 // ARCHIVO: src/lib/estados.js
 // FUNCIÓN GENERAL: etiquetas y colores de los estados del flujo documental.
 //   La API usa códigos (borrador, por_revisar...); la UI muestra etiquetas
-//   (Borrador, Por revisar...). Centraliza el mapeo para no duplicarlo.
+//   (En revisión, Por revisar...). El código 'borrador' se muestra como
+//   "En revisión" (decisión del usuario). Centraliza el mapeo.
 // FLUJO DE DATOS:
 //   - ENTRAN: código de estado de server/routes/documentos.js.
 //   - SALEN: Components/EstadoChip.jsx, Pages/Revision.jsx,
@@ -14,7 +15,7 @@
 // ============ AQUÍ EMPIEZA ETIQUETA_ESTADO ============
 // Código API -> etiqueta visible.
 export const ETIQUETA_ESTADO = {
-  borrador: "Borrador",
+  borrador: "En revisión",
   por_revisar: "Por revisar",
   aprobado: "Aprobado",
   rechazado: "Rechazado",
@@ -41,7 +42,7 @@ export function estadoCodigo(etiqueta) {
 // ============ AQUÍ EMPIEZA COLOR_POR_ESTADO ============
 // QUÉ HACE: código API -> color MUI del chip (mismos que TablaGeneral).
 export const COLOR_POR_ESTADO = {
-  borrador: "default",
+  borrador: "info",
   por_revisar: "warning",
   aprobado: "success",
   rechazado: "error",

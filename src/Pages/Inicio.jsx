@@ -87,10 +87,9 @@ export default function Inicio() {
   const [usuario] = useState(() => leerUsuario());
   const primerNombre = (usuario?.nombre ?? "Residente").trim().split(/\s+/)[0];
 
-  // NOTIFICACIONES: por revisar y borradores derivados de la lista real.
+  // NOTIFICACIONES: en revisión (código 'borrador') derivados de la lista real.
   const notis = {
-    porRevisar: todos.filter((d) => d.estado === 'por_revisar').slice(0, 5),
-    borradores: todos.filter((d) => d.estado === 'borrador').length,
+    porRevisar: todos.filter((d) => d.estado === 'borrador').slice(0, 5),
   };
 
   // CÁLCULO: banner con saludo por hora + conteos REALES (notis, no demo).
@@ -98,7 +97,6 @@ export default function Inicio() {
   const hora = new Date().getHours();
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
   const porRevisar = notis.porRevisar.length;
-  const borradores = notis.borradores;
   // ============ AQUÍ TERMINA USUARIO Y NOTIFICACIONES ============
 
   // ============ AQUÍ EMPIEZA BUSCADOR Y TABLA ============
@@ -119,9 +117,10 @@ export default function Inicio() {
   }));
 
   // KPIs REALES desde la lista (antes eran números fijos demo).
+  // 'En revisión' cuenta el código 'borrador' (etiqueta visible).
   const kpiTotal = todos.length;
   const kpiAprob = todos.filter((d) => d.estado === 'aprobado').length;
-  const kpiPorRev = todos.filter((d) => d.estado === 'por_revisar').length;
+  const kpiPorRev = todos.filter((d) => d.estado === 'borrador').length;
   const kpiRech = todos.filter((d) => d.estado === 'rechazado').length;
   // ============ AQUÍ TERMINA BUSCADOR Y TABLA ============
 
@@ -150,7 +149,7 @@ export default function Inicio() {
               </Typography>
               {/* Opacidad en vez de blanco fijo para que se lea en acento blanco también. */}
               <Typography sx={{opacity: 0.85}}>
-                Tienes {porRevisar} documento(s) por revisar y {borradores} borrador(es) en captura.
+                Tienes {porRevisar} documento(s) en revisión.
               </Typography>
             </Box>
             <Button component={Link} to="/Revision" variant="contained"
@@ -164,7 +163,7 @@ export default function Inicio() {
 
       {/* ============ AQUÍ EMPIEZA NOTIFICACIONES ============ */}
       {/* SECCIÓN JSX: notificaciones REALES (reemplaza la campana de prueba).
-          DATOS PROVENIENTES DE la lista real `todos` (filtrada a por_revisar)
+          DATOS PROVENIENTES DE la lista real `todos` (filtrada a en revisión)
           (ya filtrados por área y permiso). Máx 5 + link a /Revision. */}
       <Box id="Box-Inicio-Notificaciones" sx={{width: '100%', mb: 3}}>
         <Card sx={{ borderRadius: 2 }}>
@@ -174,14 +173,14 @@ export default function Inicio() {
                 Notificaciones
               </Typography>
               <Chip
-                label={porRevisar === 0 ? 'Sin pendientes' : `${porRevisar} por revisar`}
+                label={porRevisar === 0 ? 'Sin pendientes' : `${porRevisar} en revisión`}
                 color={porRevisar === 0 ? 'default' : 'warning'}
                 sx={{fontWeight: 'bold'}}
               />
             </Box>
             {notis.porRevisar.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                No tienes documentos por revisar. Todo al día.
+                No tienes documentos en revisión. Todo al día.
               </Typography>
             ) : (
               <List dense>
@@ -261,11 +260,11 @@ export default function Inicio() {
             color:'#fff',
             borderRadius:2,}}>
             <CardContent>
-              {/* SECCIÓN JSX: fila icono+texto de la tarjeta Por revisar. */}
-              <Box id="Box-Inicio-TarjetaPorRevisar" sx={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                {/* SECCIÓN JSX: textos de la tarjeta Por revisar. */}
-                <Box id="Box-Inicio-TarjetaPorRevisarTexto">
-                  <Typography variant="h6" fontWeight="bold">Por revisar</Typography>
+                {/* SECCIÓN JSX: fila icono+texto de la tarjeta En revisión. */}
+                <Box id="Box-Inicio-TarjetaPorRevisar" sx={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  {/* SECCIÓN JSX: textos de la tarjeta En revisión. */}
+                  <Box id="Box-Inicio-TarjetaPorRevisarTexto">
+                    <Typography variant="h6" fontWeight="bold">En revisión</Typography>
                   <Typography variant="h4" fontWeight="bold">{kpiPorRev}</Typography>
                 </Box>
                 <PendingActionsIcon sx={{fontSize:50, opacity:0.8}} />

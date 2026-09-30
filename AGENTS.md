@@ -36,14 +36,16 @@ Lee este archivo antes de tocar código. La sesión original está en
 - Scripts: `npm run todo` (API :8000 + web :5173 con concurrently),
   `npm run api` (solo API), `npm run dev` (solo web), `npm run build`, `npx eslint .`
 - Si hay `EADDRINUSE`: `Get-NetTCPConnection -LocalPort 8000,5173 | % { taskkill /PID $_.OwningProcess /T /F }`
-- `server/.env` usa `root/1234` (temporal; rotar a usuario `sislegal`). JWT 8h.
+- `server/.env` usa usuario `sislegal` / `SisLegal2026*` (rotado el 30/09/2026; ya no root). JWT 8h.
 - Usuarios de prueba: `admin@sislegal.mx/Admin123*` (admin total).
-- Salud: `GET http://localhost:8000/api/salud` → 11 tipos, 137 campos, 20 permisos.
+- Salud: `GET http://localhost:8000/api/salud` → 11 tipos, 137 campos, 20 permisos, 6 usuarios.
 - Verificación BD sin servidor: `cd server; npm run db:test`
 
 ## Datos
 
-- `db/sislegal_schema.sql` es la **fuente de verdad** (14 tablas, 11 tipos, 137 campos).
+- `db/maestro.sql` es la **fuente de verdad** (15 tablas + `adjuntos.vigente` ADJ-01, 11 tipos, 137 campos).
+  Migraciones aplicadas en vivo: `migracion_ia_contenido`, `migracion_notificaciones`,
+  `migracion_clientes_verificado` (CLI-01), `migracion_adjuntos_vigente` (ADJ-01).
 - `src/lib/tiposDocumentos.js` es espejo del catálogo (`filas`, `ayuda`, `mostrarSi`;
   `mostrarSi.valor === true` es booleano, viene de `cond_valor='true'`).
 - Tipos de campo: `texto | area | fecha | email | seleccion | moneda | fotos | check | switch | anexos`.
@@ -56,8 +58,16 @@ Lee este archivo antes de tocar código. La sesión original está en
 - El login (`POST /api/auth/login`) **NO devuelve flag `admin`** en `usuario`.
   Para saber si es admin usa `usePermisos()` (`GET /api/usuarios/yo/permisos`).
   No leas `admin` de `localStorage`.
-- `documentos` está vacía (0 filas): las tablas de Inicio salen vacías hasta que
-  haya documentos. `GenerarCarta` aún **no persiste** (Confirmar solo cierra el resumen).
+- `documentos` ya tiene datos reales; `GenerarCarta` persiste (Confirmar crea + PDF) y
+  el modo `?editar=` corrige vía `PATCH /:id/datos` (vuelve a borrador + re-avisa).
+- Estados UI: `borrador` se muestra como "En revisión" (`estados.js`, chip info).
+- Folios automáticos (FOL-01): `POST /documentos` genera `PREFIJO-AAAA-NNN` si no viene
+  folio (`siguienteFolio()` atómico con tabla `folios`; prefijos CP/CR/REN/CI/PET/COM/RES/PRI/RLA/FUN/NOT).
+- PDFs versionados (ADJ-01): `adjuntos.vigente`; regenerar marca anteriores como
+  histórico; `DELETE /documentos/:id` borra también los .pdf del disco.
+- Clientes con `verificado` + autorrelleno en GenerarCarta; campanita con fan-out
+  crear/corregir (supers+admins) y dictamen (creador + motivo); carta-poder sin
+  destinatario + cliente inyecta el nombre (`enriquecerDestinatario`).
 
 ## Reglas de UI (dadas por el usuario, obligatorias)
 
@@ -108,7 +118,9 @@ Lee este archivo antes de tocar código. La sesión original está en
 
 ## Pendientes conocidos
 
-- Seeds de documentos de prueba (tabla `documentos` vacía).
+- Recrear usuarios extra (Ricardo/Javier/Lucía) — se perdieron en el DROP + maestro del 29/09.
+- Decidir DROP físico de `clientes.contacto` (quitado del form §60, sigue en BD sin uso).
+- Subida real de fotos/anexos al servidor (viven en memoria del form; solo el PDF final persiste).
 - Portadas EADDRINUSE: matar árboles con `taskkill /PID /T /F`.
 
 ## IA (redacción automática, en construcción)

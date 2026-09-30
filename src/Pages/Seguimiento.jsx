@@ -99,7 +99,8 @@ export default function Seguimiento() {
     // Último rechazo (motivo destacado) y última aprobación del historial.
     const ultimoRechazo = historial.filter((h) => h.estado_nuevo === 'rechazado').slice(-1)[0];
     const ultimaAprobacion = historial.filter((h) => h.estado_nuevo === 'aprobado').slice(-1)[0];
-    // Editar: solo borrador/rechazado y solo el creador o el admin.
+    // Editar: solo en revisión/rechazado (códigos 'borrador'/'rechazado')
+    // y solo el creador o el admin.
     // El back lo revalida (403/400); aquí solo se muestra/oculta el botón.
     const yo = leerUsuario();
     const { admin } = usePermisos();
