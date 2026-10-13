@@ -109,6 +109,9 @@ export default function GenerarCarta() {
   const [editandoId, setEditandoId] = useState(null);
   const [editandoMotivo, setEditandoMotivo] = useState('');
   const [editandoCargando, setEditandoCargando] = useState(false);
+  // Origen revisión-PDF (?origen=revision-pdf): precarga datos extraídos por la IA,
+  // SIEMPRE como carta nueva (nunca actualiza, editandoId queda en null).
+  const [origenRevision, setOrigenRevision] = useState(false);
   // Cliente existente (directorio): lista + seleccionado para autorrelleno.
   const [clientes, setClientes] = useState([]);
   const [clienteSel, setClienteSel] = useState(null);
@@ -168,6 +171,56 @@ export default function GenerarCarta() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
   // ============ AQUÍ TERMINA MODO CORRECCIÓN ?editar= ============
+
+  // ============ AQUÍ EMPIEZA ORIGEN REVISIÓN-PDF ============
+  // ?origen=revision-pdf&tipo=: precarga tipo + datos extraídos de sessionStorage
+  // (lo guarda Revision.jsx). Siempre carta nueva: limpia editandoId/motivo.
+  useEffect(() => {
+    if (params.get('origen') !== 'revision-pdf' || origenRevision) return;
+    let vivo = true;
+    (async () => {
+      const leerRaw = () => {
+        try {
+          return sessionStorage.getItem('revision-pdf');
+        } catch {
+          return null;
+        }
+      };
+      const raw = leerRaw();
+      if (!vivo || !raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        const idTipo = parsed?.id_tipo ?? params.get('tipo') ?? '';
+        const cat = categoriaDeTipo(idTipo);
+        if (!vivo || !cat || !idTipo) return;
+        const base = datosInicialesPorTipo(camposDeTipo(idTipo));
+        const extra = (parsed?.datos && typeof parsed.datos === 'object') ? parsed.datos : {};
+        const limpios = {};
+        for (const [k, v] of Object.entries(extra)) {
+          if (v === null || v === undefined) continue;
+          if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') limpios[k] = v;
+        }
+        setCategoria(cat);
+        setTipoDoc(idTipo);
+        setDatos({ ...base, ...limpios });
+        setAgregarDestinatario(Boolean(limpios.destinatario));
+        setErrores({});
+        setEditandoId(null);
+        setEditandoMotivo('');
+        setOrigenRevision(true);
+      } catch {
+        /* JSON inválido: se ignora */
+      } finally {
+        try {
+          sessionStorage.removeItem('revision-pdf');
+        } catch {
+          /* sin storage */
+        }
+      }
+    })();
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   // ============ AQUÍ EMPIEZA CLIENTE EXISTENTE ============
   // Directorio para autorrelleno (una carga al montar).
@@ -695,6 +748,11 @@ export default function GenerarCarta() {
       {editandoMotivo && (
         <Alert severity="warning" sx={{ mt: 2 }}>
           Motivo del rechazo: {editandoMotivo}
+        </Alert>
+      )}
+      {origenRevision && !editandoId && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Datos extraídos de PDF por IA — revísalos y modifícalos. Al confirmar se genera una carta nueva.
         </Alert>
       )}
       {/* ============ AQUÍ TERMINA BANNER MODO CORRECCIÓN ============ */}

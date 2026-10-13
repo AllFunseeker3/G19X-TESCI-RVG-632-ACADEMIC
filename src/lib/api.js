@@ -174,6 +174,32 @@ export const descargarPDF = async (archivo) => {
   if (!res.ok) throw new Error("No se pudo descargar el PDF");
   return res.blob();
 };
+// Revisa un PDF externo con IA: lo clasifica entre los 11 tipos, extrae
+// datos y devuelve veredicto + hallazgos (no crea documentos).
+export const revisarPDFconIA = async (file) => {
+  const t = leerToken();
+  const fd = new FormData();
+  fd.append("archivo", file);
+  let res;
+  try {
+    res = await fetch(`${BASE}/ia/revisar`, {
+      method: "POST",
+      headers: t ? { Authorization: `Bearer ${t}` } : {},
+      body: fd,
+    });
+  } catch {
+    window.dispatchEvent(new Event(EVENTO_SIN_CONEXION));
+    throw new Error("Sin conexión con el servidor");
+  }
+  const datos = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    guardarToken(null);
+    window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA));
+    throw new Error(datos.detail ?? "Sesión expirada, ingresa de nuevo");
+  }
+  if (!res.ok) throw new Error(datos.detail ?? `Error ${res.status}`);
+  return datos;
+};
 // ============ AQUÍ TERMINA IA Y PDF ============
 
 // ============ AQUÍ EMPIEZA CLIENTES ============

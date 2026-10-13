@@ -20,7 +20,8 @@
  *   - FILTROS: etiquetas visibles; el código API se deriva con estadoCodigo().
  *   - Dictamen: usa cambiarEstado(); el responsable lo pone el back (token).
  * ========================================================================== */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Paper, Button, Tabs, Tab, Dialog, DialogTitle, DialogContent,
@@ -30,13 +31,16 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PageHeader from '../Components/PageHeader';
 // DATOS QUE SE MANDAN A ../Components/EstadoChip.jsx para procesamiento: estado={...}.
 import EstadoChip from '../Components/EstadoChip';
+import ProgresoIA from '../Components/ProgresoIA';
 // DATOS PROVENIENTES DE ../lib/api.js: bandeja real (ya filtrada por área/permiso).
-import { getDocumentos, getDocumento, cambiarEstado, eliminarDocumento, descargarPDF } from '../lib/api.js';
+import { getDocumentos, getDocumento, cambiarEstado, eliminarDocumento, descargarPDF, revisarPDFconIA } from '../lib/api.js';
 // Conversión código API <-> etiqueta visible (ver ../lib/estados.js).
 import { estadoBonito } from '../lib/estados';
+import { categoriaDeTipo } from '../lib/tiposDocumentos';
 // PERMISOS: dictaminar exige 'modificar' en la categoría de la fila.
 import { usePermisos } from '../Components/PermisosProvider';
 
@@ -96,6 +100,86 @@ export default function Revision() {
     // PERMISOS: admin/super dictaminan; eliminar exige permiso por categoría.
     const { puede, admin, super: esSuper } = usePermisos();
     // ============ AQUÍ TERMINA ESTADOS REVISIÓN ============
+    // ============ AQUÍ EMPIEZA REVISIÓN PDF EXTERNO CON IA ============
+    // Subir un PDF externo: la IA lo clasifica (11 tipos), extrae datos y revisa.
+    const navigate = useNavigate();
+    const [revAbierto, setRevAbierto] = useState(false);
+    const [revArchivo, setRevArchivo] = useState(null);
+    const [revCargando, setRevCargando] = useState(false);
+    const [revError, setRevError] = useState('');
+    const [revResultado, setRevResultado] = useState(null);
+    const [revFases, setRevFases] = useState([]);
+    const [revFase, setRevFase] = useState(0);
+    const [revProgreso, setRevProgreso] = useState(0);
+    const [revSegundos, setRevSegundos] = useState(0);
+    const [revModelo, setRevModelo] = useState('');
+    const revTimer = useRef(null);
+    const FASES_REVISION_PDF = ['Conectando con la IA', 'Extrayendo texto del PDF', 'Clasificando tipo de carta', 'Extrayendo datos', 'Generando revisión jurídica'];
+    const detenerProgresoRev = () => {
+        if (revTimer.current) clearInterval(revTimer.current);
+        revTimer.current = null;
+    };
+    const iniciarProgresoRev = (estimadoSeg = 90) => {
+        detenerProgresoRev();
+        setRevFases(FASES_REVISION_PDF);
+        setRevFase(0);
+        setRevProgreso(2);
+        setRevSegundos(0);
+        setRevModelo('');
+        const t0 = Date.now();
+        revTimer.current = setInterval(() => {
+            const s = (Date.now() - t0) / 1000;
+            setRevSegundos(Math.floor(s));
+            setRevProgreso(Math.min(90, 2 + (s / estimadoSeg) * 88));
+            setRevFase(Math.min(FASES_REVISION_PDF.length - 1, Math.floor((s / estimadoSeg) * FASES_REVISION_PDF.length)));
+        }, 500);
+    };
+    useEffect(() => () => detenerProgresoRev(), []);
+    const cerrarRevisionIA = () => {
+        if (revCargando) return;
+        detenerProgresoRev();
+        setRevAbierto(false);
+        setRevArchivo(null);
+        setRevError('');
+        setRevResultado(null);
+        setRevProgreso(0);
+        setRevFase(0);
+    };
+    const handleRevisarPDF = async () => {
+        if (!revArchivo || revCargando) return;
+        setRevError('');
+        setRevResultado(null);
+        setRevCargando(true);
+        iniciarProgresoRev(90);
+        try {
+            const r = await revisarPDFconIA(revArchivo);
+            setRevResultado(r);
+            setRevModelo(r.modelo ?? '');
+            setRevProgreso(100);
+            setRevFase(FASES_REVISION_PDF.length - 1);
+        } catch (e) {
+            setRevError(e.message || 'No se pudo revisar el PDF');
+        } finally {
+            detenerProgresoRev();
+            setRevCargando(false);
+        }
+    };
+    // Editar = abrir GenerarCarta SIEMPRE como nueva, precargada con lo extraído.
+    const handleEditarDesdeRevision = () => {
+        if (!revResultado) return;
+        try {
+            sessionStorage.setItem('revision-pdf', JSON.stringify({
+                id_tipo: revResultado.id_tipo,
+                datos: revResultado.datos ?? {},
+            }));
+        } catch {
+            /* sessionStorage no disponible */
+        }
+        const cat = categoriaDeTipo(revResultado.id_tipo);
+        cerrarRevisionIA();
+        navigate(`/Menu?origen=revision-pdf&categoria=${encodeURIComponent(cat)}&tipo=${encodeURIComponent(revResultado.id_tipo)}`);
+    };
+    // ============ AQUÍ TERMINA REVISIÓN PDF EXTERNO CON IA ============
 
     // ============ AQUÍ EMPIEZA CARGA BANDEJA ============
     // CARGA: bandeja completa al montar (el back ya filtra por área y permiso).
@@ -263,6 +347,18 @@ export default function Revision() {
                 </Tabs>
             </Box>
             {/* ============ AQUÍ TERMINA FILTROS POR ESTADO (JSX) ============ */}
+
+            {/* ============ AQUÍ EMPIEZA REVISAR PDF EXTERNO (JSX) ============ */}
+            <Box id="Box-Revision-IA-Externa" sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                    variant="contained"
+                    startIcon={<UploadFileIcon />}
+                    onClick={() => setRevAbierto(true)}
+                >
+                    Revisar PDF con IA
+                </Button>
+            </Box>
+            {/* ============ AQUÍ TERMINA REVISAR PDF EXTERNO (JSX) ============ */}
 
             {/* ============ AQUÍ EMPIEZA TABLA BANDEJA ============ */}
             {/* SECCIÓN JSX: tabla de la bandeja (id preexistente conservado). */}
@@ -514,6 +610,122 @@ export default function Revision() {
                 </DialogActions>
             </Dialog>
             {/* ============ AQUÍ TERMINA CONFIRMACIÓN BORRADO ============ */}
+
+            {/* ============ AQUÍ EMPIEZA DIÁLOGO REVISAR PDF CON IA ============ */}
+            <Dialog open={revAbierto} onClose={cerrarRevisionIA} maxWidth="md" fullWidth>
+                <DialogTitle color="encabezado.main" fontWeight="bold">
+                    Revisar carta en PDF con IA
+                </DialogTitle>
+                <DialogContent dividers>
+                    {!revResultado && !revCargando && (
+                        <Box id="Box-Revision-IA-Subida">
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                Sube una carta en PDF de los 11 tipos. La IA la clasifica sola, extrae los datos y la revisa. Luego puedes generar una carta nueva con correcciones.
+                            </Typography>
+                            <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
+                                {revArchivo ? revArchivo.name : 'Elegir PDF (solo .pdf, máx 10MB)'}
+                                <input
+                                    type="file"
+                                    hidden
+                                    accept="application/pdf,.pdf"
+                                    onChange={(e) => {
+                                        const f = e.target.files?.[0] ?? null;
+                                        setRevArchivo(f);
+                                        setRevError('');
+                                        e.target.value = '';
+                                    }}
+                                />
+                            </Button>
+                            {revError && (
+                                <Alert severity="error" sx={{ mt: 2 }} onClose={() => setRevError('')}>
+                                    {revError}
+                                </Alert>
+                            )}
+                        </Box>
+                    )}
+                    {revCargando && (
+                        <Box id="Box-Revision-IA-Progreso">
+                            <ProgresoIA fases={revFases} indice={revFase} progreso={revProgreso} segundos={revSegundos} modelo={revModelo} />
+                            <Typography variant="caption" color="text.secondary">
+                                Conexión con la IA y procesamiento de la información recibida…
+                            </Typography>
+                        </Box>
+                    )}
+                    {revError && revResultado === null && revCargando === false && revArchivo && (
+                        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setRevError('')}>
+                            {revError}
+                        </Alert>
+                    )}
+                    {revResultado && !revCargando && (
+                        <Box id="Box-Revision-IA-Resultado">
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
+                                <Chip label={`Tipo detectado: ${revResultado.nombre_tipo ?? revResultado.id_tipo}`} color="primary" />
+                                <Chip label={`Confianza ${(Math.round((revResultado.confianza ?? 0) * 100))}%`} variant="outlined" />
+                                <Chip
+                                    label={revResultado.veredicto}
+                                    color={revResultado.veredicto === 'APROBABLE' ? 'success' : revResultado.veredicto === 'RECHAZABLE' ? 'error' : 'warning'}
+                                />
+                            </Box>
+                            {revResultado.veredicto === 'APROBABLE' ? (
+                                <Alert severity="success" sx={{ mb: 2 }}>
+                                    {revResultado.mensaje || 'La redacción original está bien.'} Puedes cerrar o editar los datos para generar una carta nueva.
+                                </Alert>
+                            ) : (
+                                <Alert severity={revResultado.veredicto === 'RECHAZABLE' ? 'error' : 'warning'} sx={{ mb: 2 }}>
+                                    {revResultado.mensaje || 'La IA encontró observaciones.'}
+                                </Alert>
+                            )}
+                            {(revResultado.hallazgos ?? []).length > 0 && (
+                                <>
+                                    <Typography variant="subtitle2" fontWeight="bold">Hallazgos de la IA</Typography>
+                                    <List dense>
+                                        {(revResultado.hallazgos ?? []).map((h, i) => (
+                                            <ListItem key={i} disablePadding sx={{ py: 0.25 }}>
+                                                <ListItemText primary={`• ${h}`} />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                    <Divider sx={{ my: 1 }} />
+                                </>
+                            )}
+                            <Typography variant="subtitle2" fontWeight="bold">Datos extraídos (editables en GenerarCarta)</Typography>
+                            <List dense>
+                                {Object.entries(revResultado.datos ?? {}).map(([k, v]) => (
+                                    <ListItem key={k} disablePadding sx={{ py: 0.25 }}>
+                                        <ListItemText primary={k} secondary={formatoValor(v)} />
+                                    </ListItem>
+                                ))}
+                                {Object.keys(revResultado.datos ?? {}).length === 0 && (
+                                    <ListItem disablePadding><ListItemText primary="Sin datos extraídos" /></ListItem>
+                                )}
+                            </List>
+                            {revModelo && (
+                                <Typography variant="caption" color="text.secondary">Modelo: {revModelo}</Typography>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cerrarRevisionIA} disabled={revCargando} color="primary">
+                        {revResultado ? 'Cerrar' : 'Cancelar'}
+                    </Button>
+                    {!revResultado && (
+                        <Button
+                            variant="contained"
+                            disabled={!revArchivo || revCargando}
+                            onClick={handleRevisarPDF}
+                        >
+                            {revCargando ? 'Revisando…' : 'Revisar con IA'}
+                        </Button>
+                    )}
+                    {revResultado && !revCargando && (
+                        <Button variant="contained" onClick={handleEditarDesdeRevision}>
+                            {revResultado.veredicto === 'APROBABLE' ? 'Editar' : 'Editar y generar nueva'}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+            {/* ============ AQUÍ TERMINA DIÁLOGO REVISAR PDF CON IA ============ */}
         </Box>
         // ============ AQUÍ TERMINA CONTENEDOR REVISIÓN ============
     );

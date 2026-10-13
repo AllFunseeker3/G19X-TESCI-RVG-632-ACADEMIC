@@ -9,10 +9,13 @@
 #   cambiar modelo/puerto en ai-service/.env (IA_MODEL, IA_PORT, IA_PROVIDER).
 # ============================================================================
 # ============ AQUÍ EMPIEZA IMPORTS ============
+import io
+import json
 import os
+import re
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
@@ -417,7 +420,144 @@ def generar_pdf(body: PdfIn):
     return {**out, "id_tipo": body.id_tipo}
 # ============ AQUÍ TERMINA ENDPOINT POST PDF ============
 
-# ============ AQUÍ EMPIEZA ARRANQUE ============
+# ============ AQUÍ EMPIEZA REVISIÓN PDF EXTERNO ============
+# Campos esperados por tipo (espejo de src/lib/tiposDocumentos.js CAMPOS_POR_TIPO).
+# La IA solo devuelve claves de esta lista; el front las precarga en GenerarCarta.
+CAMPOS_ESPERADOS = {
+    "carta-poder": ["otorgante", "tipoDocOtorgante", "idOtorgante", "apoderado", "tipoDocApoderado", "idApoderado", "facultades", "limites", "testigo1Nombre", "testigo1TipoDoc", "testigo1Id", "testigo2Nombre", "testigo2TipoDoc", "testigo2Id", "vigencia", "lugar", "fecha", "destinatario"],
+    "carta-responsiva": ["quienEntrega", "tipoIdEntrega", "folioEntrega", "puestoEntrega", "quienRecibe", "tipoIdRecibe", "folioRecibe", "tipoBien", "descripcion", "marca", "modelo", "noSerie", "estadoFisico", "especifiqueDetalles", "valorEstimado", "condiciones", "lugar", "fecha"],
+    "carta-renuncia": ["empleado", "numeroEmpleado", "puesto", "empresa", "ultimoDia", "motivo", "especifiqueMotivo", "lugar", "fecha"],
+    "carta-intencion": ["emisoraNombre", "emisoraTipoId", "emisoraFolio", "emisoraRepresentante", "receptoraNombre", "receptoraTipoId", "receptoraFolio", "receptoraRepresentante", "objeto", "confidencialidad", "vinculante", "vigencia", "lugar", "fecha", "destinatario"],
+    "oficio-peticion": ["nombreDestinatario", "cargoDestinatario", "dependenciaDestinatario", "nombreRemitente", "cargoRemitente", "folio", "asunto", "peticion", "ccp", "ccpDetalle", "fundamentarArt8", "lugar", "fecha"],
+    "oficio-comision": ["nombreComisionado", "cargoComisionado", "numeroEmpleadoComisionado", "folio", "destino", "fechaInicio", "fechaFin", "motivo", "nombreAutoriza", "cargoAutoriza", "viaticos", "montoViaticos", "lugar", "fecha"],
+    "oficio-resolucion": ["nombreDestinatario", "cargoDestinatario", "folio", "referenciaOrigen", "interesado", "asunto", "sentido", "considerandos", "puntosResolutivos", "nombreResuelve", "cargoResuelve", "lugar", "fecha"],
+    "aviso-privacidad": ["razonSocial", "domicilio", "tipoAviso", "datosRecabados", "finalidad", "transferencia", "transferenciaDetalle", "contactoArco", "fecha"],
+    "aviso-rescision": ["trabajador", "numeroEmpleado", "puesto", "causa", "fundamentoLegal", "nombreRepresentante", "cargoRepresentante", "lugar", "fechaRescision", "fecha"],
+    "aviso-funcionamiento": ["autoridadDestino", "establecimiento", "rfc", "giro", "domicilio", "responsable", "horario", "fechaApertura", "fecha"],
+    "notificacion-general": ["destinatario", "domicilio", "expediente", "nombreNotifica", "cargoNotifica", "extracto", "acuseRecibo", "lugar", "fecha"],
+}
+
+PROMPT_CLASIFICAR_PDF = PromptTemplate.from_template(
+    "Eres un abogado mexicano experto en clasificación documental. "
+    "Lee el TEXTO extraído de un PDF y clasifícalo en EXACTAMENTE uno de estos 11 tipos:\n{lista_tipos}\n\n"
+    "TEXTO:\n{texto}\n\n"
+    "Devuelve SOLO JSON válido, sin markdown ni explicación, con este formato exacto:\n"
+    '{{\n  "id_tipo": "<uno de los 11 ids>",\n  "confianza": <0.0 a 1.0>\n}}'
+)
+
+
+def _extraer_texto_pdf(contenido: bytes, max_paginas: int = 15) -> str:
+    """Extrae texto con pypdf. Lanza HTTPException 422 si no hay texto legible."""
+    try:
+        from pypdf import PdfReader  # Import tardío: solo se usa aquí.
+    except Exception:
+        raise HTTPException(status_code=500, detail="Falta dependencia pypdf (pip install -r requirements.txt)")
+    try:
+        lector = PdfReader(io.BytesIO(contenido))
+    except Exception:
+        raise HTTPException(status_code=400, detail="PDF inválido o corrupto")
+    partes = []
+    for i, pag in enumerate(lector.pages):
+        if i >= max_paginas:
+            break
+        try:
+            t = pag.extract_text() or ""
+        except Exception:
+            t = ""
+        if t.strip():
+            partes.append(t.strip())
+    texto = "\n".join(partes).strip()
+    if len(texto) < 20:
+        raise HTTPException(status_code=422, detail="PDF sin texto legible (¿es escaneado sin OCR?)")
+    return texto[:12000]
+
+
+def _parse_json_respuesta(txt: str) -> dict:
+    """Parsea JSON tolerante (quita fences ```json y texto extra)."""
+    t = (txt or "").strip()
+    t = re.sub(r"^```(?:json)?\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*```$", "", t)
+    m = re.search(r"\{.*\}", t, flags=re.DOTALL)
+    if m:
+        t = m.group(0)
+    try:
+        return json.loads(t)
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"La IA no devolvió JSON válido: {t[:200]}")
+
+
+@app.post("/revisar-pdf")
+async def revisar_pdf(archivo: UploadFile = File(...)):
+    """Revisa un PDF externo: extrae texto, clasifica entre los 11 tipos,
+    extrae datos del tipo detectado y emite veredicto jurídico.
+    No crea documentos ni PDFs: solo analiza."""
+    nombre = (archivo.filename or "").strip()
+    if not nombre.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF")
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(status_code=400, detail="Archivo vacío")
+    if len(contenido) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="PDF mayor a 10MB")
+    texto = _extraer_texto_pdf(contenido)
+    # Paso A: clasificar entre los 11.
+    lista_tipos = "\n".join([f"- {k}: {TIPOS_IA[k]}. {ESTRUCTURAS_IA.get(k, '')}" for k in sorted(TIPOS_IA)])
+    prompt_cla = PROMPT_CLASIFICAR_PDF.format(lista_tipos=lista_tipos, texto=texto[:8000])
+    txt_cla, modelo_cla = _invocar_con_fallback(prompt_cla)
+    cla = _parse_json_respuesta(txt_cla)
+    id_tipo = str(cla.get("id_tipo", "")).strip()
+    try:
+        confianza = float(cla.get("confianza", 0) or 0)
+    except Exception:
+        confianza = 0.0
+    if id_tipo not in TIPOS_IA:
+        raise HTTPException(status_code=502, detail=f"La IA devolvió un tipo desconocido: {id_tipo}")
+    confianza = max(0.0, min(1.0, confianza))
+    campos = CAMPOS_ESPERADOS.get(id_tipo, [])
+    # Paso B: extraer datos + revisión jurídica en 1 llamada.
+    prompt_rev = (
+        "Eres un abogado mexicano experto en revisión de documentos legales. Analizas: "
+        f"{TIPOS_IA[id_tipo]}.\n\n"
+        f"Campos esperados (usa SOLO estas claves, omite los que no aparezcan, no inventes): {', '.join(campos)}.\n\n"
+        f"TEXTO DEL PDF:\n{texto}\n\n"
+        "Tareas: 1) Extrae cada campo con su valor literal o normalizado (fechas tal cual, checks/switch como true/false). "
+        "2) Revisa forma, datos faltantes, incoherencias, ortografía y riesgo legal mexicano. "
+        "3) Emite veredicto: APROBABLE (redacción correcta), CORREGIBLE (faltan/detalles menores) o RECHAZABLE (errores graves). "
+        "Devuelve SOLO JSON válido sin markdown con este formato exacto:\n"
+        '{\n  "datos": { "<campo>": "<valor>" },\n'
+        '  "veredicto": "APROBABLE|CORREGIBLE|RECHAZABLE",\n'
+        '  "hallazgos": ["..."],\n'
+        '  "mensaje": "resumen de 1-2 oraciones"\n}'
+    )
+    txt_rev, modelo_rev = _invocar_con_fallback(prompt_rev)
+    rev = _parse_json_respuesta(txt_rev)
+    datos = rev.get("datos") if isinstance(rev.get("datos"), dict) else {}
+    # Filtra a campos esperados + normaliza a string/bool.
+    datos_f = {}
+    for k in campos:
+        if k in datos and datos[k] not in (None, ""):
+            v = datos[k]
+            datos_f[k] = v if isinstance(v, bool) else str(v).strip()
+    veredicto = str(rev.get("veredicto", "CORREGIBLE")).strip().upper()
+    if veredicto not in ("APROBABLE", "CORREGIBLE", "RECHAZABLE"):
+        veredicto = "CORREGIBLE"
+    hallazgos = rev.get("hallazgos") if isinstance(rev.get("hallazgos"), list) else []
+    hallazgos = [str(h).strip() for h in hallazgos if str(h).strip()][:12]
+    mensaje = str(rev.get("mensaje", "")).strip()[:600]
+    return {
+        "id_tipo": id_tipo,
+        "nombre_tipo": TIPOS_IA[id_tipo],
+        "confianza": round(confianza, 2),
+        "datos": datos_f,
+        "veredicto": veredicto,
+        "hallazgos": hallazgos,
+        "mensaje": mensaje,
+        "modelo": modelo_rev or modelo_cla,
+    }
+# ============ AQUÍ TERMINA REVISIÓN PDF EXTERNO ============
+
+# ============ AQUÍ EMPIEZA ARRANQUE ============",
+
 if __name__ == "__main__":
     import uvicorn  # Import local: solo para ejecución directa.
 

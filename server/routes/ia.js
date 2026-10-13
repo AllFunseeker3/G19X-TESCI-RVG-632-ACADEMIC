@@ -10,6 +10,7 @@
 // ============================================================================
 // ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
+const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const pool = require("../db");
@@ -153,6 +154,43 @@ router.post("/pdf", async (req, res, next) => {
   }
 });
 // ============ AQUÍ TERMINA RUTA POST PDF ============
+
+// ============ AQUÍ EMPIEZA RUTA POST REVISAR PDF EXTERNO ============
+// POST /api/ia/revisar (multipart archivo=PDF) -> { id_tipo, nombre_tipo,
+// confianza, datos, veredicto, hallazgos, mensaje, modelo }.
+// Solo analiza: clasifica entre los 11 tipos, extrae datos y revisa.
+// No crea documentos.
+const subidaRevision = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /\.pdf$/i.test(file.originalname || "") || file.mimetype === "application/pdf";
+    cb(ok ? null : new Error("Solo se permiten archivos PDF"), ok);
+  },
+});
+router.post("/revisar", (req, res, next) => {
+  subidaRevision.single("archivo")(req, res, async (errMul) => {
+    if (errMul) return res.status(400).json({ detail: errMul.message || "PDF inválido" });
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ detail: "Sube un PDF en el campo archivo" });
+      }
+      const fd = new FormData();
+      fd.append("archivo", new Blob([req.file.buffer], { type: "application/pdf" }), req.file.originalname || "carta.pdf");
+      let r;
+      try {
+        r = await fetch(`${IA_URL}/revisar-pdf`, { method: "POST", body: fd });
+      } catch {
+        return res.status(503).json({ detail: "Servicio IA apagado (ai-service en :8001)" });
+      }
+      const cuerpo = await r.json().catch(() => ({}));
+      return res.status(r.status).json(cuerpo);
+    } catch (e) {
+      return next(e);
+    }
+  });
+});
+// ============ AQUÍ TERMINA RUTA POST REVISAR PDF EXTERNO ============
 
 // ============ AQUÍ EMPIEZA RUTA GET DESCARGAR PDF ============
 // GET /api/ia/pdf/:archivo — descarga el PDF (solo dentro de la carpeta,
