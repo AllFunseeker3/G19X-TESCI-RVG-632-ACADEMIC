@@ -1,7 +1,7 @@
 // ============================================================================
 // ARCHIVO: src/lib/tiposDocumentos.js
 // FUNCIÓN GENERAL: catálogo local de documentos legales (Campo 1, Campo 2 y
-//   campos por tipo). Espejo de db/sislegal_schema.sql tabla campos_tipo.
+//   campos por tipo). Espejo de db/maestro.sql tabla campos_tipo.
 // FLUJO DE DATOS:
 //   - ENTRAN: "Tipos de documentos legales.txt" (11 tipos, 137 campos).
 //   - SALEN: Components/SelectorCategoriaTipo.jsx y CampoFormulario.jsx vía

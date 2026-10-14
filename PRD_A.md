@@ -55,7 +55,7 @@ El punto 2 del PDF (`Python, FastAPI, React.js, Azure OpenAI Service, Azure AI D
 | Azure OpenAI Service | NO. Sustituido por OpenRouter/Google free por costo |
 | Azure AI Document Intelligence | NO. No hay OCR. Solo reportlab genera PDF |
 | PostgreSQL | NO. Es MariaDB/MySQL |
-| Docker | NO. Sin Dockerfile/compose |
+| Docker | SÍ (14/10/2026). `docker-compose.yml` (db MariaDB 11 + ia + api + web nginx `:8080`), Dockerfiles por servicio, `.env.docker.example` sin secretos, verificado 4 Up |
 | GitHub Actions | NO. Sin CI. Verificación manual `npm run build` + `npx eslint .` |
 | Microsoft Entra ID | NO. Auth propia JWT en localStorage, sin SSO |
 | Scrum | Solo documental, sin ceremonias formales |
@@ -127,6 +127,10 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 
 **Revisión (`Revision.jsx`):**
 - Bandeja real `GET /api/documentos`, columna Creado por (`LEFT JOIN usuarios`), tab En revisión (=borrador), filtros, Borrar con Dialog MUI propio (sin `window.confirm`), dictamen admin/super/modificar (rechazo exige comentario), visor PDF supervisores, `DELETE /:id` CASCADE.
+- Botón **Revisar documento** (REV-01, sin "IA" en etiqueta): sube PDF externo ≤10MB (`POST /api/ia/revisar` → `/revisar-pdf`), la IA clasifica 1 de 11 + extrae datos + veredicto APROBABLE/CORREGIBLE/RECHAZABLE; Editar guarda en `sessionStorage` y abre `/Menu?origen=revision-pdf` para generar carta **nueva**.
+
+**Plantillas (oculta 14/10):**
+- Galería `plantillas.jsx` sin sentido como página (duplica al selector de GenerarCarta): oculta del drawer, ruta `/Plantillas` viva. Flujo oficial `/Menu` directo.
 
 **Seguimiento (`Seguimiento.jsx`):**
 - Timeline vertical real (historial + adjuntos + responsable), alerta motivo rechazo + botón Editar y corregir (`/Menu?editar=`).
@@ -156,6 +160,10 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 - `adjuntos.vigente`; regenerar marca anteriores como histórico (transacción); visor con badge Actual/Versión anterior; `DELETE` borra también los .pdf del disco.
 
 **Conexión BD con usuario `sislegal` (rotado 30/09, ya no root).**
+
+**Docker (14/10) + limpieza LIM-01 (14/10):**
+- Compose db+ia+api+web (`:8080`), Dockerfiles, `.env.docker.example` sin secretos, CORS por env, healthcheck `mariadb-admin`. Verificado 4 Up.
+- 15→14 tablas (DROP `auditoria` + `clientes.contacto`), borrado `db/sislegal_schema.sql` (duplicado), migraciones no fusionadas.
 
 ### 6.2 NO HACE (hoy no existe)
 
@@ -204,7 +212,7 @@ Estados canónicos BD: `borrador` (UI "En revisión"), `por_revisar`, `aprobado`
         +-- GET /api/ia/pdf/:archivo <--- [documentos/Sistema legal/*.pdf]
 ```
 
-Puertos fijos: 5173 web, 8000 API, 8001 IA. Reiniciar los 3 tras cambios en `server/routes` o `ai-service`. EADDRINUSE: matar árbol `taskkill /PID /T /F`.
+Puertos fijos: 5173 web local, 8000 API, 8001 IA (Docker: web `:8080`, resto igual). Reiniciar los 3 tras cambios en `server/routes` o `ai-service` (en Docker: `docker compose up --build api` / `ia` / `web`). EADDRINUSE local: matar árbol `taskkill /PID /T /F`.
 
 ---
 
@@ -221,7 +229,7 @@ Puertos fijos: 5173 web, 8000 API, 8001 IA. Reiniciar los 3 tras cambios en `ser
 | ID | Requisito verificable |
 |---|---|
 | RNF-01 | Generación IA free 20-90s (paga 3-15s). PDF <5s local. Búsqueda tabla <500ms en vivo |
-| RNF-02 | Disponibilidad local (sin SLA). Sin Docker/CI |
+| RNF-02 | Disponibilidad local (sin SLA). Con Docker (compose verificado 14/10); sin CI |
 | RNF-03 | JWT 8h + bcrypt 10 + RBAC por área. Conexión BD con usuario `sislegal` (rotado 30/09). Secretos fuera de git |
 | RNF-04 | Solo PDF en adjuntos, validado en back y front. PII sin cifrado columna (pendiente) |
 | RNF-05 | WCAG parcial: labels fijos `Etiqueta`, foco visible MUI, teclado completo salvo preview PDF |
@@ -237,9 +245,9 @@ Puertos fijos: 5173 web, 8000 API, 8001 IA. Reiniciar los 3 tras cambios en `ser
 2. Propuesta → Propuesta técnica — HECHO (flujo IA+PDF definido)
 3. Arquitectura → Doc arquitectura — HECHO (§8+§9)
 4. Planificación → Backlog — HECHO (sesión `ProyectoLegal.md` §§42-61)
-5. Desarrollo → Sistema funcional — HECHO (3 servicios arriba, 13+ docs en vivo)
-6. QA → Reporte QA — PARCIAL (manual + lint/build/node-check/py_compile; falta reporte formal)
-7. Documentación → Manual — PARCIAL (código comentado 43 archivos; falta manual usuario)
+5. Desarrollo → Sistema funcional — HECHO (local 3 servicios + Docker 4 contenedores, 13+ docs en vivo)
+6. QA → Reporte QA — PARCIAL (manual + lint/build/node-check/py_compile + Docker verificado 14/10; falta reporte formal)
+7. Documentación → Manual — PARCIAL (README completo 14/10 + código comentado; falta manual usuario)
 8. Mantenimiento → Plan — PENDIENTE
 9. Capacitación → Acta — PENDIENTE `[PENDIENTE USUARIO: fecha y asistentes]`
 10. Cierre → Informe — PENDIENTE `[PENDIENTE USUARIO: fecha cierre estadías]`

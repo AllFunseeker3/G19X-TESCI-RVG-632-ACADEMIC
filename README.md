@@ -91,7 +91,7 @@ IA_PORT=8001
 IA_PRE_FORMALIZAR=1
 ```
 
-**BD:** `db/maestro.sql` es la fuente de verdad (14 tablas + seeds). `mysql -u root -p < db/maestro.sql`, luego `npm run db:test --prefix server`.
+**BD:** `db/maestro.sql` es la fuente de verdad (14 tablas + seeds). Instalación nueva: `mysql -u root -p < db/maestro.sql`. BD vieja (pre-LIM-01): aplica `db/migracion_limpieza_01.sql` (quita `auditoria` + `clientes.contacto`). Luego `npm run db:test --prefix server`.
 
 **Arranque:**
 ```bash
@@ -166,7 +166,7 @@ Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional s
 
 - **Empresa formadora (residencia, NO despacho usuario):** PluriOne S.A. de C.V. / Develop Talent & Technology — Puebla 46, Roma Norte, CDMX — RFC PLU060407HC9 — 55 1900 3503 | contacto@develop.com.mx.
 - **Responsables académicos (según `Requerimientos.pdf`):** Programas de Estadías / Asesor Externo: Juan Méndez Herrera; Líder de Proyecto / Evaluaciones: Edgar Loeffelmman; Representante Legal: Xochicuahuitl Gleason Juárez.
-- **Desarrollo y repo:** `AllFunseeker3` — https://github.com/AllFunseeker3/G19X-TESCI-RVG-632-ACADEMIC (`main`, HEAD `37b5cf9`).
+- **Desarrollo y repo:** `AllFunseeker3` — https://github.com/AllFunseeker3/G19X-TESCI-RVG-632-ACADEMIC (`main`, HEAD `4ca9312`: Docker + README ejecución + LIM-01).
 - `[PENDIENTE: nombre del residente/autor, matrícula, carrera, periodo de estadías, asesor académico interno — agregar aquí antes de entregar a la escuela.]`
 
 ---

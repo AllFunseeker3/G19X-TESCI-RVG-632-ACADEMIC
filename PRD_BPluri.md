@@ -57,7 +57,7 @@ El punto 2 del PDF (`Python, FastAPI, React.js, Azure OpenAI Service, Azure AI D
 | Azure OpenAI Service | NO. OpenRouter free por costo |
 | Azure AI Document Intelligence | NO. Sin OCR, solo reportlab |
 | PostgreSQL | NO. Es MariaDB |
-| Docker | NO |
+| Docker | SÍ (14/10/2026, compose db+ia+api+web `:8080`, verificado 4 Up) |
 | GitHub Actions | NO. Verificación manual build+lint |
 | Microsoft Entra ID | NO. JWT propio sin SSO |
 | Scrum | Solo documental |
@@ -103,7 +103,7 @@ Matiz real 30/09/2026: sí genera 11 tipos / 137 campos, sí redacta y formaliza
 
 **PDF:** reportlab letter Times, poder con OTORGO/ACEPTO+TESTIGOS en un `KeepTogether` (`splitByRow=0`), genérico con firma única, guarda en `documentos/Sistema legal/`, descarga con login.
 
-**Revisión:** bandeja real, Creado por, En revisión (=borrador), dictamen admin/super, rechazo exige comentario, visor PDF iframe 70vh, borrado con Dialog MUI, `DELETE CASCADE`.
+**Revisión:** bandeja real, Creado por, En revisión (=borrador), dictamen admin/super, rechazo exige comentario, visor PDF iframe 70vh, borrado con Dialog MUI, `DELETE CASCADE`, botón Revisar documento (REV-01: clasifica 11 + veredicto, Editar genera nueva).
 
 **Seguimiento:** timeline real + motivo + Editar y corregir.
 
@@ -117,11 +117,13 @@ Matiz real 30/09/2026: sí genera 11 tipos / 137 campos, sí redacta y formaliza
 
 **Auth:** JWT 8h bcrypt 10, `RutaProtegida`+`VigilanteSesion`, heartbeat 30s. RBAC `PermisosProvider`.
 
-**Config:** 4 acentos + oscuro, persistido.
+**Config:** 4 acentos + oscuro, persistido. **Plantillas oculta del drawer** (14/10, ruta viva; flujo oficial `/Menu`).
+
+**Docker + LIM-01 (14/10):** compose 4 servicios verificado; 15→14 tablas (sin `auditoria`/`clientes.contacto`); `sislegal_schema.sql` borrado.
 
 ### 6.2 NO HACE
 
-Firma e.firma, OCR, SSO Entra, refresh-token/2FA, versionado plantillas, subida real fotos/anexos, móvil, CI/Docker, observabilidad, tests auto, Vencimientos.
+Firma e.firma, OCR, SSO Entra, refresh-token/2FA, versionado plantillas, subida real fotos/anexos, móvil, CI, observabilidad, tests auto, Vencimientos.
 
 ### 6.3 NO HARÁ (este ciclo)
 
@@ -163,7 +165,7 @@ IA free 20-90s, PDF <5s, JWT 8h, conexión BD con usuario `sislegal` (rotado 30/
 
 ## 11. Cronograma (punto 6 PDF + estado)
 
-1 Detección→requerimientos HECHO. 2 Propuesta HECHO. 3 Arquitectura HECHO. 4 Planificación HECHO. 5 Desarrollo HECHO. 6 QA PARCIAL. 7 Documentación PARCIAL. 8 Mantenimiento PENDIENTE. 9 Capacitación PENDIENTE `[PENDIENTE USUARIO: fecha/asistentes]`. 10 Cierre PENDIENTE `[PENDIENTE USUARIO: fecha cierre]`.
+1 Detección→requerimientos HECHO. 2 Propuesta HECHO. 3 Arquitectura HECHO. 4 Planificación HECHO. 5 Desarrollo HECHO (local + Docker). 6 QA PARCIAL. 7 Documentación PARCIAL (README completo 14/10; falta manual). 8 Mantenimiento PENDIENTE. 9 Capacitación PENDIENTE `[PENDIENTE USUARIO: fecha/asistentes]`. 10 Cierre PENDIENTE `[PENDIENTE USUARIO: fecha cierre]`.
 
 ---
 
