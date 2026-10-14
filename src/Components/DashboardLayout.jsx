@@ -18,7 +18,8 @@ import { guardarToken, leerUsuario, getSalud } from '../lib/api.js';
 // Íconos
 import HomeIcon from '@mui/icons-material/Home';
 import DescriptionIcon from '@mui/icons-material/Description';
-import GridViewIcon from '@mui/icons-material/GridView';
+// GridViewIcon oculto con Plantillas (2026-10-14)
+// import GridViewIcon from '@mui/icons-material/GridView';
 import LogoutIcon from '@mui/icons-material/Logout';
 import SettingsIcon from '@mui/icons-material/Settings';
 import GroupIcon from '@mui/icons-material/Group';
@@ -130,12 +131,13 @@ function MenuInterior({ children }) {
                         </List>
                     </Collapse>
 
+                    {/* Plantillas oculto temporalmente (2026-10-14): ruta /Plantillas sigue viva en app.jsx
                     <ListItem disablePadding>
                         <ListItemButton component={Link} to="/Plantillas">
                             <ListItemIcon><GridViewIcon sx={{ color: 'primary.contrastText' }} /></ListItemIcon>
                             <ListItemText primary="Plantillas" />
                         </ListItemButton>
-                    </ListItem>
+                    </ListItem> */}
                     </>
                     )}
 

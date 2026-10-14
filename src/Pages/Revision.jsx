@@ -114,7 +114,7 @@ export default function Revision() {
     const [revSegundos, setRevSegundos] = useState(0);
     const [revModelo, setRevModelo] = useState('');
     const revTimer = useRef(null);
-    const FASES_REVISION_PDF = ['Conectando con la IA', 'Extrayendo texto del PDF', 'Clasificando tipo de carta', 'Extrayendo datos', 'Generando revisión jurídica'];
+    const FASES_REVISION_PDF = ['Conectando', 'Extrayendo texto del PDF', 'Clasificando tipo de carta', 'Extrayendo datos', 'Generando revisión jurídica'];
     const detenerProgresoRev = () => {
         if (revTimer.current) clearInterval(revTimer.current);
         revTimer.current = null;
@@ -355,7 +355,7 @@ export default function Revision() {
                     startIcon={<UploadFileIcon />}
                     onClick={() => setRevAbierto(true)}
                 >
-                    Revisar PDF con IA
+                    Revisar documento
                 </Button>
             </Box>
             {/* ============ AQUÍ TERMINA REVISAR PDF EXTERNO (JSX) ============ */}
@@ -614,7 +614,7 @@ export default function Revision() {
             {/* ============ AQUÍ EMPIEZA DIÁLOGO REVISAR PDF CON IA ============ */}
             <Dialog open={revAbierto} onClose={cerrarRevisionIA} maxWidth="md" fullWidth>
                 <DialogTitle color="encabezado.main" fontWeight="bold">
-                    Revisar carta en PDF con IA
+                    Revisar carta en PDF
                 </DialogTitle>
                 <DialogContent dividers>
                     {!revResultado && !revCargando && (
@@ -715,7 +715,7 @@ export default function Revision() {
                             disabled={!revArchivo || revCargando}
                             onClick={handleRevisarPDF}
                         >
-                            {revCargando ? 'Revisando…' : 'Revisar con IA'}
+                            {revCargando ? 'Revisando…' : 'Revisar'}
                         </Button>
                     )}
                     {revResultado && !revCargando && (
