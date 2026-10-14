@@ -45,7 +45,7 @@ El punto 2 del PDF (`Python, FastAPI, React.js, Azure OpenAI Service, Azure AI D
 - Credenciales en `ai-service/.env` (ignorado por git). Flag `IA_PRE_FORMALIZAR=1`.
 
 **BD:**
-- MariaDB, `db/maestro.sql` = fuente de verdad (15 tablas, ver §9). Migraciones: `migracion_ia_contenido`, `migracion_notificaciones`, `migracion_clientes_verificado`.
+- MariaDB, `db/maestro.sql` = fuente de verdad (14 tablas, ver §9). Migraciones: `migracion_ia_contenido`, `migracion_notificaciones`, `migracion_clientes_verificado`, `migracion_limpieza_01`.
 
 **Tabla gap oficial vs real:**
 
@@ -95,7 +95,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 
 - **Industria:** reduce tiempos y errores por copiado manual, evita destinatarios "A quien corresponda" cuando hay cliente vinculado, estandariza machotes (ej. carta poder con OTORGO/ACEPTO/TESTIGOS en mismo bloque).
 - **Valor LegalTech:** portafolio de automatización documental con IA de bajo costo (modelos free, sin Azure).
-- **Alumno:** competencias en IA generativa (prompts + fallback), automatización documental (137 campos condicionales), arquitectura empresarial (3 servicios + 15 tablas + RBAC).
+- **Alumno:** competencias en IA generativa (prompts + fallback), automatización documental (137 campos condicionales), arquitectura empresarial (3 servicios + 14 tablas + RBAC).
 
 > `[PENDIENTE USUARIO: agrega 3-5 líneas de justificación personal: por qué elegiste este caso, qué problema viste en el área jurídica.]`
 
@@ -208,9 +208,9 @@ Puertos fijos: 5173 web, 8000 API, 8001 IA. Reiniciar los 3 tras cambios en `ser
 
 ---
 
-## 9. Modelo de datos mínimo real (`db/maestro.sql`, 15 tablas)
+## 9. Modelo de datos mínimo real (`db/maestro.sql`, 14 tablas)
 
-- `areas, roles, puestos, categorias, permisos_rol, usuarios(id_area, puesto, telefono, fecha_ingreso), clientes(tipo fisica/moral, curp/rfc, verificado BOOLEAN, activo), tipos_documento, campos_tipo(137 filas), documentos(datos JSON, contenido MEDIUMTEXT, modelo_ia, id_cliente, folio PREFIJO-AAAA-NNN), documento_historial, adjuntos(CHECK solo-PDF), notificaciones(tipo,titulo,detalle,id_documento,leida), folios, auditoria`
+- `areas, roles, puestos (sugerencias, sin FK), categorias, permisos_rol, usuarios(id_area, puesto, telefono, fecha_ingreso), clientes(tipo fisica/moral, curp/rfc, verificado BOOLEAN, activo, sin contacto), tipos_documento, campos_tipo(137 filas), documentos(datos JSON, contenido MEDIUMTEXT, modelo_ia, id_cliente, folio PREFIJO-AAAA-NNN), documento_historial, adjuntos(CHECK solo-PDF), notificaciones(tipo,titulo,detalle,id_documento,leida), folios`
 - Seeds: 3 áreas, 5 roles, 4 categorías, 20 permisos, 11 tipos, 137 campos, 10 puestos, 5 usuarios con hashes reales, 1 cliente Acme verificado.
 - Excepciones 3NF deliberadas: columnas JSON (forms dinámicos) + `usuarios.id_area` redundante.
 

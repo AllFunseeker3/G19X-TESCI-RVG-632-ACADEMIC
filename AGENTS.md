@@ -43,7 +43,7 @@ Lee este archivo antes de tocar código. La sesión original está en
 
 ## Datos
 
-- `db/maestro.sql` es la **fuente de verdad** (15 tablas + `adjuntos.vigente` ADJ-01, 11 tipos, 137 campos).
+- `db/maestro.sql` es la **fuente de verdad** (14 tablas + `adjuntos.vigente` ADJ-01, 11 tipos, 137 campos).
   Migraciones aplicadas en vivo: `migracion_ia_contenido`, `migracion_notificaciones`,
   `migracion_clientes_verificado` (CLI-01), `migracion_adjuntos_vigente` (ADJ-01).
 - `src/lib/tiposDocumentos.js` es espejo del catálogo (`filas`, `ayuda`, `mostrarSi`;
@@ -119,7 +119,7 @@ Lee este archivo antes de tocar código. La sesión original está en
 ## Pendientes conocidos
 
 - Recrear usuarios extra (Ricardo/Javier/Lucía) — se perdieron en el DROP + maestro del 29/09.
-- Decidir DROP físico de `clientes.contacto` (quitado del form §60, sigue en BD sin uso).
+- `clientes.contacto` eliminado (LIM-01 2026-10-14; quitado del form §60, DROP físico aplicado).
 - Subida real de fotos/anexos al servidor (viven en memoria del form; solo el PDF final persiste).
 - Portadas EADDRINUSE: matar árboles con `taskkill /PID /T /F`.
 

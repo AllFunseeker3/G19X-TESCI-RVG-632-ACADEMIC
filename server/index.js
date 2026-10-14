@@ -27,10 +27,17 @@ const clientes = require("./routes/clientes");
 const app = express();
 app.use(express.json()); // Parsea cuerpos JSON.
 
-// Front Vite en dev. Si cambias su puerto, agrégalo aquí.
+// Front Vite en dev + web Docker (:8080). Si cambias su puerto, agrégalo aquí
+// o define CORS_ORIGINS="http://localhost:5173,http://localhost:8080".
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: CORS_ORIGINS.length
+      ? CORS_ORIGINS
+      : ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8080", "http://127.0.0.1:8080"],
     credentials: true,
   })
 );

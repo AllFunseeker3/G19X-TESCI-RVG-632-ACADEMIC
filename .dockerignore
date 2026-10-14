@@ -1,0 +1,10 @@
+node_modules
+dist
+documentos
+.git
+server/node_modules
+ai-service/__pycache__
+*.log
+.env
+server/.env
+ai-service/.env

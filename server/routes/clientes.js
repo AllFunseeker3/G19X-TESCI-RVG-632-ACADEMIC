@@ -46,7 +46,7 @@ router.get("/", async (req, res, next) => {
   try {
     const solo = String(req.query.solo_pendientes ?? "0") === "1";
     let q = `SELECT id_cliente AS id, tipo_cliente, nombre, rfc, curp,
-                    domicilio, contacto, correo, telefono, verificado, creado_en
+                    domicilio, correo, telefono, verificado, creado_en
              FROM clientes WHERE activo = TRUE`;
     if (solo) q += " AND verificado = FALSE";
     q += " ORDER BY verificado DESC, nombre";
@@ -59,7 +59,7 @@ router.get("/", async (req, res, next) => {
 // ============ AQUÍ TERMINA RUTA GET LISTA ============
 
 // ============ AQUÍ EMPIEZA RUTA POST ALTA ============
-// POST /api/clientes { tipo_cliente, nombre, rfc?, curp?, domicilio?, contacto?, correo?, telefono? }.
+// POST /api/clientes { tipo_cliente, nombre, rfc?, curp?, domicilio?, correo?, telefono? }.
 // Alta de cualquiera con escritura; nace verificada solo si es admin/super.
 router.post("/", async (req, res, next) => {
   try {
@@ -68,7 +68,7 @@ router.post("/", async (req, res, next) => {
       return res.status(403).json({ detail: "Sin permiso para dar de alta clientes" });
     }
     const { tipo_cliente = "moral", nombre, rfc = null, curp = null,
-      domicilio = null, contacto = null, correo = null, telefono = null } = req.body || {};
+      domicilio = null, correo = null, telefono = null } = req.body || {};
     if (!["fisica", "moral"].includes(tipo_cliente)) {
       return res.status(400).json({ detail: "Tipo inválido (fisica|moral)" });
     }
@@ -78,10 +78,10 @@ router.post("/", async (req, res, next) => {
     const verificado = esPrivilegiado(u);
     const [r] = await pool.query(
       `INSERT INTO clientes
-       (tipo_cliente, nombre, rfc, curp, domicilio, contacto, correo, telefono, verificado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (tipo_cliente, nombre, rfc, curp, domicilio, correo, telefono, verificado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [tipo_cliente, nombre.trim(), rfc || null, curp || null,
-        domicilio || null, contacto || null, correo || null, telefono || null, verificado]
+        domicilio || null, correo || null, telefono || null, verificado]
     );
     return res.status(201).json({ id: r.insertId, verificado });
   } catch (e) {
@@ -103,7 +103,7 @@ router.patch("/:id", async (req, res, next) => {
     const [[existe]] = await pool.query(
       "SELECT id_cliente FROM clientes WHERE id_cliente = ? AND activo = TRUE", [id]);
     if (!existe) return res.status(404).json({ detail: "Cliente inexistente" });
-    const { tipo_cliente, nombre, rfc, curp, domicilio, contacto, correo, telefono } = req.body || {};
+    const { tipo_cliente, nombre, rfc, curp, domicilio, correo, telefono } = req.body || {};
     const sets = [];
     const args = [];
     const pon = (col, v) => {
@@ -118,7 +118,7 @@ router.patch("/:id", async (req, res, next) => {
     }
     if (nombre !== undefined) { sets.push("nombre = ?"); args.push(String(nombre).trim()); }
     pon("rfc", rfc); pon("curp", curp); pon("domicilio", domicilio);
-    pon("contacto", contacto); pon("correo", correo); pon("telefono", telefono);
+    pon("correo", correo); pon("telefono", telefono);
     if (!esPrivilegiado(u)) { sets.push("verificado = FALSE"); } // Re-verificar tras toque ajeno.
     if (sets.length === 0) return res.json({ id });
     args.push(id);

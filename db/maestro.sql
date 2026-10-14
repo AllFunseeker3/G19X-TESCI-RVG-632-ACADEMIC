@@ -10,7 +10,7 @@
 -- CÓMO EJECUTARLO EN DBEAVER (instalación limpia):
 --   1) Conéctate a DBMaria y abre un "SQL Editor" (Ctrl+[).
 --   2) Pega este script o ábrelo con Archivo -> Abrir.
---   3) Ejecútalo completo (Alt+X). Crea la BD, las 15 tablas y los seeds.
+--   3) Ejecútalo completo (Alt+X). Crea la BD, las 14 tablas y los seeds.
 --   4) Verifica con las consultas del BLOQUE 4 (al final).
 --
 -- QUÉ GUARDA CADA TABLA:
@@ -28,7 +28,6 @@
 --   notificaciones ............... campanita: un aviso por destinatario
 --                                  (creación, corrección, dictamen).
 --   folios ....................... consecutivos atómicos por tipo+año.
---   auditoria .................... quién hizo qué y cuándo.
 -- ============================================================================
 
 -- ================= BLOQUE 1: BD ============================================
@@ -128,7 +127,6 @@ CREATE TABLE IF NOT EXISTS clientes (
   rfc        VARCHAR(20) NULL,
   curp       VARCHAR(20) NULL,
   domicilio  VARCHAR(255) NULL,
-  contacto   VARCHAR(120) NULL,
   correo     VARCHAR(150) NULL,
   telefono   VARCHAR(40) NULL,
   activo     BOOLEAN NOT NULL DEFAULT TRUE,
@@ -267,19 +265,6 @@ CREATE TABLE IF NOT EXISTS folios (
   PRIMARY KEY (id_tipo, anio),
   CONSTRAINT fk_folios_tipo FOREIGN KEY (id_tipo)
     REFERENCES tipos_documento (id_tipo)
-) ENGINE=InnoDB;
-
--- Bitácora de auditoría (quién hizo qué, sobre qué registro).
-CREATE TABLE IF NOT EXISTS auditoria (
-  id_auditoria INT AUTO_INCREMENT PRIMARY KEY,
-  id_usuario   INT NULL,
-  accion       VARCHAR(100) NOT NULL,
-  entidad      VARCHAR(60) NULL,
-  id_entidad   INT NULL,
-  detalle      JSON NULL,
-  creado_en    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_aud_user FOREIGN KEY (id_usuario)
-    REFERENCES usuarios (id_usuario) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- NOTA DE ORDEN: permisos_rol referencia a categorias, así que categorias
@@ -638,8 +623,8 @@ ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
 
 -- 3.8 Cliente de ejemplo (bórralo o edítalo cuando cargues los reales).
 -- Semilla del sistema: nace verificada.
-INSERT INTO clientes (tipo_cliente, nombre, rfc, domicilio, contacto, correo, verificado) VALUES
-  ('moral', 'EJEMPLO - Acme S.A. de C.V.', 'ACM010101AAA', 'Av. Ejemplo 123, CDMX', 'Juan Pérez', 'contacto@ejemplo.mx', TRUE)
+INSERT INTO clientes (tipo_cliente, nombre, rfc, domicilio, correo, verificado) VALUES
+  ('moral', 'EJEMPLO - Acme S.A. de C.V.', 'ACM010101AAA', 'Av. Ejemplo 123, CDMX', 'contacto@ejemplo.mx', TRUE)
 ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
 
 -- ================= BLOQUE 4: VERIFICACIÓN ==================================

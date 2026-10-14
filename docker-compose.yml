@@ -1,0 +1,77 @@
+name: sislegal
+
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-RootDocker123*}
+      MARIADB_DATABASE: sislegal
+      MARIADB_USER: ${DB_USER:-sislegal}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-SisLegal2026*}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/maestro.sql:/docker-entrypoint-initdb.d/01-maestro.sql:ro
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -uroot -p\"$$MARIADB_ROOT_PASSWORD\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  ia:
+    build: ./ai-service
+    environment:
+      IA_PORT: 8001
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Pon tu key en .env docker (ver .env.docker.example)}
+      IA_MODEL: ${IA_MODEL:-qwen/qwen3.8-27b:free}
+      IA_PROVIDER: ${IA_PROVIDER:-openrouter}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      IA_PRE_FORMALIZAR: ${IA_PRE_FORMALIZAR:-1}
+      PDF_DIR: /app/pdfs
+    volumes:
+      - pdfs:/app/pdfs
+    ports:
+      - "8001:8001"
+    depends_on:
+      - db
+
+  api:
+    build: ./server
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-sislegal}
+      DB_PASSWORD: ${DB_PASSWORD:-SisLegal2026*}
+      DB_NAME: sislegal
+      JWT_SECRET: ${JWT_SECRET:?Cambia JWT_SECRET en .env docker}
+      JWT_HORAS: 8
+      API_PORT: 8000
+      IA_URL: http://ia:8001
+      PDF_DIR: /app/pdfs
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173
+    volumes:
+      - pdfs:/app/pdfs
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      ia:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
+  pdfs:

@@ -26,7 +26,7 @@
 7. **Usuarios/supers:** alta con email auto + `SisLegal2026*`, matriz edita ROL, baja lógica. `PATCH /roles/:id/permisos`.
 8. **Notificaciones:** campanita, badge, hace-cuánto, fan-out crear (supers+admins) y dictamen (creador+motivo), refresco 30s.
 9. **Inicio/Plantillas/Config:** KPIs/buscador/dona/actividad reales, galería 11 con deep-link `/Menu?categoria=&tipo=`, Config con 4 acentos + oscuro.
-10. **Persistencia real:** MariaDB `sislegal` 15 tablas (`maestro.sql` fuente de verdad), `documentos/Sistema legal/*.pdf`, historial y auditoría. Sin `documentosDemo.js`, sin cifras fijas.
+10. **Persistencia real:** MariaDB `sislegal` 14 tablas (`maestro.sql` fuente de verdad), `documentos/Sistema legal/*.pdf`, historial. Sin `documentosDemo.js`, sin cifras fijas.
 11. **Folios auto FOL-01 + PDFs versionados ADJ-01 + BD con `sislegal`:** folio `PREFIJO-AAAA-NNN` atómico si no viene (manual se respeta; respuesta lo incluye y el front lo muestra); `adjuntos.vigente` con badge Actual/Versión anterior y DELETE que borra físicos; conexión rotada de root a `sislegal` el 30/09.
 
 ---

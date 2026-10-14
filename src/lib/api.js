@@ -95,15 +95,6 @@ export const login = (correo, contrasena) =>
   api("/auth/login", { metodo: "POST", cuerpo: { correo, contrasena } });
 // ============ AQUÍ TERMINA AUTH ============
 
-// ============ AQUÍ EMPIEZA CATÁLOGO ============
-// --- Catálogo (backend/app/routers/catalogo.py): Campo 1, Campo 2 y campos ---
-export const getCategorias = () => api("/catalogo/categorias");
-export const getTipos = (categoria) =>
-  api(`/catalogo/tipos?categoria=${encodeURIComponent(categoria)}`);
-export const getCampos = (idTipo) =>
-  api(`/catalogo/tipos/${encodeURIComponent(idTipo)}/campos`);
-// ============ AQUÍ TERMINA CATÁLOGO ============
-
 // ============ AQUÍ EMPIEZA DOCUMENTOS ============
 // --- Documentos (backend/app/routers/documentos.py) ---
 export const getDocumentos = (params = {}) => {

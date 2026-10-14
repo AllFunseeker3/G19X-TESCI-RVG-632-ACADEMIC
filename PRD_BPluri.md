@@ -49,7 +49,7 @@ El punto 2 del PDF (`Python, FastAPI, React.js, Azure OpenAI Service, Azure AI D
 - Endpoints: `GET /salud`, `POST /redactar`, `POST /corregir`, `POST /pdf`
 - PDFs en `documentos/Sistema legal/` (ignorada en git). Flag `IA_PRE_FORMALIZAR=1`.
 
-**BD:** MariaDB, `db/maestro.sql` fuente de verdad (15 tablas). Migraciones aplicadas: ia_contenido, notificaciones, clientes_verificado.
+**BD:** MariaDB, `db/maestro.sql` fuente de verdad (14 tablas). Migraciones aplicadas: ia_contenido, notificaciones, clientes_verificado, limpieza_01 (quita auditoria + clientes.contacto).
 
 | PDF punto 2 | Estado real |
 |---|---|
@@ -149,9 +149,9 @@ Los nombres de PluriOne NO dictaminan ni aparecen en `documento_historial`; ahí
 
 ---
 
-## 9. Modelo de datos (`maestro.sql`, 15 tablas)
+## 9. Modelo de datos (`maestro.sql`, 14 tablas)
 
-areas, roles, puestos, categorias, permisos_rol, usuarios, clientes (verificado), tipos_documento, campos_tipo (137), documentos (datos JSON, contenido MEDIUMTEXT, modelo_ia, id_cliente), documento_historial, adjuntos (solo-PDF), notificaciones, folios, auditoria. Seeds: 3 áreas, 5 roles, 20 permisos, 11 tipos, 137 campos, 10 puestos, 5 usuarios, Acme verificado.
+areas, roles, puestos (sugerencias, sin FK), categorias, permisos_rol, usuarios, clientes (verificado, sin contacto), tipos_documento, campos_tipo (137), documentos (datos JSON, contenido MEDIUMTEXT, modelo_ia, id_cliente), documento_historial, adjuntos (solo-PDF), notificaciones, folios. Seeds: 3 áreas, 5 roles, 20 permisos, 11 tipos, 137 campos, 10 puestos, 5 usuarios, Acme verificado.
 
 ---
 
