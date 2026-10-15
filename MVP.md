@@ -2,7 +2,6 @@
 
 **Repo:** `proyecto_resi` — React 19 + Vite 8 + MUI 9 / Express 4 + MariaDB / FastAPI + LangChain + OpenRouter
 **Base:** `PRD_A.md` / `PRD_BPluri.md` (misma funcionalidad), `Requerimientos.pdf` puntos 3-7, `Tipos de documentos legales.txt`
-**Documentos viejos `PRD.md`/`MVP.md` v1.0 del 14/09/2026:** borrados por obsoletos (hablaban de mocks, sin backend, sin IA).
 **Estado:** usable de punta a punta en local con 3 servicios arriba, y en Docker con 4 contenedores (`docker compose up`: db + ia + api + web `:8080`, verificado 14/10).
 
 ---
@@ -23,7 +22,15 @@
 4. **Revisión:** bandeja real, Creado por, En revisión, dictamen con comentario obligatorio al rechazar (400 si falta), visor PDF iframe 70vh, borrado con Dialog MUI, `DELETE CASCADE`, botón **Revisar documento** (sube PDF ≤10MB, IA clasifica 1 de 11 + extrae datos + veredicto APROBABLE/CORREGIBLE/RECHAZABLE; Editar genera carta nueva).
 5. **Seguimiento:** timeline historial+adjuntos+responsable, motivo + Editar y corregir.
 6. **Clientes verificado + autorrelleno:** tabla, chips, tabs, verificar (admin/super), Persona/CURP vs Empresa/RFC, autocomplete en Generar que solo rellena vacíos.
-7. **Usuarios/supers:** alta con email auto + `SisLegal2026*`, matriz edita ROL, baja lógica. `PATCH /roles/:id/permisos`.
+7. **Usuarios/supers:** alta con email auto + `SisLegal2026*`, matriz edita ROL, baja lógica. `PATCH /roles/:id/permisos`. Base precargada:
+
+| Nombre | Correo | Pass | Rol / Área |
+|---|---|---|---|
+| Administrador | `admin@sislegal.mx` | `Admin123*` | Administrador / Administración (todo) |
+| Abogada Legal | `legal@sislegal.mx` | `Legal123*` | Legal / Legal |
+| Super Legal | `superlegal@sislegal.mx` | `SuperLegal123*` | Superusuario Legal / Legal |
+| Operador | `operativo@sislegal.mx` | `Operativo123*` | Operativo / Operativa |
+| Super Operativo | `superop@sislegal.mx` | `SuperOp123*` | Superusuario Operativo / Operativa |
 8. **Notificaciones:** campanita, badge, hace-cuánto, fan-out crear (supers+admins) y dictamen (creador+motivo), refresco 30s.
 9. **Inicio/Config (Plantillas oculta):** KPIs/buscador/dona/actividad reales, Config con 4 acentos + oscuro. Plantillas oculta del drawer (ruta `/Plantillas` viva); el flujo oficial es `/Menu` directo.
 10. **Persistencia real:** MariaDB `sislegal` 14 tablas (`maestro.sql` fuente de verdad), `documentos/Sistema legal/*.pdf`, historial. Sin `documentosDemo.js`, sin cifras fijas.
@@ -36,12 +43,9 @@
 ## 3. NO HACE / NO HARÁ en este MVP
 
 - SSO Entra, refresh-token, 2FA, bloqueo intentos. JWT 8 h sin refresh (conexión BD ya rotada a `sislegal` el 30/09).
-- OCR / Document Intelligence, embeddings, streaming IA, fine-tuning.
 - Firma e.firma, buzón tributario, Poder Judicial.
 - Subida real de fotos/anexos al servidor (viven en memoria del form; solo el PDF final persiste).
 - Vencimientos en Inicio, versionado semántico plantillas, PWA/móvil, CI, Postgres/Azure, tests auto, soporte 24/7.
-
-> `[PENDIENTE USUARIO: elige 1-2 para fase 2 con fecha si tu asesor lo pide. Recomendado: manual de usuario + subida real de anexos.]`
 
 ---
 
@@ -61,7 +65,7 @@
 
 ---
 
-## 5. Contratos API reales (ya no mock)
+## 5. Contratos API reales
 
 ```
 POST /api/auth/login {correo, contrasena} → {token, usuario}
@@ -83,7 +87,7 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 
 ---
 
-## 6. DoD del MVP (verificado 14/10; base 30/09)
+## 6. DoD del MVP
 
 - [x] 11 tipos crean folio visible en Revisión/Seguimiento tras recargar
 - [x] Rechazo sin comentario bloqueado
@@ -116,7 +120,7 @@ Si IA da `Servicio IA apagado` prende `:8001`. Si da `Modelo saturado (429)` esp
 
 ---
 
-## 8. Después del MVP (fase 2 sugerida)
+## 8. Después del MVP 
 
 V1: subida real anexos + manual + refresh-token (README y Docker ya hechos).
 V2: key de paga (3-15s, sin 429, streaming, `IA_PRE_FORMALIZAR=0`), validación jurídica asistida, QR en PDF.

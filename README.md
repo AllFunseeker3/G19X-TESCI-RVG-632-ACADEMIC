@@ -20,7 +20,7 @@ Un residente crea cualquiera de los 11 tipos, la IA redacta y formaliza, se gene
 
 | Categoría | Tipo | Campos | Particularidad |
 |---|---|---|---|
-| Cartas | Poder | 17 | Machote exacto OTORGO/ACEPTO/TESTIGOS indivisible, destinatario opcional, formaliza `lana→recursos` |
+| Cartas | Poder | 17 | Machote exacto OTORGO/ACEPTO/TESTIGOS indivisible, destinatario opcional, formaliza|
 | Cartas | Responsiva | 19 | Moneda `$`, fotos JPG/PNG |
 | Cartas | Renuncia | 9 | `numeroEmpleado`, motivo Otro |
 | Cartas | Intención | 14 | Emisora/receptora, checks confidencialidad/vinculante, destinatario opcional |

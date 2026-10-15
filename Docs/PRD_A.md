@@ -13,17 +13,13 @@ Proyecto de residencia / estadía LegalTech de carácter genérico.
 
 No se adscribe a ningún despacho ni dependencia usuaria en este documento. El sistema `SisLegal` está pensado para un área jurídica genérica que necesita generar, revisar y trazar documentos legales.
 
-> `[PENDIENTE USUARIO: si tu escuela te pide nombrar dependencia usuaria final, escribe aquí nombre del despacho / juzgado / empresa destinataria. Si no, deja "usuario jurídico genérico".]`
-
-> `[PENDIENTE USUARIO: nombre del residente/autor, matrícula, carrera, periodo de estadías, nombre del asesor académico.]`
-
 Roles académicos y roles del software van separados (ver §7). Ningún asesor académico dictamina documentos en el sistema.
 
 ---
 
 ## 2. Tecnologías REALES usadas (sustituye al punto 2 del PDF)
 
-El punto 2 del PDF (`Python, FastAPI, React.js, Azure OpenAI Service, Azure AI Document Intelligence, PostgreSQL, Docker, GitHub Actions, LangChain, Microsoft Entra ID y Scrum`) **NO se usa tal cual**. Esto es lo que sí corre hoy:
+
 
 **Front (`:5173`):**
 - React 19 + Vite 8 + React Router 7
@@ -33,7 +29,7 @@ El punto 2 del PDF (`Python, FastAPI, React.js, Azure OpenAI Service, Azure AI D
 - `src/lib/api.js`: fetch con Bearer JWT, eventos `sislegal:sin-conexion` / `sesion-expirada`
 
 **Back (`:8000`):**
-- Express 4 + `mysql2` + MariaDB `sislegal` en `localhost:3306` + `jsonwebtoken` (JWT 8h) + `bcryptjs` + `cors` + `dotenv`
+- Express 4 + + MariaDB `sislegal` en `localhost:8080` + `jsonwebtoken` (JWT 8h) + `bcryptjs` + `cors` + `dotenv`
 - Rutas `server/routes/` (8): auth, catalogo, clientes, documentos, ia (proxy), notificaciones, usuarios, salud
 - `npm run todo` levanta API + web con concurrently. `npm run api` solo API.
 
@@ -86,9 +82,6 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 3. Implementar automatización y validación jurídica — HECHO parcial (automatización + validación formal + formalización IA; validación jurídica de fondo sigue siendo humana).
 4. Validar la calidad de los documentos — HECHO parcial (QA manual + build/lint + pruebas en vivo; sin suite automatizada).
 5. Elaborar documentación técnica y plan de soporte — PARCIAL (este PRD + `AGENTS.md` + comentarios en código; falta manual de usuario final y plan multinivel formal).
-
-> `[PENDIENTE USUARIO: redacta 1 párrafo por objetivo con evidencia de tu residencia: fechas, actas, capturas.]`
-
 ---
 
 ## 5. Justificación (punto 5 del PDF)
@@ -96,8 +89,6 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 - **Industria:** reduce tiempos y errores por copiado manual, evita destinatarios "A quien corresponda" cuando hay cliente vinculado, estandariza machotes (ej. carta poder con OTORGO/ACEPTO/TESTIGOS en mismo bloque).
 - **Valor LegalTech:** portafolio de automatización documental con IA de bajo costo (modelos free, sin Azure).
 - **Alumno:** competencias en IA generativa (prompts + fallback), automatización documental (137 campos condicionales), arquitectura empresarial (3 servicios + 14 tablas + RBAC).
-
-> `[PENDIENTE USUARIO: agrega 3-5 líneas de justificación personal: por qué elegiste este caso, qué problema viste en el área jurídica.]`
 
 ---
 
@@ -179,12 +170,8 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 ### 6.3 NO HARÁ (fuera de este ciclo de residencia, salvo que lo pidas)
 
 - Integración Poder Judicial / buzón tributario.
-- Facturación, cobros, multiempresa.
-- Migración a PostgreSQL / Azure / Entra sin re-plan (implicaría reescribir `server/db.js`, auth y despliegue).
-- IA con streaming en vivo, embeddings propios o fine-tuning.
+- Facturación, cobros, multiempresa
 - Soporte multinivel 24/7 formal.
-
-> `[PENDIENTE USUARIO: tacha o mueve 1-2 ítems de NO HARÁ a "fase 2" si tu asesor te lo exige, y pon fecha.]`
 
 ---
 
@@ -197,7 +184,15 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 | Legal / Operativo | Solo su área | Crear/corregir sus docs, ver sus docs |
 | Sistema | — | Cambia estado, genera acuse/historial |
 
-Login real: `admin@sislegal.mx/Admin123*`, `legal/Legal123*`, `superlegal/SuperLegal123*`, `operativo/Operativo123*`, `superop/SuperOp123*`. Pass genérica altas: `SisLegal2026*`.
+Login real: `admin@sislegal.mx/Admin123*`, `legal@sislegal.mx/Legal123*`, `superlegal@sislegal.mx/SuperLegal123*`, `operativo@sislegal.mx/Operativo123*`, `superop@sislegal.mx/SuperOp123*`. Pass genérica altas: `SisLegal2026*`.
+
+| Nombre (seed) | Correo | Pass | Rol | Área |
+|---|---|---|---|---|
+| Administrador | `admin@sislegal.mx` | `Admin123*` | Administrador | Administración |
+| Abogada Legal | `legal@sislegal.mx` | `Legal123*` | Legal | Legal |
+| Super Legal | `superlegal@sislegal.mx` | `SuperLegal123*` | Superusuario Legal | Legal |
+| Operador | `operativo@sislegal.mx` | `Operativo123*` | Operativo | Operativa |
+| Super Operativo | `superop@sislegal.mx` | `SuperOp123*` | Superusuario Operativo | Operativa |
 Estados canónicos BD: `borrador` (UI "En revisión"), `por_revisar`, `aprobado`, `rechazado`, `notificado`. `estados.js` mapea etiquetas + chip `info` para borrador.
 
 ---
@@ -261,7 +256,7 @@ Puertos fijos: 5173 web local, 8000 API, 8001 IA (Docker: web `:8080`, resto igu
 3. Arquitectura — componentes/APIs — Entregable arquitectura — HECHO
 4. Planificación — backlog/cronograma — Entregable plan — HECHO
 5. Desarrollo — generación/validación/versiones/aprobación — Entregable sistema — HECHO
-6. Pruebas — funcional/integración/documental — Entregable QA — PARCIAL `[PENDIENTE USUARIO: anexa evidencias y ciclos #]`
+6. Pruebas — funcional/integración/documental — Entregable QA — PARCIAL
 7. Documentación — manuales — Entregable manual — PARCIAL
 8. Mantenimiento — soporte/plantillas — Entregable plan — PENDIENTE
 9. Capacitación — admin/usuarios — Entregable acta — PENDIENTE
