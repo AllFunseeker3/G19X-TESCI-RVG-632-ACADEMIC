@@ -45,7 +45,7 @@ Timeline historial + adjuntos + responsable, motivo rojo/verde + *Editar y corre
 
 ### 2.5 Clientes (`/Clientes`), Usuarios (`/Usuarios`), Inicio, Config
 - Clientes: chips Verificado/Pendiente, tabs Todos/Pendientes, Verificar (admin/super), Persona/CURP vs Empresa/RFC, baja lógica. Alta operativo→pendiente; edición ajena sobre verificada→pendiente.
-- Usuarios: alta Nombre/paterno/materno, email auto ASCII, `SisLegal2026*`, selector Legal/Operativo/Administrador + switch super (solo admin). Matriz edita el ROL (afecta a todos), baja lógica + reactivar.
+- Usuarios: alta Nombre/paterno/materno, email auto ASCII, contraseña genérica inicial, selector Legal/Operativo/Administrador + switch super (solo admin). Matriz edita el ROL (afecta a todos), baja lógica + reactivar.
 - Inicio: KPIs/buscador/dona/actividad reales (sin fijos). Sin Vencimientos.
 - Config: 4 acentos (azul #163172/rojo/verde/blanco) + oscuro, persiste localStorage. Plantillas oculta del menú (ruta `/Plantillas` viva).
 
@@ -79,7 +79,7 @@ VITE_API_URL=http://localhost:8000/api
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=sislegal
-DB_PASSWORD=SisLegal2026*
+DB_PASSWORD=CAMBIA_ESTA_CONTRASENA
 DB_NAME=sislegal
 JWT_SECRET=CAMBIA_ESTE_SECRETO_LARGO
 JWT_HORAS=8
@@ -99,7 +99,7 @@ npm run todo            # API :8000 + web :5173
 python -m uvicorn main:app --host 127.0.0.1 --port 8001  # desde ai-service/
 ```
 
-**Demo:** `/Ingreso` en `http://localhost:5173` → `admin@sislegal.mx / Admin123*` (ver `MVP.md` para los 5).
+**Demo:** `/Ingreso` en `http://localhost:5173` → `admin@sislegal.mx / Admin123*`. Son **5 cuentas de prueba** (una por rol: administrador, legal, super legal, operativo y super operativo), precargadas en `maestro.sql` para probar las funciones, permisos y flujo de dictamen del software; **no son usuarios reales** (detalle de las 5 en `MVP.md`).
 
 ### 3.2b Puesta en marcha — Opción B: Docker (recomendada para demo)
 
@@ -116,7 +116,7 @@ docker compose up --build
 ```
 
 **Abre:**
-- Web: `http://localhost:8080` → `admin@sislegal.mx / Admin123*`
+- Web: `http://localhost:8080` → `admin@sislegal.mx / Admin123*` (cuentas de prueba por rol; detalle en §3.2 **Demo**)
 - API: `http://localhost:8000/api/salud` → `{tipos:11, campos:137, permisos:20, usuarios:5}`
 - IA: `http://localhost:8001/salud` → `{proveedor, modelo, plantillas:11}`
 - BD: `localhost:3306` (user/pass de tu `.env`, BD `sislegal` con seeds de `maestro.sql`)

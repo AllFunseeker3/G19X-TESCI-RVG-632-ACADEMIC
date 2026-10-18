@@ -4,10 +4,10 @@ services:
   db:
     image: mariadb:11
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-RootDocker123*}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Cambia DB_ROOT_PASSWORD en .env docker}
       MARIADB_DATABASE: sislegal
       MARIADB_USER: ${DB_USER:-sislegal}
-      MARIADB_PASSWORD: ${DB_PASSWORD:-SisLegal2026*}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Cambia DB_PASSWORD en .env docker}
     volumes:
       - db_data:/var/lib/mysql
       - ./db/maestro.sql:/docker-entrypoint-initdb.d/01-maestro.sql:ro
@@ -43,7 +43,7 @@ services:
       DB_HOST: db
       DB_PORT: 3306
       DB_USER: ${DB_USER:-sislegal}
-      DB_PASSWORD: ${DB_PASSWORD:-SisLegal2026*}
+      DB_PASSWORD: ${DB_PASSWORD:?Cambia DB_PASSWORD en .env docker}
       DB_NAME: sislegal
       JWT_SECRET: ${JWT_SECRET:?Cambia JWT_SECRET en .env docker}
       JWT_HORAS: 8

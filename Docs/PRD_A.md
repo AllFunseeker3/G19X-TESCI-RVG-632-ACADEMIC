@@ -133,7 +133,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 - Tabla con chips Verificado/Pendiente, tabs Todos/Pendientes, Verificar, diálogo Persona/CURP vs Empresa/RFC, baja lógica. Alta por no-admin/super nace pendiente; edición ajena sobre verificada la regresa a pendiente.
 
 **Usuarios (`Usuarios.jsx` + `UsuariosAdmin.jsx` + `/api/usuarios`):**
-- Alta Nombre/paterno/materno, email auto ASCII, pass genérica `SisLegal2026*`, selector base Legal/Operativo/Administrador + switch super (solo admin). Matriz permisos clicable edita el ROL (`PATCH /roles/:id/permisos`). Baja lógica + reactivar. 5 usuarios base con hashes reales en `maestro.sql`.
+- Alta Nombre/paterno/materno, email auto ASCII, pass genérica inicial, selector base Legal/Operativo/Administrador + switch super (solo admin). Matriz permisos clicable edita el ROL (`PATCH /roles/:id/permisos`). Baja lógica + reactivar. 5 usuarios base con hashes reales en `maestro.sql`.
 
 **Notificaciones (`CentroNotificaciones.jsx` + `/api/notificaciones`):**
 - Tabla `notificaciones`, badge no-leídas, últimas 10 con hace-cuánto, marca leída al abrir/clic, refresco 30s. Fan-out al crear/corregir (supers área + admins) y al dictaminar (solo creador + motivo si rechazo).
@@ -184,7 +184,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 | Legal / Operativo | Solo su área | Crear/corregir sus docs, ver sus docs |
 | Sistema | — | Cambia estado, genera acuse/historial |
 
-Login real: `admin@sislegal.mx/Admin123*`, `legal@sislegal.mx/Legal123*`, `superlegal@sislegal.mx/SuperLegal123*`, `operativo@sislegal.mx/Operativo123*`, `superop@sislegal.mx/SuperOp123*`. Pass genérica altas: `SisLegal2026*`.
+Logins de las 5 cuentas de prueba (una por rol): `admin@sislegal.mx/Admin123*`, `legal@sislegal.mx/Legal123*`, `superlegal@sislegal.mx/SuperLegal123*`, `operativo@sislegal.mx/Operativo123*`, `superop@sislegal.mx/SuperOp123*`. Pass genérica de altas: inicial.
 
 | Nombre (seed) | Correo | Pass | Rol | Área |
 |---|---|---|---|---|

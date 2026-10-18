@@ -56,7 +56,7 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 - Scripts: `npm run todo` (API :8000 + web :5173 con concurrently),
   `npm run api` (solo API), `npm run dev` (solo web), `npm run build`, `npx eslint .`
 - Si hay `EADDRINUSE`: `Get-NetTCPConnection -LocalPort 8000,5173 | % { taskkill /PID $_.OwningProcess /T /F }`
-- `server/.env` usa usuario `sislegal` / `SisLegal2026*` (rotado el 30/09/2026; ya no root). JWT 8h.
+- `server/.env` usa usuario `sislegal`; contraseña SOLO ahí (no versionada; rotada el 30/09/2026 y 18/10/2026; ya no root). JWT 8h.
 - Usuarios de prueba: `admin@sislegal.mx/Admin123*` (admin total).
 - Salud: `GET http://localhost:8000/api/salud` → 11 tipos, 137 campos, 20 permisos, 6 usuarios.
 - Verificación BD sin servidor: `cd server; npm run db:test`
