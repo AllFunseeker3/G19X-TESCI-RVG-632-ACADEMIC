@@ -2,10 +2,13 @@
 // ARCHIVO: src/Pages/Ingreso.jsx
 // FUNCIÓN GENERAL: Pantalla de login (correo + contraseña).
 //   Valida contra el back, guarda token/usuario y navega a /Inicio.
+//   CC-01: si la cuenta trae contraseña temporal (debe_cambiar_contrasena),
+//   muestra un paso 2 obligatorio para cambiarla antes de entrar.
 // FLUJO DE DATOS:
-//   - ENTRAN: credenciales del formulario hacia lib/api.js (login).
+//   - ENTRAN: credenciales del formulario hacia lib/api.js (login) y, en el
+//     paso 2, {actual, nueva} hacia cambiarContrasena.
 //   - SALEN: token/usuario a localStorage y navegación a Inicio.jsx.
-// QUÉ MODIFICAR SI hay cambios: campos y handleLogin; estilos del Paper/Box.
+// QUÉ MODIFICAR SI hay cambios: campos y handleLogin/handleCambio; estilos del Paper/Box.
 // ============================================================================
 import {
     Alert,
@@ -28,19 +31,38 @@ import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
-import { guardarToken, guardarUsuario, login } from '../lib/api.js';
+import {
+    cambiarContrasena,
+    guardarToken,
+    guardarUsuario,
+    leerToken,
+    leerUsuario,
+    login,
+} from '../lib/api.js';
 
 // ============ AQUÍ EMPIEZA INGRESO ============
 // Página de acceso: formulario controlado que autentica contra el back.
 export default function Ingreso() {
     const navigate = useNavigate();
     // ============ AQUÍ EMPIEZA ESTADOS INGRESO ============
+    // CC-01: si quedó una sesión con cambio obligatorio pendiente (p. ej. el
+    // usuario recargó la página), arranca directo en el paso 2.
+    const [cambioPendiente, setCambioPendiente] = useState(() => {
+        const u = leerUsuario();
+        return leerToken() && u && u.debe_cambiar_contrasena ? { usuario: u } : null;
+    });
     // Campos del formulario + flags de UI (ver contraseña, error, carga).
     const [correo, setCorreo] = useState('admin@sislegal.mx');
-    const [contrasena, setContrasena] = useState('Admin123*');
+    const [contrasena, setContrasena] = useState(cambioPendiente ? '' : 'Admin123*');
     const [mostrarPassword, setMostrarPassword] = useState(false);
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(false);
+    // Paso 2 (CC-01): contraseña nueva + confirmación.
+    const [nueva, setNueva] = useState('');
+    const [confirmar, setConfirmar] = useState('');
+    const [errorCambio, setErrorCambio] = useState('');
+    const [guardandoCambio, setGuardandoCambio] = useState(false);
+    const mensajeError = cambioPendiente ? errorCambio : error;
     // ============ AQUÍ TERMINA ESTADOS INGRESO ============
 
     // ============ AQUÍ EMPIEZA HANDLER LOGIN ============
@@ -54,6 +76,11 @@ export default function Ingreso() {
             const data = await login(correo.trim(), contrasena);
             guardarToken(data.token);
             guardarUsuario(data.usuario);
+            if (data.usuario?.debe_cambiar_contrasena) {
+                // Contraseña temporal (CC-01): obliga el cambio antes de entrar.
+                setCambioPendiente({ usuario: data.usuario });
+                return;
+            }
             navigate('/Inicio', { replace: true });
         } catch (err) {
             setError(err.message || 'No se pudo iniciar sesión');
@@ -62,6 +89,32 @@ export default function Ingreso() {
         }
     };
     // ============ AQUÍ TERMINA HANDLER LOGIN ============
+
+    // ============ AQUÍ EMPIEZA HANDLER CAMBIO OBLIGATORIO (CC-01) ============
+    // Guarda la contraseña nueva usando la temporal recién capturada como "actual".
+    const handleCambio = async (e) => {
+        e.preventDefault();
+        setErrorCambio('');
+        if (String(nueva).length < 8) {
+            setErrorCambio('La contraseña nueva mínima es 8 caracteres');
+            return;
+        }
+        if (nueva !== confirmar) {
+            setErrorCambio('Las contraseñas nuevas no coinciden');
+            return;
+        }
+        setGuardandoCambio(true);
+        try {
+            await cambiarContrasena(contrasena, nueva);
+            guardarUsuario({ ...(cambioPendiente?.usuario || {}), debe_cambiar_contrasena: false });
+            navigate('/Inicio', { replace: true });
+        } catch (err) {
+            setErrorCambio(err.message || 'No se pudo cambiar la contraseña');
+        } finally {
+            setGuardandoCambio(false);
+        }
+    };
+    // ============ AQUÍ TERMINA HANDLER CAMBIO OBLIGATORIO (CC-01) ============
 
     return (
         // ============ AQUÍ EMPIEZA CONTENEDOR INGRESO ============
@@ -137,25 +190,111 @@ export default function Ingreso() {
                 {/* ============ AQUÍ TERMINA PANEL LATERAL BIENVENIDA ============ */}
 
                 {/* ============ AQUÍ EMPIEZA FORMULARIO ACCESO ============ */}
-                <Box component="form" onSubmit={handleLogin} sx={{ p: { xs: 4, sm: 6, md: 8 } }}>
+                <Box component="form" onSubmit={cambioPendiente ? handleCambio : handleLogin} sx={{ p: { xs: 4, sm: 6, md: 8 } }}>
                     <Stack spacing={1} sx={{ mb: 4 }}>
                         <Typography variant="overline" color="encabezado.main" fontWeight={700} letterSpacing={1.2}>
-                            Acceso al sistema
+                            {cambioPendiente ? 'Primer ingreso' : 'Acceso al sistema'}
                         </Typography>
                         <Typography variant="h4" component="h1" fontWeight={800} color="encabezado.main">
-                            Bienvenido de nuevo
+                            {cambioPendiente ? 'Cambia tu contraseña' : 'Bienvenido de nuevo'}
                         </Typography>
                         <Typography color="text.secondary">
-                            Ingresa tus datos para continuar.
+                            {cambioPendiente
+                                ? 'Tu contraseña actual es temporal; crea una nueva (mínimo 8 caracteres) para continuar.'
+                                : 'Ingresa tus datos para continuar.'}
                         </Typography>
                     </Stack>
 
-                    {error && (
+                    {mensajeError && (
                         <Alert severity="error" sx={{ mb: 2 }}>
-                            {error}
+                            {mensajeError}
                         </Alert>
                     )}
 
+                    {/* ============ AQUÍ EMPIEZA PASO 2: CAMBIO OBLIGATORIO (CC-01) ============ */}
+                    {cambioPendiente && (
+                        <Stack spacing={2.5}>
+                            <Box>
+                                <InputLabel
+                                    shrink
+                                    htmlFor="cambio-actual"
+                                    sx={{ position: 'static', transform: 'none', fontSize: '0.75rem', display: 'block', mb: 0.5 }}
+                                >
+                                    Contraseña actual (temporal)
+                                </InputLabel>
+                                <TextField
+                                    fullWidth
+                                    id="cambio-actual"
+                                    type="password"
+                                    value={contrasena}
+                                    onChange={(e) => setContrasena(e.target.value)}
+                                    variant="standard"
+                                    placeholder="La que te compartió el administrador"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockOutlinedIcon sx={{ color: 'encabezado.main' }} />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                            </Box>
+                            <Box>
+                                <InputLabel
+                                    shrink
+                                    htmlFor="cambio-nueva"
+                                    sx={{ position: 'static', transform: 'none', fontSize: '0.75rem', display: 'block', mb: 0.5 }}
+                                >
+                                    Contraseña nueva
+                                </InputLabel>
+                                <TextField
+                                    fullWidth
+                                    id="cambio-nueva"
+                                    type="password"
+                                    value={nueva}
+                                    onChange={(e) => setNueva(e.target.value)}
+                                    variant="standard"
+                                    placeholder="Mínimo 8 caracteres"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockOutlinedIcon sx={{ color: 'encabezado.main' }} />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                            </Box>
+                            <Box>
+                                <InputLabel
+                                    shrink
+                                    htmlFor="cambio-confirmar"
+                                    sx={{ position: 'static', transform: 'none', fontSize: '0.75rem', display: 'block', mb: 0.5 }}
+                                >
+                                    Confirmar contraseña nueva
+                                </InputLabel>
+                                <TextField
+                                    fullWidth
+                                    id="cambio-confirmar"
+                                    type="password"
+                                    value={confirmar}
+                                    onChange={(e) => setConfirmar(e.target.value)}
+                                    variant="standard"
+                                    placeholder="Repite la contraseña nueva"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockOutlinedIcon sx={{ color: 'encabezado.main' }} />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                            </Box>
+                        </Stack>
+                    )}
+                    {/* ============ AQUÍ TERMINA PASO 2: CAMBIO OBLIGATORIO (CC-01) ============ */}
+
+                    {/* ============ AQUÍ EMPIEZA FORMULARIO LOGIN ============ */}
+                    {!cambioPendiente && (
                     <Stack spacing={2.5}>
                         {/* ============ AQUÍ EMPIEZA CAMPO CORREO ============ */}
                         <Box>
@@ -223,8 +362,11 @@ export default function Ingreso() {
                         </Box>
                         {/* ============ AQUÍ TERMINA CAMPO CONTRASEÑA ============ */}
                     </Stack>
+                    )}
+                    {/* ============ AQUÍ TERMINA FORMULARIO LOGIN ============ */}
 
                     {/* ============ AQUÍ EMPIEZA OPCIONES ACCESO ============ */}
+                    {!cambioPendiente && (
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, mb: 3 }}>
                         <FormControlLabel
                             control={<Checkbox size="small" color="primary" />}
@@ -234,6 +376,7 @@ export default function Ingreso() {
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </Box>
+                    )}
                     {/* ============ AQUÍ TERMINA OPCIONES ACCESO ============ */}
 
                     {/* ============ AQUÍ EMPIEZA BOTÓN INGRESAR ============ */}
@@ -242,11 +385,12 @@ export default function Ingreso() {
                         variant="contained"
                         size="large"
                         type="submit"
-                        disabled={cargando}
+                        disabled={cambioPendiente ? guardandoCambio : cargando}
                         sx={{ py: 1.5, borderRadius: 1.5, fontWeight: 700, textTransform: 'none', boxShadow: 'none' }}
                     >
-                        {cargando ? 'Ingresando...' : 'Ingresar'}
+                        {cambioPendiente ? (guardandoCambio ? 'Guardando...' : 'Guardar y continuar') : (cargando ? 'Ingresando...' : 'Ingresar')}
                     </Button>
+                    {/* ============ AQUÍ TERMINA BOTÓN INGRESAR ============ */}
                 </Box>
                 {/* ============ AQUÍ TERMINA FORMULARIO ACCESO ============ */}
             </Paper>

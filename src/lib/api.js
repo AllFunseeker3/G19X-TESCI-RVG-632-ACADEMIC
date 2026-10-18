@@ -93,6 +93,10 @@ async function api(ruta, { metodo = "GET", cuerpo, token } = {}) {
 // --- Auth (backend/app/routers/auth.py) ---
 export const login = (correo, contrasena) =>
   api("/auth/login", { metodo: "POST", cuerpo: { correo, contrasena } });
+
+// CC-01: cambio de contraseña del usuario logueado (obligatorio en primer ingreso).
+export const cambiarContrasena = (actual, nueva) =>
+  api("/auth/cambiar-contrasena", { metodo: "POST", cuerpo: { actual, nueva } });
 // ============ AQUÍ TERMINA AUTH ============
 
 // ============ AQUÍ EMPIEZA DOCUMENTOS ============

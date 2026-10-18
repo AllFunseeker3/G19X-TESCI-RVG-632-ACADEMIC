@@ -1,7 +1,7 @@
 /* ============================================================================
  * ARCHIVO: src/Components/UsuariosAdmin.jsx
  * FUNCIÓN GENERAL: panel de administración de usuarios (solo quien gestiona).
- *   - Pestaña "Nuevo usuario": nombre libre + email auto 3+3+3 + pass genérica,
+ *   - Pestaña "Nuevo usuario": nombre libre + email auto 3+3+3 + pass temporal (CC-01),
  *     con rol/área traídos de la API y filtrados por alcance.
  *   - Pestaña "Ver usuarios": tabla + detalle con matriz de permisos,
  *     cambio de rol (quita/da permisos), baja lógica y reactivación.
@@ -159,7 +159,7 @@ export default function UsuariosAdmin() {
   // ============ AQUÍ TERMINA ROLES ofrecidos/base + super ============
 
   // ============ AQUÍ EMPIEZA HANDLERS alta/detalle/rol/reactivar ============
-  // ALTA: nombre compuesto + rol/área/datos. El back genera email y pass genérica.
+  // ALTA: nombre compuesto + rol/área/datos. El back genera email y pass temporal (CC-01).
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -181,7 +181,7 @@ export default function UsuariosAdmin() {
         telefono: form.telefono.trim() || null,
         fecha_ingreso: form.fecha_ingreso || null,
       });
-      setExito(`Usuario creado (${data.correo}) con pass: ${data.contrasena}`);
+      setExito(`Usuario creado (${data.correo}). Contraseña temporal: ${data.contrasena} — se muestra una sola vez; deberá cambiarla en su primer ingreso.`);
       setForm({ ...FORM_VACIO, id_area: areas.length === 1 ? String(areas[0].id) : "" });
       setEsSuper(false);
       recargar();
@@ -290,7 +290,7 @@ export default function UsuariosAdmin() {
                   Registro de usuarios
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Captura los datos; el correo y la contraseña se generan solos.
+                  Captura los datos; el correo y la contraseña temporal se generan solos (el usuario la cambia al entrar).
                 </Typography>
               </Box>
             </Box>
@@ -330,7 +330,7 @@ export default function UsuariosAdmin() {
                 <Alert severity="info" sx={{ borderRadius: 2 }}>
                   Se creará con correo <strong>{emailPreview || '…'}</strong>
                   {rolFinal && <> como <strong>{rolFinal.nombre}</strong></>} y
-                  contraseña genérica del sistema (se muestra al crear).
+                  una contraseña temporal (correo + 4 caracteres aleatorios; se muestra una sola vez y se cambia al primer ingreso).
                 </Alert>
 
                 <SeccionFormulario titulo="Rol y asignación" columnas={2}>

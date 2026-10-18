@@ -45,7 +45,7 @@ Timeline historial + adjuntos + responsable, motivo rojo/verde + *Editar y corre
 
 ### 2.5 Clientes (`/Clientes`), Usuarios (`/Usuarios`), Inicio, Config
 - Clientes: chips Verificado/Pendiente, tabs Todos/Pendientes, Verificar (admin/super), Persona/CURP vs Empresa/RFC, baja lógica. Alta operativo→pendiente; edición ajena sobre verificada→pendiente.
-- Usuarios: alta Nombre/paterno/materno, email auto ASCII, contraseña genérica inicial, selector Legal/Operativo/Administrador + switch super (solo admin). Matriz edita el ROL (afecta a todos), baja lógica + reactivar.
+- Usuarios: alta Nombre/paterno/materno, email auto ASCII, contraseña temporal (correo sin @ + 4 aleatorios, se muestra al crear) que es obligatorio cambiar en el primer ingreso (la API bloquea hasta cambiarla), selector Legal/Operativo/Administrador + switch super (solo admin). Matriz edita el ROL (afecta a todos), baja lógica + reactivar.
 - Inicio: KPIs/buscador/dona/actividad reales (sin fijos). Sin Vencimientos.
 - Config: 4 acentos (azul #163172/rojo/verde/blanco) + oscuro, persiste localStorage. Plantillas oculta del menú (ruta `/Plantillas` viva).
 

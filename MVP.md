@@ -22,7 +22,7 @@
 4. **Revisión:** bandeja real, Creado por, En revisión, dictamen con comentario obligatorio al rechazar (400 si falta), visor PDF iframe 70vh, borrado con Dialog MUI, `DELETE CASCADE`, botón **Revisar documento** (sube PDF ≤10MB, IA clasifica 1 de 11 + extrae datos + veredicto APROBABLE/CORREGIBLE/RECHAZABLE; Editar genera carta nueva).
 5. **Seguimiento:** timeline historial+adjuntos+responsable, motivo + Editar y corregir.
 6. **Clientes verificado + autorrelleno:** tabla, chips, tabs, verificar (admin/super), Persona/CURP vs Empresa/RFC, autocomplete en Generar que solo rellena vacíos.
-7. **Usuarios/supers:** alta con email auto + contraseña genérica inicial, matriz edita ROL, baja lógica. `PATCH /roles/:id/permisos`. Base precargada:
+7. **Usuarios/supers:** alta con email auto + contraseña temporal (correo + 4 aleatorios, obliga cambio al primer ingreso con bloqueo de API), matriz edita ROL, baja lógica. `PATCH /roles/:id/permisos`. Base precargada:
 
 | Nombre | Correo | Pass | Rol / Área |
 |---|---|---|---|

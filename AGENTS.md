@@ -65,7 +65,8 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 
 - `db/maestro.sql` es la **fuente de verdad** (14 tablas + `adjuntos.vigente` ADJ-01, 11 tipos, 137 campos).
   Migraciones aplicadas en vivo: `migracion_ia_contenido`, `migracion_notificaciones`,
-  `migracion_clientes_verificado` (CLI-01), `migracion_adjuntos_vigente` (ADJ-01).
+  `migracion_clientes_verificado` (CLI-01), `migracion_adjuntos_vigente` (ADJ-01),
+  `migracion_cambio_contrasena` (CC-01, 18/10).
 - `src/lib/tiposDocumentos.js` es espejo del catálogo (`filas`, `ayuda`, `mostrarSi`;
   `mostrarSi.valor === true` es booleano, viene de `cond_valor='true'`).
 - Tipos de campo: `texto | area | fecha | email | seleccion | moneda | fotos | check | switch | anexos`.
@@ -78,6 +79,11 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 - El login (`POST /api/auth/login`) **NO devuelve flag `admin`** en `usuario`.
   Para saber si es admin usa `usePermisos()` (`GET /api/usuarios/yo/permisos`).
   No leas `admin` de `localStorage`.
+- Altas de usuarios (CC-01, 18/10): contraseña temporal = parte del correo + 4 aleatorios
+  (se muestra una sola vez al crear). `debe_cambiar_contrasena` bloquea TODA la API
+  (403 `CAMBIO_CONTRASENA_REQUERIDO`) hasta cambiarla con
+  `POST /api/auth/cambiar-contrasena { actual, nueva }`; es la única ruta que pasa
+  con el flag activo (`conAuthPermitirCambio` en middleware). Seeds/demo quedan en FALSE.
 - `documentos` ya tiene datos reales; `GenerarCarta` persiste (Confirmar crea + PDF) y
   el modo `?editar=` corrige vía `PATCH /:id/datos` (vuelve a borrador + re-avisa).
 - Estados UI: `borrador` se muestra como "En revisión" (`estados.js`, chip info).

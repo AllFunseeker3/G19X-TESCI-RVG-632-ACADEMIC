@@ -37,7 +37,7 @@ async function cargarUsuario(req) {
   }
   const [filas] = await pool.query(
     `SELECT u.id_usuario AS id, u.nombre, u.correo, u.id_rol, u.id_area,
-            u.activo, r.nombre AS rol, r.es_super,
+            u.activo, u.debe_cambiar_contrasena, r.nombre AS rol, r.es_super,
             (r.nombre = 'Administrador') AS admin
      FROM usuarios u JOIN roles r ON r.id_rol = u.id_rol
      WHERE u.id_usuario = ?`,
@@ -45,15 +45,28 @@ async function cargarUsuario(req) {
   );
   const u = filas[0];
   if (!u || !u.activo) return null;
-  return { ...u, admin: u.admin === 1 }; // Normaliza flag admin a booleano.
+  // Normaliza flags a booleano real.
+  return {
+    ...u,
+    admin: u.admin === 1,
+    debe_cambiar_contrasena: u.debe_cambiar_contrasena === 1,
+  };
 }
 // ============ AQUÍ TERMINA FUNCIÓN CARGARUSUARIO ============
 
 // ============ AQUÍ EMPIEZA FUNCIÓN CONAUTH ============
 // QUÉ HACE: middleware solo-auth (401 si no hay usuario válido).
+// CC-01: si la cuenta debe cambiar contraseña, bloquea todo (403) — así el
+// cambio es obligatorio de verdad y no se puede brincar con llamadas directas.
 async function conAuth(req, res, next) {
   const u = await cargarUsuario(req);
   if (!u) return res.status(401).json({ detail: "No autenticado" });
+  if (u.debe_cambiar_contrasena) {
+    return res.status(403).json({
+      detail: "Debes cambiar tu contraseña antes de continuar",
+      codigo: "CAMBIO_CONTRASENA_REQUERIDO",
+    });
+  }
   req.usuario = u;
   return next();
 }
@@ -90,6 +103,18 @@ function exigir(categoria, accion) {
 }
 // ============ AQUÍ TERMINA FUNCIÓN EXIGIR ============
 
+// ============ AQUÍ EMPIEZA FUNCIÓN CONAUTHPERMITIRCAMBIO ============
+// QUÉ HACE: variante de conAuth SOLO para la ruta de cambio de contraseña:
+// deja pasar aunque debe_cambiar_contrasena esté activo (es justo la ruta que
+// lo desbloquea). Uso: router.post("/cambiar-contrasena", conAuthPermitirCambio, ...).
+async function conAuthPermitirCambio(req, res, next) {
+  const u = await cargarUsuario(req);
+  if (!u) return res.status(401).json({ detail: "No autenticado" });
+  req.usuario = u;
+  return next();
+}
+// ============ AQUÍ TERMINA FUNCIÓN CONAUTHPERMITIRCAMBIO ============
+
 // ============ AQUÍ EMPIEZA EXPORTS ============
-module.exports = { conAuth, tienePermiso, exigir };
+module.exports = { conAuth, conAuthPermitirCambio, tienePermiso, exigir };
 // ============ AQUÍ TERMINA EXPORTS ============

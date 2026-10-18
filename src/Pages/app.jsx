@@ -19,7 +19,7 @@ import Seguimiento from './Seguimiento';
 import Clientes from './Clientes';
 import Configuracion from './Configuracion';
 import Usuarios from './Usuarios';
-import { leerToken } from '../lib/api.js';
+import { leerToken, leerUsuario } from '../lib/api.js';
 
 // ============ AQUÍ EMPIEZA VIGILANTE SESIÓN ============
 // Vigila caída del back (sin-conexion) y 401 (sesion-expirada) -> /Ingreso.
@@ -42,6 +42,8 @@ function VigilanteSesion() {
 // Ruta protegida: sin token -> login.
 function RutaProtegida({ children }) {
   if (!leerToken()) return <Navigate to="/Ingreso" replace />;
+  // CC-01: cuentas con contraseña temporal pendiente van directo al cambio.
+  if (leerUsuario()?.debe_cambiar_contrasena) return <Navigate to="/Ingreso" replace />;
   return <DashBoardLayout>{children}</DashBoardLayout>;
 }
 // ============ AQUÍ TERMINA RUTA PROTEGIDA ============

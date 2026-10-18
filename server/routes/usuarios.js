@@ -10,6 +10,7 @@
 // ============================================================================
 // ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
+const { randomInt } = require("crypto");
 const pool = require("../db");
 const { hashContrasena } = require("../auth");
 const { conAuth } = require("../middleware");
@@ -47,9 +48,15 @@ function generarCorreo(nombreCompleto) {
   return `${nombre}${paterno}${materno}@sislegal.mx`;
 }
 
-// QUÉ HACE: contraseña genérica por defecto.
-function contrasenaGenerica() {
-  return "SisLegal2026*";
+// QUÉ HACE: contraseña temporal por usuario: la parte del correo antes de "@"
+// + 4 caracteres aleatorios legibles (sin 0/O/1/l/I). Se muestra una sola vez
+// al crear (CC-01) y el usuario DEBE cambiarla en su primer ingreso.
+function generarContrasenaTemporal(correo) {
+  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let sufijo = "";
+  for (let i = 0; i < 4; i++) sufijo += letras[randomInt(0, letras.length)];
+  const base = String(correo || "").split("@")[0] || "usuario";
+  return base + sufijo;
 }
 
 // QUÉ HACE: ¿puede el usuario actual crear un usuario con este rol/área?
@@ -245,7 +252,7 @@ router.get("/:id", async (req, res, next) => {
 // ============ AQUÍ TERMINA RUTA GET DETALLE USUARIO ============
 
 // ============ AQUÍ EMPIEZA RUTA POST CREAR USUARIO ============
-// POST /api/usuarios — alta con email auto y contraseña genérica.
+// POST /api/usuarios — alta con email auto y contraseña temporal (CC-01).
 router.post("/", async (req, res, next) => {
   try {
     const u = req.usuario;
@@ -282,19 +289,22 @@ router.post("/", async (req, res, next) => {
       }
       email = emailFinal;
     }
-    const pass = contrasena || contrasenaGenerica();
+    // Contraseña temporal por usuario (correo + 4 aleatorios, CC-01); si el
+    // admin mandó una manual, se respeta. En ambos casos el primer ingreso
+    // obliga a cambiarla (debe_cambiar_contrasena = TRUE).
+    const pass = contrasena || generarContrasenaTemporal(email);
     if (String(pass).length < 8) {
       return res.status(400).json({ detail: "La contraseña mínima es 8 caracteres" });
     }
     const [r] = await pool.query(
       `INSERT INTO usuarios
-       (nombre, correo, hash_contrasena, id_rol, id_area,
+       (nombre, correo, hash_contrasena, debe_cambiar_contrasena, id_rol, id_area,
         puesto, telefono, fecha_ingreso)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, TRUE, ?, ?, ?, ?, ?)`,
       [
         String(nombre || "").trim(),
         email,
-        hashContrasena(contrasena || pass), // Guarda hash, nunca claro.
+        hashContrasena(pass), // Guarda hash, nunca claro.
         id_rol,
         area,
         puesto,
@@ -302,7 +312,7 @@ router.post("/", async (req, res, next) => {
         fecha_ingreso || null,
       ]
     );
-    return res.status(201).json({ id: r.insertId, correo: email, contrasena: pass }); // Devuelve credenciales iniciales.
+    return res.status(201).json({ id: r.insertId, correo: email, contrasena: pass }); // Temporal: se muestra una sola vez.
   } catch (e) {
     if (e && e.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ detail: "Correo ya registrado" });

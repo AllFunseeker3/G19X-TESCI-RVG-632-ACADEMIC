@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre          VARCHAR(120) NOT NULL,
   correo          VARCHAR(150) NOT NULL UNIQUE,
   hash_contrasena VARCHAR(255) NOT NULL,
+  debe_cambiar_contrasena BOOLEAN NOT NULL DEFAULT FALSE, -- CC-01: obliga el cambio al primer ingreso.
   id_rol          INT NOT NULL,
   id_area         INT NOT NULL,
   puesto          VARCHAR(100) NULL,
