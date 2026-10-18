@@ -4,6 +4,26 @@ Sistema de gestión documental legal ("Sistema de Residencias").
 Lee este archivo antes de tocar código. La sesión original está en
 `C:\Users\vave_\Documentos\Sesiones\ProyectoLegal.md`.
 
+## 🛑 REGLAS PERMANENTES DEL USUARIO (2026-10-17) — LEER ANTES QUE NADA
+
+Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el front el
+2026-09-22). Aplican SIEMPRE, a todo agente/modelo que toque este repo:
+
+1. **PROHIBIDO cambiar el diseño establecido.** No tocar `theme.js`, layout, Drawer,
+   AppBar, colores, tipografías, escala, espaciados ni estilos de componentes ya
+   establecidos. Nada de "mejoras" estéticas/visuales sin autorización explícita.
+2. **PROHIBIDO quitar funcionalidades, endpoints, componentes, archivos o código que
+   sirve** sin autorización explícita del usuario. Nada de "limpieza", refactors o
+   reescrituras por iniciativa propia. Detectar código muerto o un bug ≠ borrarlo:
+   **informar y preguntar primero**; el usuario decide.
+3. **No reinventar la rueda.** Lo que ya está hecho y funciona se respeta y se
+   reutiliza; no proponer rehacerlo ni sustituirlo sin que el usuario lo pida.
+4. **Cambios quirúrgicos**: solo lo estrictamente necesario para la tarea pedida,
+   siguiendo los patrones ya existentes en el archivo (mismo estilo, mismos componentes).
+5. **Ante la duda, preguntar.** No asumir. No "aprovechar" para tocar cosas fuera de lo pedido.
+6. **Verificación obligatoria** tras cualquier cambio: `git status` antes (árbol limpio),
+   `npx eslint .` + `npm run build` + probar lo tocado después; `git checkout` para revertir si algo se rompe.
+
 ## Proyecto
 
 - Ruta: `C:\Users\vave_\Escritorio\proyecto_r\proyecto_resi`
