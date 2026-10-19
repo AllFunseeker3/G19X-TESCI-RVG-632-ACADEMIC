@@ -171,6 +171,20 @@ Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional s
 
 ---
 
+## 6. Declaración de uso de Inteligencia Artificial
+
+Como parte de la entrega académica, y atendiendo el criterio de la evaluación (*"si usas IA para programar, decláralo; no se penaliza"*), se declara de forma explícita lo siguiente:
+
+- **¿Se usó IA para programar?** **Sí.** El proyecto se desarrolló con apoyo de herramientas de IA generativa: asistentes de código (GitHub Copilot) y agentes de IA basados en LLM (OpenCode, con modelos tipo Claude, GPT y Qwen) usados como copiloto de desarrollo.
+- **¿Para qué se usó?** Andamiaje y refactor de componentes React/MUI, escritura y depuración de rutas Express (`server/`) y endpoints FastAPI (`ai-service/`), redacción y corrección del esquema SQL (`db/`), generación de documentación (README, PRD, MVP, manuales, actas) y revisión de estilo (`eslint`/`prettier`).
+- **¿Qué no se delegó?** Las decisiones de arquitectura, el modelo de datos, las reglas de negocio (RBAC por área, folios automáticos, versionado de PDF, estados del documento), el diseño de la interfaz y la validación final en vivo las definió y verificó el equipo autor.
+- **Verificación humana obligatoria.** Todo cambio generado con IA fue revisado, probado en vivo (`npx eslint .`, `npm run build`, `npm run db:test`, flujo end-to-end en `:8080`) y corregido por el autor; ningún cambio se aceptó sin pasar esas pruebas.
+- **La IA dentro del producto es una funcionalidad, no una ayuda de programación.** SisLegal integra IA en su operación (redactar, formalizar, corregir y revisar PDFs) a través de `ai-service` (FastAPI + LangChain) y OpenRouter. Eso forma parte del software entregado.
+
+> Se declara con transparencia para que el uso de IA se considere una **herramienta de apoyo** al trabajo del autor, y no un sustituto de su criterio, diseño y validación.
+
+---
+
 ## Apéndice técnico (para revisores)
 
 - **Contratos:** ver `MVP.md §5` (auth, catálogo, documentos, IA redactar/corregir/revisar/pdf, clientes, notificaciones, usuarios).
