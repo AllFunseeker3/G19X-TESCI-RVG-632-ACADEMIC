@@ -23,10 +23,12 @@ import {
     Paper,
     Stack,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
@@ -116,6 +118,14 @@ export default function Ingreso() {
     };
     // ============ AQUÍ TERMINA HANDLER CAMBIO OBLIGATORIO (CC-01) ============
 
+    // ============ AQUÍ EMPIEZA HANDLER VOLVER AL LOGIN (CC-01) ============
+    // Abandona el cambio obligatorio: borra la sesión guardada y vuelve al login.
+    const handleVolverLogin = () => {
+        guardarToken(null); // Quita token + usuario de localStorage.
+        window.location.assign('/Ingreso'); // Recarga limpia en el formulario de acceso.
+    };
+    // ============ AQUÍ TERMINA HANDLER VOLVER AL LOGIN (CC-01) ============
+
     return (
         // ============ AQUÍ EMPIEZA CONTENEDOR INGRESO ============
         <Box
@@ -191,6 +201,21 @@ export default function Ingreso() {
 
                 {/* ============ AQUÍ EMPIEZA FORMULARIO ACCESO ============ */}
                 <Box component="form" onSubmit={cambioPendiente ? handleCambio : handleLogin} sx={{ p: { xs: 4, sm: 6, md: 8 } }}>
+                    {/* ============ AQUÍ EMPIEZA BOTÓN VOLVER AL LOGIN (CC-01) ============ */}
+                    {cambioPendiente && (
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Tooltip title="Volver al inicio de sesión">
+                                <IconButton
+                                    aria-label="Volver al inicio de sesión"
+                                    onClick={handleVolverLogin}
+                                    sx={{ color: 'encabezado.main' }}
+                                >
+                                    <ArrowBackIcon />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    )}
+                    {/* ============ AQUÍ TERMINA BOTÓN VOLVER AL LOGIN (CC-01) ============ */}
                     <Stack spacing={1} sx={{ mb: 4 }}>
                         <Typography variant="overline" color="encabezado.main" fontWeight={700} letterSpacing={1.2}>
                             {cambioPendiente ? 'Primer ingreso' : 'Acceso al sistema'}
@@ -386,7 +411,7 @@ export default function Ingreso() {
                         size="large"
                         type="submit"
                         disabled={cambioPendiente ? guardandoCambio : cargando}
-                        sx={{ py: 1.5, borderRadius: 1.5, fontWeight: 700, textTransform: 'none', boxShadow: 'none' }}
+                        sx={{ py: 1.5, mt: cambioPendiente ? 3 : 0, borderRadius: 1.5, fontWeight: 700, textTransform: 'none', boxShadow: 'none' }}
                     >
                         {cambioPendiente ? (guardandoCambio ? 'Guardando...' : 'Guardar y continuar') : (cargando ? 'Ingresando...' : 'Ingresar')}
                     </Button>
