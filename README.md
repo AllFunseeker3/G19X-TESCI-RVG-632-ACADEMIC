@@ -167,13 +167,13 @@ Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional s
 - **Empresa formadora (residencia, NO despacho usuario):** PluriOne S.A. de C.V. / Develop Talent & Technology — Puebla 46, Roma Norte, CDMX — RFC PLU060407HC9 — 55 1900 3503 | contacto@develop.com.mx.
 - **Responsables académicos (según `Requerimientos.pdf`):** Programas de Estadías / Asesor Externo: Juan Méndez Herrera; Líder de Proyecto / Evaluaciones: Edgar Loeffelmman; Representante Legal: Xochicuahuitl Gleason Juárez.
 - **Desarrollo y repo:** `AllFunseeker3` — https://github.com/AllFunseeker3/G19X-TESCI-RVG-632-ACADEMIC (`main`, HEAD `4ca9312`: Docker + README ejecución + LIM-01).
-- `[PENDIENTE: nombre del residente/autor, matrícula, carrera, periodo de estadías, asesor académico interno — agregar aquí antes de entregar a la escuela.]`
+- `[nombre del residente/autor:Ricardo Velásquez Galicia, matrícula: 213107015 , carrera: Ingenieria en Sistemas Computacionales,  asesor académico interno: Mtra. Teresita Del Niño de Jesús Arriaga Sierra]`
 
 ---
 
 ## 6. Declaración de uso de Inteligencia Artificial
 
-Como parte de la entrega académica, y atendiendo el criterio de la evaluación (*"si usas IA para programar, decláralo; no se penaliza"*), se declara de forma explícita lo siguiente:
+Como parte de la entrega académica, y atendiendo el criterio de la evaluación, se declara de forma explícita lo siguiente:
 
 - **¿Se usó IA para programar?** **Sí.** El proyecto se desarrolló con apoyo de herramientas de IA generativa: asistentes de código (GitHub Copilot) y agentes de IA basados en LLM (OpenCode, con modelos tipo Claude, GPT y Qwen) usados como copiloto de desarrollo.
 - **¿Para qué se usó?** Andamiaje y refactor de componentes React/MUI, escritura y depuración de rutas Express (`server/`) y endpoints FastAPI (`ai-service/`), redacción y corrección del esquema SQL (`db/`), generación de documentación (README, PRD, MVP, manuales, actas) y revisión de estilo (`eslint`/`prettier`).
