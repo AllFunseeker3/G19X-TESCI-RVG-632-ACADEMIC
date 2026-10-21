@@ -54,8 +54,10 @@ export default function Ingreso() {
         return leerToken() && u && u.debe_cambiar_contrasena ? { usuario: u } : null;
     });
     // Campos del formulario + flags de UI (ver contraseña, error, carga).
-    const [correo, setCorreo] = useState('admin@sislegal.mx');
-    const [contrasena, setContrasena] = useState(cambioPendiente ? '' : 'Admin123*');
+    // Sin credenciales precargadas: la demo está documentada en README, pero
+    // el bundle no debe llevar una contraseña de administrador.
+    const [correo, setCorreo] = useState('');
+    const [contrasena, setContrasena] = useState('');
     const [mostrarPassword, setMostrarPassword] = useState(false);
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(false);

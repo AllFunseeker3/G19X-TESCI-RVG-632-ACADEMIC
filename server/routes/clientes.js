@@ -1,19 +1,19 @@
 // ============================================================================
 // ARCHIVO: server/routes/clientes.js
 // FUNCIÓN GENERAL: directorio de clientes (personas/empresas) con verificación.
-//   Todos crean/editan; el alta de no-privilegiados queda pendiente hasta que
-//   un admin/super la verifique (columna verificado).
+//   Solo roles con permiso de cartas pueden ver/gestionar clientes (PII).
+//   El alta de no-privilegiados queda pendiente hasta que un admin/super la verifique.
 // FLUJO DE DATOS:
 //   - ENTRAN: requests autenticados + tabla clientes.
 //   - SALEN: JSON de lista/alta/edición hacia Pages/Clientes.jsx y el
 //     autocomplete de GenerarCarta.jsx.
-// QUÉ MODIFICAR SI hay cambios: endurecer reglas de escritura aquí (el front
-//   solo oculta botones; el back decide).
+// QUÉ MODIFICAR SI hay cambios: endurecer reglas de lectura/escritura aquí
+//   (el front solo oculta botones; el back decide).
 // ============================================================================
 // ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
 const pool = require("../db");
-const { conAuth } = require("../middleware");
+const { conAuth, tienePermiso } = require("../middleware");
 // ============ AQUÍ TERMINA IMPORTS ============
 
 // ============ AQUÍ EMPIEZA ROUTER ============
@@ -22,16 +22,21 @@ router.use(conAuth); // Todas exigen login.
 // ============ AQUÍ TERMINA ROUTER ============
 
 // ============ AQUÍ EMPIEZA HELPERS PERMISOS ============
-// QUÉ HACE: ¿puede `u` escribir en el directorio? Admin/super sí; si no,
-// exige permiso 'crear' en al menos una categoría (quien genera cartas).
+// QUÉ HACE: ¿puede `u` ver clientes (incluye RFC/CURP/domicilio)? Solo
+// admin o roles con permiso de ver cartas; Operativo/Super Operativo no.
+async function puedeVerClientes(u) {
+  if (u.admin) return true;
+  return tienePermiso(u.id_rol, false, "cartas", "ver");
+}
+
+// QUÉ HACE: ¿puede `u` escribir en el directorio? Admin o roles con permiso
+// de crear/modificar cartas (los clientes se usan para redactar cartas).
 async function puedeEscribir(u) {
-  if (u.admin || u.es_super) return true;
-  const [filas] = await pool.query(
-    `SELECT 1 FROM permisos_rol WHERE id_rol = ?
-     AND (puede_crear OR puede_modificar) LIMIT 1`,
-    [u.id_rol]
+  if (u.admin) return true;
+  return (
+    (await tienePermiso(u.id_rol, false, "cartas", "crear")) ||
+    (await tienePermiso(u.id_rol, false, "cartas", "modificar"))
   );
-  return filas.length > 0;
 }
 
 // QUÉ HACE: ¿es privilegiado (su alta nace verificada)? Admin o super.
@@ -44,7 +49,14 @@ function esPrivilegiado(u) {
 // GET /api/clientes?solo_pendientes=0 — activos (verificados primero).
 router.get("/", async (req, res, next) => {
   try {
+    const u = req.usuario;
+    if (!(await puedeVerClientes(u))) {
+      return res.status(403).json({ detail: "Sin permiso para consultar clientes" });
+    }
     const solo = String(req.query.solo_pendientes ?? "0") === "1";
+    if (solo && !esPrivilegiado(u)) {
+      return res.status(403).json({ detail: "Solo admin o super ven pendientes" });
+    }
     let q = `SELECT id_cliente AS id, tipo_cliente, nombre, rfc, curp,
                     domicilio, correo, telefono, verificado, creado_en
              FROM clientes WHERE activo = TRUE`;

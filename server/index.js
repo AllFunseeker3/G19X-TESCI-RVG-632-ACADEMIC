@@ -73,6 +73,14 @@ app.use((err, _req, res, _next) => {
 // ============ AQUÍ TERMINA MANEJADOR DE ERRORES ============
 
 // ============ AQUÍ EMPIEZA ARRANQUE ============
-const PORT = Number(process.env.API_PORT || 8000);
-app.listen(PORT, () => console.log(`SisLegal API en http://localhost:${PORT}`));
+// Solo escucha cuando se ejecuta directo (npm start). Si se importa
+// (pruebas con supertest), exporta la app sin abrir puerto.
+if (require.main === module) {
+  const PORT = Number(process.env.API_PORT || 8000);
+  app.listen(PORT, () => console.log(`SisLegal API en http://localhost:${PORT}`));
+}
 // ============ AQUÍ TERMINA ARRANQUE ============
+
+// ============ AQUÍ EMPIEZA EXPORTS ============
+module.exports = app;
+// ============ AQUÍ TERMINA EXPORTS ============

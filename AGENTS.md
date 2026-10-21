@@ -56,10 +56,12 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 - Scripts: `npm run todo` (API :8000 + web :5173 con concurrently),
   `npm run api` (solo API), `npm run dev` (solo web), `npm run build`, `npx eslint .`
 - Si hay `EADDRINUSE`: `Get-NetTCPConnection -LocalPort 8000,5173 | % { taskkill /PID $_.OwningProcess /T /F }`
-- `server/.env` usa usuario `sislegal`; contraseña SOLO ahí (no versionada; rotada el 30/09/2026 y 18/10/2026; ya no root). JWT 8h.
+- `server/.env` usa usuario `sislegal`; contraseña SOLO ahí (no versionada; rotada el 30/09/2026, 18/10/2026 y 21/10/2026; ya no root). La contraseña de **root local** se rotó el 21/10/2026 en sus 5 cuentas (`localhost`, `127.0.0.1`, `::1`, `ricardo_victus`, `%`) y la del **volumen Docker** (`root@%` y `root@localhost`) también el 21/10/2026 sin borrar el volumen; el valor vive solo en `.env` (ignorado). JWT 8h, rotado también el 21/10/2026.
 - Usuarios de prueba: `admin@sislegal.mx/Admin123*` (admin total).
 - Salud: `GET http://localhost:8000/api/salud` → 11 tipos, 137 campos, 20 permisos, 6 usuarios.
 - Verificación BD sin servidor: `cd server; npm run db:test`
+- Pruebas automáticas de API: `cd server; npm test` (node:test + supertest; 6 casos; limpia sus datos y restaura folios)
+- Seguridad (21/10/2026): `server/.dockerignore` y `ai-service/.dockerignore` evitan secretos en imágenes; Docker publica API/web solo en `127.0.0.1` y la IA solo es interna (`ia:8001`). `GET /api/clientes` exige admin o `cartas.ver`; las descargas de PDF validan `docVisible` o que el archivo lo haya generado el mismo usuario hace ≤10 min; `POST /api/documentos/:id/adjuntos` es solo admin.
 
 ## Datos
 
@@ -79,7 +81,7 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 - El login (`POST /api/auth/login`) **NO devuelve flag `admin`** en `usuario`.
   Para saber si es admin usa `usePermisos()` (`GET /api/usuarios/yo/permisos`).
   No leas `admin` de `localStorage`.
-- Altas de usuarios (CC-01, 18/10): contraseña temporal = parte del correo + 4 aleatorios
+- Altas de usuarios (CC-01, 18/10): contraseña temporal = parte del correo + 8 aleatorios
   (se muestra una sola vez al crear). `debe_cambiar_contrasena` bloquea TODA la API
   (403 `CAMBIO_CONTRASENA_REQUERIDO`) hasta cambiarla con
   `POST /api/auth/cambiar-contrasena { actual, nueva }`; es la única ruta que pasa
@@ -159,6 +161,7 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
   Otros tipos → 400. Modelo saturado → 429 limpio para reintentar.
 - Proxy Express con auth: `POST /api/ia/redactar` (`server/routes/ia.js`,
   `IA_URL` default `http://127.0.0.1:8001`). El front nunca llama directo a la IA.
+  En Docker la IA no publica puerto de host: `api → http://ia:8001`.
 - BD: migración `db/migracion_ia_contenido.sql` (`contenido MEDIUMTEXT`,
   `modelo_ia VARCHAR(120)`); aplicador `server/aplicar-migracion-ia.js`.
   `POST /api/documentos` acepta `contenido` + `modelo_ia` (borrador).
@@ -169,8 +172,10 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 - PDFs: `ai-service/pdf_carta_poder.py` (reportlab, formato institucional:
   lugar/fecha derecha, título centrado subrayado, cuerpo justificado con datos,
   firmas Otorgante/Apoderado + Testigos). `POST /pdf` en ai-service;
-  `POST /api/ia/pdf` (registra adjunto solo-PDF si hay `id_documento`);
-  `GET /api/ia/pdf/:archivo` descarga con login. Carpeta
-  `documentos/Sistema legal/` (ignorada en git, se regenera).
+  `POST /api/ia/pdf` (registra adjunto solo-PDF si hay `id_documento`; exige
+  `docVisible(..., \"modificar\")`); `POST /api/documentos/:id/adjuntos` es solo
+  admin (evita reclamar el PDF de otro documento); `GET /api/ia/pdf/:archivo`
+  exige adjunto visible o PDF reciente del mismo usuario (10 min), no solo login.
+  Carpeta `documentos/Sistema legal/` (ignorada en git, se regenera).
 - Tras cambiar `server/`, reiniciar la API (`npm run todo` de nuevo):
   Node no recarga solo.

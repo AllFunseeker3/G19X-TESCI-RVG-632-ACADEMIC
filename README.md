@@ -6,7 +6,7 @@
 
 - **Qué resuelve:** estandariza 4 categorías + **11 tipos** (cartas, oficios, avisos, notificaciones) en plantillas parametrizadas con **137 campos**, evita errores de destinatarios/fechas, y deja trazabilidad de quién creó, quién dictaminó y qué PDF es el vigente.
 - **Cómo lo hace:** formulario dinámico por secciones (Box) + **IA que redacta, formaliza y corrige** (OpenRouter free, sin Azure por costo) + **PDF institucional** (reportlab) + flujo **En revisión → Aprobado/Rechazado** con motivo + notificaciones + folios automáticos + PDFs versionados.
-- **Estado:** MVP funcional verificado en vivo de 2 formas: local (API `:8000` + web `:5173` + IA `:8001`, MariaDB `sislegal`) y Docker (web `:8080` + API `:8000` + IA `:8001` + DB `:3306`). No es SaaS multiempresa, no tiene SSO/OCR/firma e.firma/CI.
+- **Estado:** MVP funcional verificado en vivo de 2 formas: local (API `:8000` + web `:5173` + IA `:8001`, MariaDB `sislegal`) y Docker (web `:8080` + API `:8000` en `127.0.0.1`, IA interna en la red de compose y DB `:3306`). No es SaaS multiempresa, no tiene SSO/OCR/firma e.firma/CI.
 - **Base académica:** `Requerimientos.pdf` puntos 3–7 + `Tipos de documentos legales.txt`. Las tecnologías del PDF eran recomendación; aquí se documenta el stack real.
 
 ### Alcance en una frase
@@ -44,13 +44,13 @@ Bandeja real, *Creado por*, tab En revisión (=borrador), filtros, Borrar con Di
 Timeline historial + adjuntos + responsable, motivo rojo/verde + *Editar y corregir* (`/Menu?editar=#id`, creador/admin en borrador/rechazado).
 
 ### 2.5 Clientes (`/Clientes`), Usuarios (`/Usuarios`), Inicio, Config
-- Clientes: chips Verificado/Pendiente, tabs Todos/Pendientes, Verificar (admin/super), Persona/CURP vs Empresa/RFC, baja lógica. Alta operativo→pendiente; edición ajena sobre verificada→pendiente.
-- Usuarios: alta Nombre/paterno/materno, email auto ASCII, contraseña temporal (correo sin @ + 4 aleatorios, se muestra al crear) que es obligatorio cambiar en el primer ingreso (la API bloquea hasta cambiarla), selector Legal/Operativo/Administrador + switch super (solo admin). Matriz edita el ROL (afecta a todos), baja lógica + reactivar.
+- Clientes: chips Verificado/Pendiente, tabs Todos/Pendientes, Verificar (admin/super), Persona/CURP vs Empresa/RFC, baja lógica. Solo roles con permiso de cartas ven/gestionan el directorio (Operativo/Super Operativo reciben 403); alta de no-privilegiado→pendiente, edición ajena sobre verificada→pendiente.
+- Usuarios: alta Nombre/paterno/materno, email auto ASCII, contraseña temporal (correo sin @ + 8 aleatorios, se muestra al crear) que es obligatorio cambiar en el primer ingreso (la API bloquea hasta cambiarla), selector Legal/Operativo/Administrador + switch super (solo admin). Matriz edita el ROL (afecta a todos), baja lógica + reactivar.
 - Inicio: KPIs/buscador/dona/actividad reales (sin fijos). Sin Vencimientos.
 - Config: 4 acentos (azul #163172/rojo/verde/blanco) + oscuro, persiste localStorage. Plantillas oculta del menú (ruta `/Plantillas` viva).
 
 ### 2.6 Transversales
-Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`).
+Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`). Pruebas automáticas de API con `node:test` + `supertest` (6 casos: bloqueo CC-01, contraseña actual incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo y descarga PDF autorizada); se ejecutan con `npm test` en `server/`. Descargas PDF e IA validan documento/adjunto visible; Docker publica API/web solo en `127.0.0.1` y no publica la IA.
 
 ---
 
@@ -99,13 +99,13 @@ npm run todo            # API :8000 + web :5173
 python -m uvicorn main:app --host 127.0.0.1 --port 8001  # desde ai-service/
 ```
 
-**Demo:** `/Ingreso` en `http://localhost:5173` → `admin@sislegal.mx / Admin123*`. Son **5 cuentas de prueba** (una por rol: administrador, legal, super legal, operativo y super operativo), precargadas en `maestro.sql` para probar las funciones, permisos y flujo de dictamen del software; **no son usuarios reales** (detalle de las 5 en `MVP.md`).
+**Demo:** `/Ingreso` en `http://localhost:5173` → `admin@sislegal.mx / Admin123*`. Son **5 cuentas de prueba** (una por rol: administrador, legal, super legal, operativo y super operativo), precargadas en `maestro.sql` para probar las funciones, permisos y flujo de dictamen del software; **no son usuarios reales** (detalle de las 5 en `Docs/MVP.md`). El formulario ya **no precarga** estas credenciales: se capturan manualmente y el bundle público no contiene la contraseña de admin.
 
 ### 3.2b Puesta en marcha — Opción B: Docker (recomendada para demo)
 
 **Requisitos:** Docker Desktop Running + key OpenRouter `:free`. No necesitas Node/Python/MariaDB locales (van en contenedores).
 
-**Archivos Docker (ya en el repo):** `docker-compose.yml` (db + ia + api + web), `server/Dockerfile`, `ai-service/Dockerfile`, `Dockerfile.web` + `nginx.conf`, `.dockerignore`, `.env.docker.example`.
+**Archivos Docker (ya en el repo):** `docker-compose.yml` (db + ia + api + web), `server/Dockerfile`, `ai-service/Dockerfile`, `Dockerfile.web` + `nginx.conf`, `.dockerignore` raíz y por servicio (`server/.dockerignore`, `ai-service/.dockerignore`), `.env.docker.example`.
 
 ```powershell
 copy .env.docker.example .env
@@ -116,10 +116,12 @@ docker compose up --build
 ```
 
 **Abre:**
-- Web: `http://localhost:8080` → `admin@sislegal.mx / Admin123*` (cuentas de prueba por rol; detalle en §3.2 **Demo**)
+- Web: `http://localhost:8080` → `admin@sislegal.mx / Admin123*` (cuentas de prueba por rol; detalle en §3.2 **Demo**; formulario sin precarga)
 - API: `http://localhost:8000/api/salud` → `{tipos:11, campos:137, permisos:20, usuarios:5}`
-- IA: `http://localhost:8001/salud` → `{proveedor, modelo, plantillas:11}`
+- IA: **solo red interna de Docker** (`api → http://ia:8001`); ya no se publica en `localhost:8001`.
 - BD: `localhost:3306` (user/pass de tu `.env`, BD `sislegal` con seeds de `maestro.sql`)
+
+> API y web se publican en `127.0.0.1` (solo este equipo). La IA no tiene puerto de host. Si necesitas abrir la demo a la LAN, hazlo de forma consciente y con TLS/credenciales rotadas.
 
 **Comandos:**
 ```powershell
@@ -133,7 +135,7 @@ docker compose up --build web         # rebuild solo web tras cambiar front
 **Notas Docker:**
 - El navegador llama a `VITE_API_URL` (`http://localhost:8000/api`); el `api` habla con la IA por `IA_URL=http://ia:8001` (red interna).
 - PDFs en volumen compartido `pdfs` (`PDF_DIR=/app/pdfs` en api e ia).
-- Si `ports are not available ... 8000`: para tu API local (`Ctrl+C` en `npm run todo`) o la IA `:8001`.
+- Si `ports are not available ... 8000`: para tu API local (`Ctrl+C` en `npm run todo`). La IA de Docker no usa el `8001` del host; solo el uvicorn local lo ocupa.
 - Si `db unhealthy`: `docker inspect sislegal-db-1 --format "{{json .State.Health}}"` (ya corregido a `mariadb-admin`).
 
 ### 3.3 Uso diario por rol (rutas)
@@ -152,22 +154,22 @@ Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional s
 ## 4. Donde los usuarios pueden encontrar ayuda sobre su proyecto
 
 - **Este README:** instalación, uso diario y límites.
-- **En el repo:** `MVP.md` (foto real + cómo probar 10 min + DoD), `PRD_A.md` (genérico técnico), `PRD_BPluri.md` (contexto residencia), `AGENTS.md` (12 reglas UI + RBAC + IA + pendientes), `Archivos sobre el proyecto/*.docx` (propuesta + arquitectura; nota: dicen folio manual pre-FOL-01).
+- **En el repo:** `Docs/MVP.md` (foto real + cómo probar 10 min + DoD), `Docs/PRD_A.md` (genérico técnico), `AGENTS.md` (12 reglas UI + RBAC + IA + pendientes), `Archivos sobre el proyecto/*.docx` (propuesta + arquitectura; nota: dicen folio manual pre-FOL-01).
 - **En la app:** subtítulos y ayudas por campo (`ayuda`), tooltips, alertas de error/success, `EstadoConexion` + botón Reintentar.
 - **Diagnóstico rápido:**
-  - `Servicio IA apagado` → prende `:8001`. `Modelo saturado (429)` → espera o cambia `IA_MODEL`.
+  - `Servicio IA apagado` → prende el uvicorn local `:8001` o revisa `docker compose logs ia`. `Modelo saturado (429)` → espera o cambia `IA_MODEL`.
   - `EADDRINUSE` → `Get-NetTCPConnection -LocalPort 8000,5173 | % { taskkill /PID $_.OwningProcess /T /F }`.
-  - Verificación: `npx eslint .`, `npm run build`, `npm run db:test --prefix server`, `GET /api/salud`.
-- **Soporte:** al ser residencia local, el soporte es el equipo autor (§5) + asesor externo. No hay mesa 24/7. Para bugs abre un issue en GitHub con pasos, folio/ID, captura y logs de `server/` + `ai-service/`.
+  - Verificación: `npx eslint .`, `npm run build`, `npm run db:test --prefix server`, `npm test --prefix server`, `GET /api/salud`.
+- **Soporte:** al ser residencia local, el soporte es el autor (§5) + asesor externo. No hay mesa 24/7. Para bugs abre un issue en GitHub con pasos, folio/ID, captura y logs de `server/` + `ai-service/`.
 
 ---
 
-## 5. Autores del proyecto
+## 5. Autor del proyecto
 
 - **Empresa formadora (residencia, NO despacho usuario):** PluriOne S.A. de C.V. / Develop Talent & Technology — Puebla 46, Roma Norte, CDMX — RFC PLU060407HC9 — 55 1900 3503 | contacto@develop.com.mx.
 - **Responsables académicos (según `Requerimientos.pdf`):** Programas de Estadías / Asesor Externo: Juan Méndez Herrera; Líder de Proyecto / Evaluaciones: Edgar Loeffelmman; Representante Legal: Xochicuahuitl Gleason Juárez.
-- **Desarrollo y repo:** `AllFunseeker3` — https://github.com/AllFunseeker3/G19X-TESCI-RVG-632-ACADEMIC (`main`, HEAD `4ca9312`: Docker + README ejecución + LIM-01).
-- `[nombre del residente/autor:Ricardo Velásquez Galicia, matrícula: 213107015 , carrera: Ingenieria en Sistemas Computacionales,  asesor académico interno: Mtra. Teresita Del Niño de Jesús Arriaga Sierra]`
+- **Desarrollo y repo:** `AllFunseeker3` — https://github.com/AllFunseeker3/G19X-TESCI-RVG-632-ACADEMIC (rama `main`).
+- **Autor:** Ricardo Velásquez Galicia — matrícula 213107015 — Ingeniería en Sistemas Computacionales — asesor académico interno: Mtra. Teresita Del Niño de Jesús Arriaga Sierra.
 
 ---
 
@@ -177,8 +179,8 @@ Como parte de la entrega académica, y atendiendo el criterio de la evaluación,
 
 - **¿Se usó IA para programar?** **Sí.** El proyecto se desarrolló con apoyo de herramientas de IA generativa: asistentes de código (GitHub Copilot) y agentes de IA basados en LLM (OpenCode, con modelos tipo Claude, GPT y Qwen) usados como copiloto de desarrollo.
 - **¿Para qué se usó?** Andamiaje y refactor de componentes React/MUI, escritura y depuración de rutas Express (`server/`) y endpoints FastAPI (`ai-service/`), redacción y corrección del esquema SQL (`db/`), generación de documentación (README, PRD, MVP, manuales, actas) y revisión de estilo (`eslint`/`prettier`).
-- **¿Qué no se delegó?** Las decisiones de arquitectura, el modelo de datos, las reglas de negocio (RBAC por área, folios automáticos, versionado de PDF, estados del documento), el diseño de la interfaz y la validación final en vivo las definió y verificó el equipo autor.
-- **Verificación humana obligatoria.** Todo cambio generado con IA fue revisado, probado en vivo (`npx eslint .`, `npm run build`, `npm run db:test`, flujo end-to-end en `:8080`) y corregido por el autor; ningún cambio se aceptó sin pasar esas pruebas.
+- **¿Qué no se delegó?** Las decisiones de arquitectura, el modelo de datos, las reglas de negocio (RBAC por área, folios automáticos, versionado de PDF, estados del documento), el diseño de la interfaz y la validación final en vivo las definió y verificó el autor.
+- **Verificación humana obligatoria.** Todo cambio generado con IA fue revisado, probado en vivo (`npx eslint .`, `npm run build`, `npm run db:test`, `npm test`, flujo end-to-end en `:8080`) y corregido por el autor; ningún cambio se aceptó sin pasar esas pruebas.
 - **La IA dentro del producto es una funcionalidad, no una ayuda de programación.** SisLegal integra IA en su operación (redactar, formalizar, corregir y revisar PDFs) a través de `ai-service` (FastAPI + LangChain) y OpenRouter. Eso forma parte del software entregado.
 
 > Se declara con transparencia para que el uso de IA se considere una **herramienta de apoyo** al trabajo del autor, y no un sustituto de su criterio, diseño y validación.
@@ -187,7 +189,7 @@ Como parte de la entrega académica, y atendiendo el criterio de la evaluación,
 
 ## Apéndice técnico (para revisores)
 
-- **Contratos:** ver `MVP.md §5` (auth, catálogo, documentos, IA redactar/corregir/revisar/pdf, clientes, notificaciones, usuarios).
+- **Contratos:** ver `Docs/MVP.md §5` (auth, catálogo, documentos, IA redactar/corregir/revisar/pdf, clientes, notificaciones, usuarios).
 - **Modelo:** `db/maestro.sql` 14 tablas (areas, roles, puestos, categorias, permisos_rol, usuarios, clientes, tipos_documento, campos_tipo 137, documentos JSON+contenido+modelo_ia+id_cliente+folio, historial, adjuntos solo-PDF+vigente, notificaciones, folios).
-- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK + Docker verificado 2026-10-14 (4 Up, `db healthy`, `/api/salud` 11/137/20/5, `/salud` IA 11 plantillas, web 200). Docs reales de prueba descritos en sesión interna.
-- **NO hace:** SSO/refresh/2FA, OCR, e.firma, uploads reales anexos, vencimientos, versionado plantillas, CI, Postgres/Azure, tests auto, PWA.
+- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK, `npm test` 6/6 (API: CC-01, 401, clientes 403, rechazo 400, folio consecutivo, PDF autorizado) + Docker 2026-10-21 (api/web en loopback, IA interna, `/api/salud` 200, web 200, login admin 200, imagen API sin `.env`). Docs reales de prueba descritos en sesión interna.
+- **NO hace:** SSO/refresh/2FA, OCR, e.firma, uploads reales anexos, vencimientos, versionado plantillas, CI, Postgres/Azure, PWA.

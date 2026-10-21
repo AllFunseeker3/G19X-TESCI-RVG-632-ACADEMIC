@@ -125,9 +125,11 @@ function MenuInterior({ children }) {
                                 <ListItemText primary="Seguimiento" />
                             </ListItemButton>
 
-                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Clientes">
-                                <ListItemText primary="Clientes" />
-                            </ListItemButton>
+                            {puede('cartas', 'ver') && (
+                                <ListItemButton sx={{ pl: 4 }} component={Link} to="/Clientes">
+                                    <ListItemText primary="Clientes" />
+                                </ListItemButton>
+                            )}
                         </List>
                     </Collapse>
 

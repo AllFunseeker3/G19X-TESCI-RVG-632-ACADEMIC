@@ -49,12 +49,12 @@ function generarCorreo(nombreCompleto) {
 }
 
 // QUÉ HACE: contraseña temporal por usuario: la parte del correo antes de "@"
-// + 4 caracteres aleatorios legibles (sin 0/O/1/l/I). Se muestra una sola vez
+// + 8 caracteres aleatorios legibles (sin 0/O/1/l/I). Se muestra una sola vez
 // al crear (CC-01) y el usuario DEBE cambiarla en su primer ingreso.
 function generarContrasenaTemporal(correo) {
   const letras = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   let sufijo = "";
-  for (let i = 0; i < 4; i++) sufijo += letras[randomInt(0, letras.length)];
+  for (let i = 0; i < 8; i++) sufijo += letras[randomInt(0, letras.length)];
   const base = String(correo || "").split("@")[0] || "usuario";
   return base + sufijo;
 }
@@ -289,7 +289,7 @@ router.post("/", async (req, res, next) => {
       }
       email = emailFinal;
     }
-    // Contraseña temporal por usuario (correo + 4 aleatorios, CC-01); si el
+    // Contraseña temporal por usuario (correo + 8 aleatorios, CC-01); si el
     // admin mandó una manual, se respeta. En ambos casos el primer ingreso
     // obliga a cambiarla (debe_cambiar_contrasena = TRUE).
     const pass = contrasena || generarContrasenaTemporal(email);

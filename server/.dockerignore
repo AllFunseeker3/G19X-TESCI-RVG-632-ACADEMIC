@@ -1,0 +1,10 @@
+# Secretos: nunca meter .env en la imagen (compose los pasa por environment).
+.env
+.env.*
+!.env.example
+
+# Dependencias y artefactos locales (la imagen instala con npm ci).
+node_modules
+test
+*.log
+npm-debug.log*

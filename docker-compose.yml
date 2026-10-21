@@ -32,8 +32,8 @@ services:
       PDF_DIR: /app/pdfs
     volumes:
       - pdfs:/app/pdfs
-    ports:
-      - "8001:8001"
+    # Sin ports: la IA solo es accesible por la red interna de compose
+    # (api -> http://ia:8001). No se expone a la LAN.
     depends_on:
       - db
 
@@ -54,7 +54,7 @@ services:
     volumes:
       - pdfs:/app/pdfs
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -68,7 +68,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - api
 

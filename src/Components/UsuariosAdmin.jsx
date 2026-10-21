@@ -330,7 +330,7 @@ export default function UsuariosAdmin() {
                 <Alert severity="info" sx={{ borderRadius: 2 }}>
                   Se creará con correo <strong>{emailPreview || '…'}</strong>
                   {rolFinal && <> como <strong>{rolFinal.nombre}</strong></>} y
-                  una contraseña temporal (correo + 4 caracteres aleatorios; se muestra una sola vez y se cambia al primer ingreso).
+                  una contraseña temporal (correo + 8 caracteres aleatorios; se muestra una sola vez y se cambia al primer ingreso).
                 </Alert>
 
                 <SeccionFormulario titulo="Rol y asignación" columnas={2}>

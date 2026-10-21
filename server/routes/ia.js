@@ -15,6 +15,7 @@ const path = require("path");
 const fs = require("fs");
 const pool = require("../db");
 const { conAuth } = require("../middleware");
+const { docVisible } = require("./documentos");
 // ============ AQUÍ TERMINA IMPORTS ============
 
 // ============ AQUÍ EMPIEZA ROUTER Y CONFIG ============
@@ -27,6 +28,51 @@ const PDF_DIR =
   process.env.PDF_DIR ||
   path.join(__dirname, "..", "..", "documentos", "Sistema legal");
 // ============ AQUÍ TERMINA ROUTER Y CONFIG ============
+
+// ============ AQUÍ EMPIEZA CONTROL DE PDFS RECIENTES ============
+// El PDF se genera antes de crear/adjuntar el documento. Para que el usuario
+// que lo pidió pueda descargarlo sin abrir la descarga a cualquier sesión,
+// se recuerda (en memoria, 10 min) quién generó cada archivo.
+const PDF_RECIENTE_MS = 10 * 60 * 1000;
+const pdfsRecientes = new Map(); // archivo -> { idUsuario, expira }
+
+function recordarPdf(archivo, idUsuario) {
+  const nombre = String(archivo || "");
+  if (!nombre) return;
+  for (const [k, v] of pdfsRecientes) {
+    if (v.expira < Date.now()) pdfsRecientes.delete(k);
+  }
+  pdfsRecientes.set(nombre, { idUsuario, expira: Date.now() + PDF_RECIENTE_MS });
+}
+
+function pdfRecienteDe(archivo, idUsuario) {
+  const datos = pdfsRecientes.get(archivo);
+  if (!datos) return false;
+  if (datos.expira < Date.now()) {
+    pdfsRecientes.delete(archivo);
+    return false;
+  }
+  return datos.idUsuario === idUsuario;
+}
+
+// QUÉ HACE: autoriza la descarga si el archivo está adjunto a un documento
+// visible para el usuario (misma regla de área/permiso que /api/documentos).
+async function puedeVerPdfAdjunto(archivo, usuario) {
+  const [filas] = await pool.query(
+    "SELECT id_documento FROM adjuntos WHERE nombre_archivo = ? ORDER BY id_adjunto DESC",
+    [archivo]
+  );
+  for (const f of filas) {
+    try {
+      await docVisible(f.id_documento, usuario, "ver");
+      return true;
+    } catch (e) {
+      if (e.status !== 403 && e.status !== 404) throw e; // 403/404: prueba otro adjunto.
+    }
+  }
+  return false;
+}
+// ============ AQUÍ TERMINA CONTROL DE PDFS RECIENTES ============
 
 // ============ AQUÍ EMPIEZA HELPER ENRIQUECER DESTINATARIO ============
 // QUÉ HACE: si carta-poder viene sin destinatario pero con cliente vinculado,
@@ -113,6 +159,16 @@ router.post("/pdf", async (req, res, next) => {
     if (!id_tipo || typeof datos !== "object") {
       return res.status(400).json({ detail: "Faltan id_tipo y datos" });
     }
+    // IDOR: si el PDF se va a adjuntar, primero se valida que el documento
+    // exista y que el usuario tenga permiso de modificarlo.
+    let idDoc = null;
+    if (id_documento !== null && id_documento !== undefined && id_documento !== "") {
+      idDoc = Number(id_documento);
+      if (!Number.isInteger(idDoc) || idDoc <= 0) {
+        return res.status(400).json({ detail: "id_documento inválido" });
+      }
+      await docVisible(idDoc, req.usuario, "modificar");
+    }
     const datosFinal = await enriquecerDestinatario(id_tipo, datos);
     let r;
     try {
@@ -126,18 +182,19 @@ router.post("/pdf", async (req, res, next) => {
     }
     const cuerpo = await r.json().catch(() => ({}));
     if (!r.ok) return res.status(r.status).json(cuerpo); // Propaga error de la IA.
+    recordarPdf(cuerpo.archivo, req.usuario.id);
     let idAdjunto = null;
-    if (id_documento) {
+    if (idDoc) {
       // ADJ-01 versionado: anteriores a histórico + nuevo como vigente, en transacción.
       const connex = await pool.getConnection();
       try {
         await connex.beginTransaction();
-        await connex.query("UPDATE adjuntos SET vigente = FALSE WHERE id_documento = ?", [id_documento]);
+        await connex.query("UPDATE adjuntos SET vigente = FALSE WHERE id_documento = ?", [idDoc]);
         const [ins] = await connex.query(
           `INSERT INTO adjuntos
            (id_documento, nombre_archivo, tipo_mime, tamano_bytes, ruta, vigente, id_subido_por)
            VALUES (?, ?, 'application/pdf', ?, ?, TRUE, ?)`,
-          [id_documento, cuerpo.archivo, cuerpo.bytes ?? null, cuerpo.ruta, req.usuario.id] // ?? tolera falta de bytes.
+          [idDoc, cuerpo.archivo, cuerpo.bytes ?? null, cuerpo.ruta, req.usuario.id] // ?? tolera falta de bytes.
         );
         await connex.commit();
         idAdjunto = ins.insertId;
@@ -200,6 +257,14 @@ router.get("/pdf/:archivo", async (req, res, next) => {
     const nombre = path.basename(String(req.params.archivo || "")); // Evita path traversal.
     if (!/^[\w][\w\-.]*\.pdf$/i.test(nombre)) {
       return res.status(400).json({ detail: "Nombre de archivo inválido" });
+    }
+    // Autorización: adjunto de un documento visible o PDF generado por este
+    // mismo usuario en los últimos 10 min. Nunca basta con estar autenticado.
+    const autorizado =
+      (await puedeVerPdfAdjunto(nombre, req.usuario)) ||
+      pdfRecienteDe(nombre, req.usuario.id);
+    if (!autorizado) {
+      return res.status(404).json({ detail: "PDF inexistente" });
     }
     const ruta = path.join(PDF_DIR, nombre);
     if (!fs.existsSync(ruta)) {

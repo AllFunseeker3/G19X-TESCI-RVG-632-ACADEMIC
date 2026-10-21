@@ -1,0 +1,7 @@
+# Secretos y artefactos locales (la imagen copia solo main.py/pdf_carta_poder.py).
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+*.log

@@ -368,17 +368,34 @@ router.patch("/:id/estado", async (req, res, next) => {
 
 // ============ AQUÍ EMPIEZA RUTA POST ADJUNTO ============
 // POST /api/documentos/:id/adjuntos — ficha de un PDF ya almacenado.
+// Solo admin: el flujo normal registra el adjunto desde /api/ia/pdf, que ya
+// validó el documento. Evita que un usuario "reclame" el PDF de otro documento.
 router.post("/:id/adjuntos", async (req, res, next) => {
   try {
-    const { nombre_archivo, tipo_mime = "application/pdf", tamano_bytes = null, ruta } = req.body || {};
+    if (!req.usuario.admin) {
+      return res.status(403).json({ detail: "Solo admin registra adjuntos externos" });
+    }
+    const { nombre_archivo, tipo_mime = "application/pdf", tamano_bytes = null } = req.body || {};
+    const nombre = path.basename(String(nombre_archivo || ""));
+    if (!/^[\w][\w\-.]*\.pdf$/i.test(nombre)) {
+      return res.status(400).json({ detail: "Nombre de archivo inválido" });
+    }
     const d = await docVisible(Number(req.params.id), req.usuario, "modificar");
     if (tipo_mime !== "application/pdf")
       return res.status(400).json({ detail: "Solo se aceptan PDF" }); // CHECK solo-PDF.
+    const rutaFinal = path.join(PDF_DIR, nombre);
+    if (!fs.existsSync(rutaFinal)) {
+      return res.status(404).json({ detail: "PDF inexistente" });
+    }
+    const tieneTamano = tamano_bytes !== null && tamano_bytes !== undefined && tamano_bytes !== "";
+    const tamano = tieneTamano && Number.isFinite(Number(tamano_bytes))
+      ? Number(tamano_bytes)
+      : fs.statSync(rutaFinal).size;
     const [r] = await pool.query(
       `INSERT INTO adjuntos
        (id_documento, nombre_archivo, tipo_mime, tamano_bytes, ruta, id_subido_por)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [d.id_documento, nombre_archivo, tipo_mime, tamano_bytes, ruta, req.usuario.id]
+      [d.id_documento, nombre, tipo_mime, tamano, rutaFinal, req.usuario.id]
     );
     return res.status(201).json({ id: r.insertId });
   } catch (e) {
@@ -477,4 +494,7 @@ router.delete("/:id", async (req, res, next) => {
 
 // ============ AQUÍ EMPIEZA EXPORTS ============
 module.exports = router;
+// Reutilizado por routes/ia.js para validar que el PDF pertenezca a un documento
+// visible antes de registrar adjuntos o permitir la descarga.
+module.exports.docVisible = docVisible;
 // ============ AQUÍ TERMINA EXPORTS ============
