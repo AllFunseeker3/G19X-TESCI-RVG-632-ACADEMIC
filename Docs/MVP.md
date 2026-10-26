@@ -35,8 +35,9 @@
 9. **Inicio/Config (Plantillas oculta):** KPIs/buscador/dona/actividad reales, Config con 4 acentos + oscuro. Plantillas oculta del drawer (ruta `/Plantillas` viva); el flujo oficial es `/Menu` directo.
 10. **Persistencia real:** MariaDB `sislegal` 14 tablas (`maestro.sql` fuente de verdad), `documentos/Sistema legal/*.pdf`, historial. Sin `documentosDemo.js`, sin cifras fijas.
 11. **Folios auto FOL-01 + PDFs versionados ADJ-01 + BD con `sislegal`:** folio `PREFIJO-AAAA-NNN` atómico si no viene (manual se respeta; respuesta lo incluye y el front lo muestra); `adjuntos.vigente` con badge Actual/Versión anterior y DELETE que borra físicos; conexión rotada de root a `sislegal` el 30/09; contraseña de root local rotada el 21/10/2026 (5 cuentas).
-12. **Docker (14/10, seguridad 21/10):** `docker-compose.yml` (db MariaDB 11 + ia + api + web nginx `:8080`), Dockerfiles por servicio, `.env.docker.example` sin secretos, CORS por env, healthcheck `mariadb-admin`. Verificado: 4 Up, db healthy, `/api/salud` 11/137/20/5, IA 11 plantillas, web 200. API/web publicados solo en `127.0.0.1`; IA sin puerto de host (solo red interna); `server/.dockerignore` y `ai-service/.dockerignore` evitan secretos en imágenes.
-13. **Limpieza LIM-01 (14/10):** DROP `auditoria` (sin uso) + DROP `clientes.contacto` (fuera del form); 15→14 tablas; `db/sislegal_schema.sql` borrado (duplicado de `maestro.sql`); migraciones NO fusionadas (trail de upgrade).
+12. **Docker (14/10, seguridad 21/10 y 26/10):** `docker-compose.yml` (db MariaDB 11 + ia + api + web nginx `:8080`), Dockerfiles por servicio, `.env.docker.example` sin secretos, CORS por env, healthcheck `mariadb-admin`. Verificado: 4 Up, db healthy, `/api/salud` 11/137/20/5, IA 11 plantillas, web 200. API, web y BD publicados solo en `127.0.0.1` (`db` con `127.0.0.1:${DB_PORT:-3306}:3306`); IA sin puerto de host (solo red interna); `server/.dockerignore` y `ai-service/.dockerignore` evitan secretos en imágenes.
+13. **Pruebas aisladas (26/10):** `npm test` usa `sislegal_test` vía `server/.env.test` (ignorado; plantilla `.env.test.example`) y aborta si `DB_NAME` no termina en `_test`; `npm run db:test:prep` recrea la base desde `maestro.sql` con guardas para no tocar `sislegal`.
+14. **Limpieza LIM-01 (14/10):** DROP `auditoria` (sin uso) + DROP `clientes.contacto` (fuera del form); 15→14 tablas; `db/sislegal_schema.sql` borrado (duplicado de `maestro.sql`); migraciones NO fusionadas (trail de upgrade).
 
 ---
 
@@ -95,10 +96,10 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 - [x] KPIs/dona sin fijos
 - [x] Login/logout + rutas protegidas
 - [x] `npm run build` OK (warning chunk preexistente), `npx eslint .` limpio, `node --check` OK, `py_compile` OK, `db:test` OK (MariaDB 12.3.3, 11/137/20)
-- [x] 6 pruebas automáticas de API con `node:test` + `supertest` (`npm test` en `server/`): bloqueo CC-01 (403), contraseña actual incorrecta (401), clientes sin `cartas.ver` (403), rechazo sin comentario (400), folio consecutivo y descarga PDF solo si el adjunto es visible
+- [x] 8 pruebas automáticas de API con `node:test` + `supertest` (`npm test` en `server/`, contra `sislegal_test`): bloqueo CC-01 (403), contraseña actual incorrecta (401), clientes sin `cartas.ver` (403), rechazo sin comentario (400), folio consecutivo, descarga PDF solo si el adjunto es visible, flujo crear→corregir→aprobar y Super que no puede crear otro Super
 - [x] 1280px y 390px sin traslapes (labels fijos, escala 87.5%)
 - [x] README con 5 puntos + ejecución local y Docker + credenciales demo (14/10); formulario sin precarga (21/10)
-- [x] Docker: 4 Up, db healthy, `/api/salud` 11/137/20/5, IA interna 11 plantillas, web 200; API/web en loopback (21/10)
+- [x] Docker: 4 Up, db healthy, `/api/salud` 11/137/20/5, IA interna 11 plantillas, web 200 (21/10); API/web/BD en loopback y binding de BD verificado el 26/10
 - [x] LIM-01: 14 tablas, CRUD clientes sin `contacto` OK (14/10)
 - [ ] Manual usuario + acta capacitación + informe cierre `[PENDIENTE USUARIO: fechas y asistentes]`
 
@@ -107,7 +108,7 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 ## 7. Cómo probar (10 min)
 
 **A. Local:** `npm run todo` (API :8000 + web :5173) + aparte IA (`cd ai-service; python -m uvicorn main:app --host 127.0.0.1 --port 8001`).
-**B. Docker:** `docker compose up` → web `http://127.0.0.1:8080`, API `http://127.0.0.1:8000`; IA interna (`api → ia:8001`, sin puerto de host).
+**B. Docker:** `docker compose up` → web `http://127.0.0.1:8080`, API `http://127.0.0.1:8000`, BD `127.0.0.1:3306`; IA interna (`api → ia:8001`, sin puerto de host).
 
 1. `/Ingreso` → `admin@sislegal.mx / Admin123*`.
 2. `/Menu` → categoría Cartas + Carta Poder → verifica formulario.

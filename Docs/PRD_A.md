@@ -51,7 +51,7 @@ Roles académicos y roles del software van separados (ver §7). Ningún asesor a
 | Azure OpenAI Service | NO. Sustituido por OpenRouter/Google free por costo |
 | Azure AI Document Intelligence | NO. No hay OCR. Solo reportlab genera PDF |
 | PostgreSQL | NO. Es MariaDB/MySQL |
-| Docker | SÍ (14/10/2026; endurecido 21/10/2026). `docker-compose.yml` (db MariaDB 11 + ia + api + web nginx `:8080`), Dockerfiles por servicio, `.env.docker.example` sin secretos, verificado 4 Up. API/web solo `127.0.0.1`; IA sin puerto de host |
+| Docker | SÍ (14/10/2026; endurecido 21/10/2026 y 26/10/2026). `docker-compose.yml` (db MariaDB 11 + ia + api + web nginx `:8080`), Dockerfiles por servicio, `.env.docker.example` sin secretos, verificado 4 Up. API/web/BD solo `127.0.0.1`; IA sin puerto de host |
 | GitHub Actions | NO. Sin CI. Verificación manual `npm run build` + `npx eslint .` |
 | Microsoft Entra ID | NO. Auth propia JWT en localStorage, sin SSO |
 | Scrum | Solo documental, sin ceremonias formales |
@@ -80,7 +80,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 1. Analizar los procesos documentales — HECHO (catálogo 11 tipos fijado).
 2. Diseñar la arquitectura tecnológica — HECHO (Express+MariaDB+React+FastAPI-IA, documentada en §8).
 3. Implementar automatización y validación jurídica — HECHO parcial (automatización + validación formal + formalización IA; validación jurídica de fondo sigue siendo humana).
-4. Validar la calidad de los documentos — HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 6 casos de API con node:test/supertest; validación jurídica de fondo sigue siendo humana).
+4. Validar la calidad de los documentos — HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 8 casos de API con node:test/supertest sobre `sislegal_test`; validación jurídica de fondo sigue siendo humana).
 5. Elaborar documentación técnica y plan de soporte — PARCIAL (este PRD + `AGENTS.md` + comentarios en código; falta manual de usuario final y plan multinivel formal).
 ---
 
@@ -207,7 +207,7 @@ Estados canónicos BD: `borrador` (UI "En revisión"), `por_revisar`, `aprobado`
         +-- GET /api/ia/pdf/:archivo <--- [documentos/Sistema legal/*.pdf]
 ```
 
-Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API solo `127.0.0.1` (`:8080`/`:8000`), IA sin puerto de host (`api → ia:8001`), BD `:3306` (pendiente endurecer). Reiniciar los 3 tras cambios en `server/routes` o `ai-service` (en Docker: `docker compose up --build api` / `ia` / `web`). EADDRINUSE local: matar árbol `taskkill /PID /T /F`.
+Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` (`:8080`/`:8000`/`:3306`), IA sin puerto de host (`api → ia:8001`). Reiniciar los 3 tras cambios en `server/routes` o `ai-service` (en Docker: `docker compose up --build api` / `ia` / `web`). EADDRINUSE local: matar árbol `taskkill /PID /T /F`.
 
 ---
 
@@ -256,7 +256,7 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API solo `127.0.0.1` (`:
 3. Arquitectura — componentes/APIs — Entregable arquitectura — HECHO
 4. Planificación — backlog/cronograma — Entregable plan — HECHO
 5. Desarrollo — generación/validación/versiones/aprobación — Entregable sistema — HECHO
-6. Pruebas — funcional/integración/documental — Entregable QA — HECHO (6 casos de API automatizados + QA manual y evidencias)
+6. Pruebas — funcional/integración/documental — Entregable QA — HECHO (8 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
 7. Documentación — manuales — Entregable manual — PARCIAL
 8. Mantenimiento — soporte/plantillas — Entregable plan — PENDIENTE
 9. Capacitación — admin/usuarios — Entregable acta — PENDIENTE
@@ -271,5 +271,5 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API solo `127.0.0.1` (`:
 **Aceptación global:**
 - Crear los 11 tipos de punta a punta y verlos en Revisión/Seguimiento tras recargar.
 - Rechazo sin comentario bloqueado (400). Borrado con Dialog propio.
-- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 6/6.
+- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 8/8 contra `sislegal_test`.
 - Trazabilidad por folio + historial + notificaciones verificables.

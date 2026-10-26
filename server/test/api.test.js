@@ -1,12 +1,12 @@
 // ============================================================================
 // ARCHIVO: server/test/api.test.js
 // FUNCIÓN GENERAL: pruebas automáticas de la API (node:test + supertest).
-//   Cubre 6 reglas críticas del back: bloqueo CC-01, contraseña actual
-//   incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo
-//   y descarga de PDF solo para adjuntos visibles.
+//   Cubre 8 reglas críticas del back: bloqueo CC-01, contraseña actual
+//   incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo,
+//   PDF visible, flujo crear→corregir→aprobar y Super no crea Supers.
 // FLUJO DE DATOS:
-//   - ENTRAN: app Express (sin abrir puerto), MariaDB de server/.env y los
-//     5 usuarios base documentados en README (cuentas de prueba por rol).
+//   - ENTRAN: app Express (sin abrir puerto), MariaDB de server/.env.test
+//     (BD aislada `sislegal_test`) y los 5 usuarios base de maestro.sql.
 //   - SALEN: resultados TAP de node:test; los datos temporales se borran y
 //     el contador de folios se restaura al terminar.
 // QUÉ MODIFICAR SI hay cambios: agregar casos con test(); si cambian las
@@ -17,6 +17,13 @@ const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
+// Carga la configuración de pruebas ANTES de index/db. El guard de abajo evita
+// que un .env.test mal configurado borre folios de la BD de trabajo.
+require("dotenv").config({ path: path.join(__dirname, "..", ".env.test") });
+if (!process.env.DB_NAME) process.env.DB_NAME = "sislegal_test";
+if (!/_test$/.test(process.env.DB_NAME)) {
+  throw new Error("Las pruebas deben usar una BD *_test (ej. sislegal_test)");
+}
 const request = require("supertest");
 const app = require("../index");
 const pool = require("../db");
@@ -26,14 +33,16 @@ const pool = require("../db");
 // Cuentas demo documentadas en README §3.2.
 const ADMIN = { correo: "admin@sislegal.mx", contrasena: "Admin123*" };
 const LEGAL = { correo: "legal@sislegal.mx", contrasena: "Legal123*" };
+const SUPERLEGAL = { correo: "superlegal@sislegal.mx", contrasena: "SuperLegal123*" };
 const OPERATIVO = { correo: "operativo@sislegal.mx", contrasena: "Operativo123*" };
 const PDF_DIR = path.join(__dirname, "..", "..", "documentos", "Sistema legal");
 
 let adminToken = null; // Token Bearer del admin para los casos.
 let legalToken = null; // Token de Legal (puede ver cartas de su área).
+let superLegalToken = null; // Token de Super Legal (gestiona su área).
 let operativoToken = null; // Token del rol sin permiso de cartas/clientes.
 let usuarioTemporalId = null; // Usuario creado en el caso 1 (se borra al final).
-const documentosCreados = []; // IDs creados en los casos 4, 5 y 6.
+const documentosCreados = []; // IDs creados en los casos 4, 5, 6 y 7.
 let foliosPrevios = []; // Foto de la tabla folios antes de las pruebas.
 // ============ AQUÍ TERMINA CONSTANTES Y ESTADO ============
 
@@ -55,6 +64,7 @@ function bearer(token) {
 before(async () => {
   adminToken = await login(ADMIN.correo, ADMIN.contrasena);
   legalToken = await login(LEGAL.correo, LEGAL.contrasena);
+  superLegalToken = await login(SUPERLEGAL.correo, SUPERLEGAL.contrasena);
   operativoToken = await login(OPERATIVO.correo, OPERATIVO.contrasena);
   const [filas] = await pool.query(
     "SELECT id_tipo, anio, ultimo_numero FROM folios ORDER BY id_tipo, anio"
@@ -217,6 +227,71 @@ test("PDF: solo se descarga si el adjunto es visible", async () => {
 });
 // ============ AQUÍ TERMINA CASO 6 ============
 
+// ============ AQUÍ EMPIEZA CASO 7: FLUJO PRINCIPAL ============
+// Crear como Legal, corregir datos (vuelve a borrador) y aprobar como admin.
+test("Flujo principal: crear → corregir → aprobar", async () => {
+  const alta = await request(app)
+    .post("/api/documentos")
+    .set(bearer(legalToken))
+    .send({ id_tipo: "carta-poder", datos: { nombre: "Original" } });
+  assert.equal(alta.status, 201, JSON.stringify(alta.body));
+  documentosCreados.push(alta.body.id);
+
+  const correccion = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/datos`)
+    .set(bearer(legalToken))
+    .send({ datos: { nombre: "Corregido" }, contenido: "Texto corregido" });
+  assert.equal(correccion.status, 200, JSON.stringify(correccion.body));
+  assert.equal(correccion.body.estado, "borrador");
+
+  const revision = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "por_revisar" });
+  assert.equal(revision.status, 200, JSON.stringify(revision.body));
+
+  const aprobado = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "aprobado", comentario: "Aprobado en prueba" });
+  assert.equal(aprobado.status, 200, JSON.stringify(aprobado.body));
+  assert.equal(aprobado.body.estado, "aprobado");
+
+  const detalle = await request(app)
+    .get(`/api/documentos/${alta.body.id}`)
+    .set(bearer(legalToken));
+  assert.equal(detalle.status, 200);
+  assert.equal(detalle.body.estado, "aprobado");
+  assert.equal(detalle.body.datos.nombre, "Corregido");
+});
+// ============ AQUÍ TERMINA CASO 7 ============
+
+// ============ AQUÍ EMPIEZA CASO 8: SUPER NO CREA SUPER ============
+// Un Super Legal puede gestionar su área, pero no puede crear otro Super.
+test("Superusuario no puede crear otro Superusuario", async () => {
+  const roles = await request(app)
+    .get("/api/usuarios/roles")
+    .set(bearer(adminToken));
+  assert.equal(roles.status, 200);
+  const rolSuper = roles.body.find((r) => r.nombre === "Superusuario Legal");
+  assert.ok(rolSuper, "No se encontró el rol Superusuario Legal");
+
+  const intento = await request(app)
+    .post("/api/usuarios")
+    .set(bearer(superLegalToken))
+    .send({ nombre: "Super Intruso", id_rol: rolSuper.id, id_area: 2 });
+  try {
+    assert.equal(intento.status, 403, JSON.stringify(intento.body));
+    assert.match(intento.body.detail, /super/i);
+  } finally {
+    // Si el bug permitiera crearlo, no dejar basura en la BD de pruebas.
+    if (intento.body?.id) {
+      await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [intento.body.id]);
+    }
+  }
+});
+// ============ AQUÍ TERMINA CASO 8 ============
+
 // ============ AQUÍ EMPIEZA LIMPIEZA ============
 // Deja la BD como estaba: sin documentos/avisos temporales, sin el usuario
 // de prueba y con el contador de folios en su valor previo.
@@ -230,7 +305,7 @@ after(async () => {
     if (usuarioTemporalId) {
       await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [usuarioTemporalId]);
     }
-    // Restaura la tabla folios completa (los casos 4, 5 y 6 consumieron números).
+    // Restaura la tabla folios completa (los casos 4, 5, 6 y 7 consumieron números).
     await pool.query("DELETE FROM folios");
     if (foliosPrevios.length) {
       await pool.query(

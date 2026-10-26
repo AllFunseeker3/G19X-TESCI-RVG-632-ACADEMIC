@@ -17,6 +17,7 @@ documentos/
 
 # Secretos y entorno local (nunca subir credenciales)
 .env
+server/.env.test
 backend/venv/
 __pycache__/
 

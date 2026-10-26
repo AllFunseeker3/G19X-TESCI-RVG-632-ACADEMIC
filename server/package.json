@@ -8,6 +8,7 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "db:test": "node test-conexion.js",
+    "db:test:prep": "node test/preparar-bd-test.js",
     "test": "node --test --test-concurrency=1 test/api.test.js"
   },
   "dependencies": {

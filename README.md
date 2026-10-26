@@ -6,7 +6,7 @@
 
 - **Qué resuelve:** estandariza 4 categorías + **11 tipos** (cartas, oficios, avisos, notificaciones) en plantillas parametrizadas con **137 campos**, evita errores de destinatarios/fechas, y deja trazabilidad de quién creó, quién dictaminó y qué PDF es el vigente.
 - **Cómo lo hace:** formulario dinámico por secciones (Box) + **IA que redacta, formaliza y corrige** (OpenRouter free, sin Azure por costo) + **PDF institucional** (reportlab) + flujo **En revisión → Aprobado/Rechazado** con motivo + notificaciones + folios automáticos + PDFs versionados.
-- **Estado:** MVP funcional verificado en vivo de 2 formas: local (API `:8000` + web `:5173` + IA `:8001`, MariaDB `sislegal`) y Docker (web `:8080` + API `:8000` en `127.0.0.1`, IA interna en la red de compose y DB `:3306`). No es SaaS multiempresa, no tiene SSO/OCR/firma e.firma/CI.
+- **Estado:** MVP funcional verificado en vivo de 2 formas: local (API `:8000` + web `:5173` + IA `:8001`, MariaDB `sislegal`) y Docker (web `:8080` + API `:8000` + DB `:3306`, los tres en `127.0.0.1`, IA interna en la red de compose). No es SaaS multiempresa, no tiene SSO/OCR/firma e.firma/CI.
 - **Base académica:** `Requerimientos.pdf` puntos 3–7 + `Tipos de documentos legales.txt`. Las tecnologías del PDF eran recomendación; aquí se documenta el stack real.
 
 ### Alcance en una frase
@@ -50,7 +50,7 @@ Timeline historial + adjuntos + responsable, motivo rojo/verde + *Editar y corre
 - Config: 4 acentos (azul #163172/rojo/verde/blanco) + oscuro, persiste localStorage. Plantillas oculta del menú (ruta `/Plantillas` viva).
 
 ### 2.6 Transversales
-Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`). Pruebas automáticas de API con `node:test` + `supertest` (6 casos: bloqueo CC-01, contraseña actual incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo y descarga PDF autorizada); se ejecutan con `npm test` en `server/`. Descargas PDF e IA validan documento/adjunto visible; Docker publica API/web solo en `127.0.0.1` y no publica la IA.
+Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`). Pruebas automáticas de API con `node:test` + `supertest` (8 casos: bloqueo CC-01, contraseña actual incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo, descarga PDF autorizada, flujo crear→corregir→aprobar y Super que no crea Supers); se ejecutan con `npm test` en `server/` contra una BD aislada `sislegal_test`. Descargas PDF e IA validan documento/adjunto visible; Docker publica API, web y BD solo en `127.0.0.1` y no publica la IA.
 
 ---
 
@@ -93,6 +93,17 @@ IA_PRE_FORMALIZAR=1
 
 **BD:** `db/maestro.sql` es la fuente de verdad (14 tablas + seeds). Instalación nueva: `mysql -u root -p < db/maestro.sql`. BD vieja (pre-LIM-01): aplica `db/migracion_limpieza_01.sql` (quita `auditoria` + `clientes.contacto`). Luego `npm run db:test --prefix server`.
 
+**BD de pruebas (separada de la de trabajo):** `npm test` **no** usa `sislegal`; usa `sislegal_test` y se niega a correr si `DB_NAME` no termina en `_test`. Preparación una sola vez:
+
+```bash
+copy server\.env.test.example server\.env.test   # ignorado por git
+notepad server\.env.test                         # DB_PASSWORD + DB_ADMIN_PASSWORD
+npm run db:test:prep --prefix server             # recrea sislegal_test desde maestro.sql
+npm test --prefix server                         # 8/8 contra sislegal_test
+```
+
+`db:test:prep` borra **solo** bases `*_test`; el usuario de la app (`DB_USER`) recibe permisos sobre `sislegal_test`. `DB_ADMIN_*` (root) se usa únicamente para recrear la base y vive solo en `.env.test`. `npm run db:test` sigue siendo la verificación de solo lectura de la BD de trabajo.
+
 **Arranque:**
 ```bash
 npm run todo            # API :8000 + web :5173
@@ -117,11 +128,11 @@ docker compose up --build
 
 **Abre:**
 - Web: `http://localhost:8080` → `admin@sislegal.mx / Admin123*` (cuentas de prueba por rol; detalle en §3.2 **Demo**; formulario sin precarga)
-- API: `http://localhost:8000/api/salud` → `{tipos:11, campos:137, permisos:20, usuarios:5}`
+- API: `http://localhost:8000/api/salud` → con `maestro.sql` limpio `{tipos:11, campos:137, permisos:20, usuarios:5}`
 - IA: **solo red interna de Docker** (`api → http://ia:8001`); ya no se publica en `localhost:8001`.
-- BD: `localhost:3306` (user/pass de tu `.env`, BD `sislegal` con seeds de `maestro.sql`)
+- BD: `127.0.0.1:3306` (solo este equipo; user/pass de tu `.env`, BD `sislegal` con seeds de `maestro.sql`)
 
-> API y web se publican en `127.0.0.1` (solo este equipo). La IA no tiene puerto de host. Si necesitas abrir la demo a la LAN, hazlo de forma consciente y con TLS/credenciales rotadas.
+> API, web y BD se publican en `127.0.0.1` (solo este equipo). La IA no tiene puerto de host. Si necesitas abrir la demo a la LAN, hazlo de forma consciente y con TLS/credenciales rotadas.
 
 **Comandos:**
 ```powershell
@@ -159,7 +170,7 @@ Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional s
 - **Diagnóstico rápido:**
   - `Servicio IA apagado` → prende el uvicorn local `:8001` o revisa `docker compose logs ia`. `Modelo saturado (429)` → espera o cambia `IA_MODEL`.
   - `EADDRINUSE` → `Get-NetTCPConnection -LocalPort 8000,5173 | % { taskkill /PID $_.OwningProcess /T /F }`.
-  - Verificación: `npx eslint .`, `npm run build`, `npm run db:test --prefix server`, `npm test --prefix server`, `GET /api/salud`.
+  - Verificación: `npx eslint .`, `npm run build`, `npm run db:test --prefix server`, `npm run db:test:prep --prefix server`, `npm test --prefix server`, `GET /api/salud`.
 - **Soporte:** al ser residencia local, el soporte es el autor (§5) + asesor externo. No hay mesa 24/7. Para bugs abre un issue en GitHub con pasos, folio/ID, captura y logs de `server/` + `ai-service/`.
 
 ---
@@ -191,5 +202,5 @@ Como parte de la entrega académica, y atendiendo el criterio de la evaluación,
 
 - **Contratos:** ver `Docs/MVP.md §5` (auth, catálogo, documentos, IA redactar/corregir/revisar/pdf, clientes, notificaciones, usuarios).
 - **Modelo:** `db/maestro.sql` 14 tablas (areas, roles, puestos, categorias, permisos_rol, usuarios, clientes, tipos_documento, campos_tipo 137, documentos JSON+contenido+modelo_ia+id_cliente+folio, historial, adjuntos solo-PDF+vigente, notificaciones, folios).
-- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK, `npm test` 6/6 (API: CC-01, 401, clientes 403, rechazo 400, folio consecutivo, PDF autorizado) + Docker 2026-10-21 (api/web en loopback, IA interna, `/api/salud` 200, web 200, login admin 200, imagen API sin `.env`). Docs reales de prueba descritos en sesión interna.
+- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK, `npm test` 8/8 contra `sislegal_test` (API: CC-01, 401, clientes 403, rechazo 400, folio consecutivo, PDF autorizado, flujo crear→corregir→aprobar y Super no crea Supers) + `/api/salud` con `usuarios:5` sobre `sislegal_test` + Docker 2026-10-21 (api/web en loopback, IA interna, `/api/salud` 200, web 200, login admin 200, imagen API sin `.env`) y 2026-10-26 (binding de BD verificado en `127.0.0.1`). Docs reales de prueba descritos en sesión interna.
 - **NO hace:** SSO/refresh/2FA, OCR, e.firma, uploads reales anexos, vencimientos, versionado plantillas, CI, Postgres/Azure, PWA.
