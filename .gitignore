@@ -15,6 +15,9 @@ dist-ssr
 # PDFs generados por la IA (documentos/Sistema legal, se regeneran)
 documentos/
 
+# Carpeta personal local: nunca debe subirse al repo ni a GitHub
+personal/
+
 # Secretos y entorno local (nunca subir credenciales)
 .env
 server/.env.test
