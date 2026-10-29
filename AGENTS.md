@@ -124,7 +124,7 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
    peticion, ccp, ccpDetalle, anexos, fundamentarArt8 debajo de anexos.
 8. **Resumen** (`ResumenDocumento.jsx`): fecha ISO→dd/mm/aaaa, moneda `$`, check Sí/No,
    switch Sí/No (Art.8: "Con fundamento en el artículo 8 Constitucional"),
-   anexos "Se adjunta(n) N documento(s) como anexo: …", destinatario primero.
+   anexos "Se adjuntará(n) N documento(s) al confirmar: …", destinatario primero.
 9. **Escala compacta** (`theme.js`): `html 87.5%`, tipografías reducidas
    (h4 1.75, h5 1.25, h6 1.05, body1 0.9, body2 0.875, caption 0.75, button 0.85).
    Drawer 210px.
@@ -149,7 +149,7 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 
 - Recrear usuarios extra (Ricardo/Javier/Lucía) — se perdieron en el DROP + maestro del 29/09.
 - `clientes.contacto` eliminado (LIM-01 2026-10-14; quitado del form §60, DROP físico aplicado).
-- Subida real de fotos/anexos al servidor (viven en memoria del form; solo el PDF final persiste).
+- Subida real de fotos al servidor (viven en memoria del form; el PDF final y los anexos PDF ya persisten).
 - Portadas EADDRINUSE: matar árboles con `taskkill /PID /T /F`.
 
 ## IA (redacción automática, en construcción)

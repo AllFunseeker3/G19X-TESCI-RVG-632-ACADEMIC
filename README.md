@@ -24,7 +24,7 @@ Un residente crea cualquiera de los 11 tipos, la IA redacta y formaliza, se gene
 | Cartas | Responsiva | 19 | Moneda `$`, fotos JPG/PNG |
 | Cartas | Renuncia | 9 | `numeroEmpleado`, motivo Otro |
 | Cartas | Intención | 14 | Emisora/receptora, checks confidencialidad/vinculante, destinatario opcional |
-| Oficios | Petición | 14 | Art. 8 switch, ccp condicional, anexos solo-PDF con preview |
+| Oficios | Petición | 14 | Art. 8 switch, ccp condicional, anexos solo-PDF guardados en el servidor |
 | Oficios | Comisión | 14 | Viáticos condicional, fechas manuales inicio/fin |
 | Oficios | Resolución | 13 | Considerandos + puntos resolutivos `filas:5`, autoridad que resuelve |
 | Avisos | Privacidad | 9 | Integral/Simplificado/Corto, transferencia switch |
@@ -32,7 +32,7 @@ Un residente crea cualquiera de los 11 tipos, la IA redacta y formaliza, se gene
 | Avisos | Funcionamiento | 9 | `autoridadDestino` + RFC obligatorios |
 | Notificaciones | General | 9 | Acuse switch (Nombre/Firma/Fecha/Hora) |
 
-Campos: texto, area (`filas`), fecha `dd/mm/aaaa` con máscara + picker nativo, email, selección, moneda, fotos, check, switch, anexos solo-PDF. `mostrarSi` condicional con limpieza auto. Solo `id==='fecha'` trae hoy auto.
+Campos: texto, area (`filas`), fecha `dd/mm/aaaa` con máscara + picker nativo, email, selección, moneda, fotos, check, switch, anexos solo-PDF. `mostrarSi` condicional con limpieza auto. Solo `id==='fecha'` trae hoy auto. Los anexos PDF se suben al confirmar (`POST /api/documentos/:id/anexos`, máx. 10 archivos de 10 MB) y quedan en `adjuntos` con `vigente=FALSE`; las fotos del formulario siguen viviendo en memoria.
 
 ### 2.2 Generar (`/Menu`)
 Selector Categoría → Tipo dependiente, autocomplete Clientes (chip Sin verificar, solo rellena vacíos), validación bloqueante con `errores`. Flujo: `Generar documento con IA` → **Resumen** (verificar) → Redactar (preview solo-lectura + `ProgresoIA` por fases + cronómetro) → cuadro *¿Algo está mal?* + Corregir repetible → Confirmar crea + PDF. Modo `?editar=` precarga + banner con motivo (vuelve a borrador + re-avisa).
@@ -50,7 +50,7 @@ Timeline historial + adjuntos + responsable, motivo rojo/verde + *Editar y corre
 - Config: 4 acentos (azul #163172/rojo/verde/blanco) + oscuro, persiste localStorage. Plantillas oculta del menú (ruta `/Plantillas` viva).
 
 ### 2.6 Transversales
-Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`). Pruebas automáticas de API con `node:test` + `supertest` (8 casos: bloqueo CC-01, contraseña actual incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo, descarga PDF autorizada, flujo crear→corregir→aprobar y Super que no crea Supers); se ejecutan con `npm test` en `server/` contra una BD aislada `sislegal_test`. Descargas PDF e IA validan documento/adjunto visible; Docker publica API, web y BD solo en `127.0.0.1` y no publica la IA.
+Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`). Anexos del formulario: `POST /api/documentos/:id/anexos` (multer, 10 PDF de 10 MB, firma `%PDF-`) los guarda en `PDF_DIR` y los registra en `adjuntos`; si la subida falla, la pantalla lo dice y ofrece reintentar sin duplicar el documento. Pruebas automáticas de API con `node:test` + `supertest` (9 casos: bloqueo CC-01, contraseña actual incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo, descarga PDF autorizada, flujo crear→corregir→aprobar, Super que no crea Supers y anexos PDF persistidos); se ejecutan con `npm test` en `server/` contra una BD aislada `sislegal_test` y una carpeta de PDFs propia. Descargas PDF e IA validan documento/adjunto visible; Docker publica API, web y BD solo en `127.0.0.1` y no publica la IA.
 
 ---
 
@@ -99,8 +99,10 @@ IA_PRE_FORMALIZAR=1
 copy server\.env.test.example server\.env.test   # ignorado por git
 notepad server\.env.test                         # DB_PASSWORD + DB_ADMIN_PASSWORD
 npm run db:test:prep --prefix server             # recrea sislegal_test desde maestro.sql
-npm test --prefix server                         # 8/8 contra sislegal_test
+npm test --prefix server                         # 9/9 contra sislegal_test
 ```
+
+`server/.env.test.example` también trae `PDF_DIR=../documentos/Pruebas test`: las pruebas escriben sus PDF en esa carpeta y **no** en `documentos/Sistema legal`. Si se omite, `api.test.js` usa el mismo valor por omisión que `routes/ia.js` y `routes/documentos.js`. La ruta relativa se resuelve desde `server/` antes de cargar la API.
 
 `db:test:prep` borra **solo** bases `*_test`; el usuario de la app (`DB_USER`) recibe permisos sobre `sislegal_test`. `DB_ADMIN_*` (root) se usa únicamente para recrear la base y vive solo en `.env.test`. `npm run db:test` sigue siendo la verificación de solo lectura de la BD de trabajo.
 
@@ -158,7 +160,7 @@ docker compose up --build web         # rebuild solo web tras cambiar front
 6. Gestionar: `/Usuarios` → alta/editar rol/baja-reactivar. `/Inicio` para KPIs y búsqueda.
 
 ### 3.4 Reglas que deben respetar
-Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, fotos/anexos del form viven en memoria (solo el PDF final persiste), IA free tarda 20-90s y puede dar 429 → esperar 1 min.
+Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, fotos del form viven en memoria y los anexos PDF sí se guardan al confirmar (quedan en `adjuntos` y se descargan con el mismo permiso del documento), IA free tarda 20-90s y puede dar 429 → esperar 1 min.
 
 ---
 
@@ -202,5 +204,5 @@ Como parte de la entrega académica, y atendiendo el criterio de la evaluación,
 
 - **Contratos:** ver `Docs/MVP.md §5` (auth, catálogo, documentos, IA redactar/corregir/revisar/pdf, clientes, notificaciones, usuarios).
 - **Modelo:** `db/maestro.sql` 14 tablas (areas, roles, puestos, categorias, permisos_rol, usuarios, clientes, tipos_documento, campos_tipo 137, documentos JSON+contenido+modelo_ia+id_cliente+folio, historial, adjuntos solo-PDF+vigente, notificaciones, folios).
-- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK, `npm test` 8/8 contra `sislegal_test` (API: CC-01, 401, clientes 403, rechazo 400, folio consecutivo, PDF autorizado, flujo crear→corregir→aprobar y Super no crea Supers) + `/api/salud` con `usuarios:5` sobre `sislegal_test` + Docker 2026-10-21 (api/web en loopback, IA interna, `/api/salud` 200, web 200, login admin 200, imagen API sin `.env`) y 2026-10-26 (binding de BD verificado en `127.0.0.1`). Docs reales de prueba descritos en sesión interna.
-- **NO hace:** SSO/refresh/2FA, OCR, e.firma, uploads reales anexos, vencimientos, versionado plantillas, CI, Postgres/Azure, PWA.
+- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK, `npm test` 9/9 contra `sislegal_test` (API: CC-01, 401, clientes 403, rechazo 400, folio consecutivo, PDF autorizado, flujo crear→corregir→aprobar, Super no crea Supers y anexos PDF persistidos) + `/api/salud` con `usuarios:5` sobre `sislegal_test` + Docker 2026-10-21 (api/web en loopback, IA interna, `/api/salud` 200, web 200, login admin 200, imagen API sin `.env`) y 2026-10-26 (binding de BD verificado en `127.0.0.1`). Docs reales de prueba descritos en sesión interna.
+- **NO hace:** SSO/refresh/2FA, OCR, e.firma, subida de fotos, vencimientos, versionado plantillas, CI, Postgres/Azure, PWA.

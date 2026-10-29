@@ -19,7 +19,7 @@ import {
   CATEGORIAS, tiposDeCategoria, nombreCategoria,
   nombreTipo, camposDeTipo, categoriaDeTipo,
 } from '../lib/tiposDocumentos';
-import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descargarPDF, generarPDF, redactarConIA, corregirConIA } from '../lib/api.js';
+import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descargarPDF, generarPDF, redactarConIA, corregirConIA, subirAnexos } from '../lib/api.js';
 import PageHeader from '../Components/PageHeader';
 import ProgresoIA from '../Components/ProgresoIA';
 import CampoFormulario, { esFechaValida, formatearHoyDDMMAAAA } from '../Components/CampoFormulario';
@@ -96,8 +96,9 @@ export default function GenerarCarta() {
   const [iaError, setIaError] = useState('');
   const [iaRetro, setIaRetro] = useState(''); // Retro del usuario: qué corregir del texto
   const [iaCorrigiendo, setIaCorrigiendo] = useState(false); // Corrigiendo con IA en curso
-  const [guardado, setGuardado] = useState(null); // { id, archivo, folio } del documento + PDF
+  const [guardado, setGuardado] = useState(null); // { id, archivo, folio, anexos, avisoAnexos }
   const [guardando, setGuardando] = useState(false); // Confirmar está creando doc + PDF
+  const [reintentandoAnexos, setReintentandoAnexos] = useState(false);
   const [errorGuardar, setErrorGuardar] = useState('');
   // Progreso por fases (estimado por timer: el back es 1 petición sin eventos).
   const [iaFases, setIaFases] = useState([]);
@@ -547,6 +548,13 @@ export default function GenerarCarta() {
     return plano;
   };
 
+  // Archivos PDF del formulario que aún no viven en el servidor (los nombres
+  // que vienen de ?editar= son strings y no se re-suben).
+  const archivosAnexosPendientes = () => campos
+    .filter((c) => c.tipo === 'anexos')
+    .flatMap((c) => (Array.isArray(datos[c.id]) ? datos[c.id] : []))
+    .filter((a) => a && typeof a !== 'string');
+
   // ============ AQUÍ EMPIEZA PROGRESO ESTIMADO IA ============
   // El back es una petición HTTP sin progreso real: se estima 0→90% por timer
   // y se completa a 100% al resolver. Fases textuales por operación.
@@ -668,7 +676,21 @@ export default function GenerarCarta() {
       } catch (ePdf) {
         setErrorGuardar(`Documento #${idDoc} guardado, pero el PDF falló: ${ePdf.message}`);
       }
-      setGuardado({ id: idDoc, archivo, folio: folioDoc });
+      // Anexos: se suben solo después de existir el documento (necesitan su id).
+      // Si fallan, el panel de éxito lo dice y ofrece reintentar sin duplicar.
+      const pendientes = archivosAnexosPendientes();
+      let anexosGuardados = 0;
+      let avisoAnexos = '';
+      if (pendientes.length > 0) {
+        setIaProgreso(85);
+        try {
+          const subidos = await subirAnexos(idDoc, pendientes);
+          anexosGuardados = subidos.anexos?.length ?? pendientes.length;
+        } catch (eAnexos) {
+          avisoAnexos = `El documento #${idDoc} quedó guardado, pero ${pendientes.length} anexo(s) NO se subieron: ${eAnexos.message}`;
+        }
+      }
+      setGuardado({ id: idDoc, archivo, folio: folioDoc, anexos: anexosGuardados, avisoAnexos });
       setIaProgreso(100);
       setIaAbierto(false);
     } catch (e) {
@@ -676,6 +698,30 @@ export default function GenerarCarta() {
     } finally {
       detenerProgreso();
       setGuardando(false);
+    }
+  };
+
+  // Reintenta SOLO la subida de anexos de un documento ya guardado.
+  const handleReintentarAnexos = async () => {
+    if (!guardado?.id || reintentandoAnexos) return;
+    const pendientes = archivosAnexosPendientes();
+    if (pendientes.length === 0) return;
+    setReintentandoAnexos(true);
+    try {
+      const subidos = await subirAnexos(guardado.id, pendientes);
+      const n = subidos.anexos?.length ?? pendientes.length;
+      setGuardado((prev) => ({
+        ...prev,
+        anexos: (prev.anexos ?? 0) + n,
+        avisoAnexos: '',
+      }));
+    } catch (e) {
+      setGuardado((prev) => ({
+        ...prev,
+        avisoAnexos: `El documento #${prev.id} quedó guardado, pero los anexos NO se subieron: ${e.message}`,
+      }));
+    } finally {
+      setReintentandoAnexos(false);
     }
   };
 
@@ -1022,13 +1068,31 @@ export default function GenerarCarta() {
 
             {/* ============ AQUÍ EMPIEZA ALERTA GUARDADO ============ */}
             {guardado && (
-              <Alert severity="success" sx={{ mt: 2 }} onClose={() => setGuardado(null)}>
+              <Alert
+                severity={guardado.avisoAnexos ? 'warning' : 'success'}
+                sx={{ mt: 2 }}
+                onClose={() => setGuardado(null)}
+              >
                 Documento #{guardado.id}{guardado.folio ? ` (folio ${guardado.folio})` : ''} {editandoId ? 'corregido (regresó a revisión con redacción IA' : 'guardado en revisión (con redacción IA'}
                 {guardado.archivo ? ' y PDF' : ''}).
+                {guardado.anexos > 0 && ` ${guardado.anexos} anexo(s) guardado(s) en el servidor.`}
                 {guardado.archivo && (
                   <Button size="small" onClick={handleDescargarPDF} sx={{ ml: 1, color: 'encabezado.main' }}>
                     Descargar PDF
                   </Button>
+                )}
+                {guardado.avisoAnexos && (
+                  <Box component="span" sx={{ display: 'block', mt: 1 }}>
+                    <strong>{guardado.avisoAnexos}</strong>
+                    <Button
+                      size="small"
+                      onClick={handleReintentarAnexos}
+                      disabled={reintentandoAnexos}
+                      sx={{ ml: 1 }}
+                    >
+                      {reintentandoAnexos ? 'Reintentando...' : 'Reintentar anexos'}
+                    </Button>
+                  </Box>
                 )}
               </Alert>
             )}

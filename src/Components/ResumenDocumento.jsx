@@ -56,7 +56,7 @@ function formatoValorResumen(campo, valor) {
   if (campo.tipo === 'anexos') {
     const arr = Array.isArray(valor) ? valor : [];
     return arr.length > 0
-      ? `Se adjunta(n) ${arr.length} documento(s) como anexo: ${arr.map(nombreAnexo).join(', ')}`
+      ? `Se adjuntará(n) ${arr.length} documento(s) al confirmar: ${arr.map(nombreAnexo).join(', ')}`
       : '—';
   }
   if (campo.tipo === 'area' || campo.tipo === 'texto' || campo.tipo === 'email' || campo.tipo === 'seleccion') {

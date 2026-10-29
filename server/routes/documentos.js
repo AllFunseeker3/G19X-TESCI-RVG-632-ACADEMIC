@@ -11,6 +11,8 @@
 // ============================================================================
 // ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
+const crypto = require("crypto");
+const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const pool = require("../db");
@@ -34,6 +36,55 @@ const ESTADOS = new Set([
   "notificado",
 ]);
 // ============ AQUÍ TERMINA ROUTER Y CONSTANTES ============
+
+// ============ AQUÍ EMPIEZA CONFIG DE ANEXOS (multer) ============
+// Los anexos del formulario (oficio-petición) se guardan en el MISMO PDF_DIR
+// que usa la IA: así la descarga autorizada (/api/ia/pdf/:archivo) y el borrado
+// del documento los encuentran sin rutas paralelas.
+const MAX_ANEXO_BYTES = 10 * 1024 * 1024; // 10 MB por archivo.
+const MAX_ANEXOS = 10; // Tope por petición (evita lotes abusivos).
+
+// QUÉ HACE: nombre de disco seguro y único (sin acentos, espacios ni "../").
+function nombreAnexoUnico(original) {
+  const limpio = path
+    .basename(String(original || "anexo.pdf"))
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\.pdf$/i, "")
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 80) || "anexo";
+  return `anexo-${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${limpio}.pdf`;
+}
+
+const almacenAnexos = multer.diskStorage({
+  destination: (_req, _archivo, cb) => {
+    try {
+      fs.mkdirSync(PDF_DIR, { recursive: true });
+      cb(null, PDF_DIR);
+    } catch (e) {
+      cb(e);
+    }
+  },
+  filename: (_req, archivo, cb) => cb(null, nombreAnexoUnico(archivo.originalname)),
+});
+
+const subidaAnexos = multer({
+  storage: almacenAnexos,
+  limits: { fileSize: MAX_ANEXO_BYTES, files: MAX_ANEXOS },
+  fileFilter: (_req, archivo, cb) => {
+    const esPdf =
+      archivo.mimetype === "application/pdf" &&
+      /\.pdf$/i.test(archivo.originalname || "");
+    if (!esPdf) {
+      const e = new Error("Solo se aceptan archivos PDF");
+      e.status = 400;
+      return cb(e);
+    }
+    return cb(null, true);
+  },
+});
+// ============ AQUÍ TERMINA CONFIG DE ANEXOS (multer) ============
 
 // ============ AQUÍ EMPIEZA FUNCIÓN CATEGORÍADE ============
 // QUÉ HACE: categoría del tipo (para checar permiso). 404 si no existe.
@@ -403,6 +454,109 @@ router.post("/:id/adjuntos", async (req, res, next) => {
   }
 });
 // ============ AQUÍ TERMINA RUTA POST ADJUNTO ============
+
+// ============ AQUÍ EMPIEZA RUTA POST ANEXOS ============
+// POST /api/documentos/:id/anexos (multipart, campo "archivos") — guarda los
+// PDF anexos que el formulario tenía en memoria. Mismas reglas que PATCH
+// /datos: creador o admin, y solo si el documento sigue corregible.
+async function autorizarAnexos(req, res, next) {
+  try {
+    const d = await docVisible(Number(req.params.id), req.usuario, "ver");
+    if (!(req.usuario.admin || d.id_creador === req.usuario.id)) {
+      return res.status(403).json({ detail: "Solo el creador o un admin suben anexos" });
+    }
+    if (!["borrador", "rechazado"].includes(d.estado)) {
+      return res.status(400).json({
+        detail: "Solo se anexan PDF a un documento en borrador o rechazado",
+      });
+    }
+    req.docAnexos = d;
+    return next();
+  } catch (e) {
+    return next(e);
+  }
+}
+
+// QUÉ HACE: borra del disco lo que multer alcanzó a escribir en esta petición.
+function borrarAnexosSubidos(nombres) {
+  for (const n of nombres || []) {
+    try {
+      const base = path.basename(String(n || ""));
+      if (!/^[\w][\w\-.]*\.pdf$/i.test(base)) continue;
+      const ruta = path.join(PDF_DIR, base);
+      if (fs.existsSync(ruta)) fs.unlinkSync(ruta);
+    } catch (eFs) {
+      console.error("Limpieza de anexo:", eFs.message);
+    }
+  }
+}
+
+// Envuelve multer para limpiar lo ya escrito si un archivo del lote falla
+// (tamaño, tipo o límite de cantidad) y responder siempre en JSON.
+function recibirAnexos(req, res, next) {
+  subidaAnexos.array("archivos", MAX_ANEXOS)(req, res, (err) => {
+    if (err) {
+      borrarAnexosSubidos((req.files || []).map((a) => a.filename));
+      const status = err.code === "LIMIT_FILE_SIZE" ? 413 : err.status || 400;
+      const detail =
+        err.code === "LIMIT_FILE_SIZE"
+          ? "Cada anexo debe pesar 10 MB o menos"
+          : err.message || "No se pudieron subir los anexos";
+      return res.status(status).json({ detail });
+    }
+    return next();
+  });
+}
+
+router.post("/:id/anexos", autorizarAnexos, recibirAnexos, async (req, res, next) => {
+  const archivos = req.files || [];
+  try {
+    if (!archivos.length) {
+      return res.status(400).json({ detail: "Adjunte al menos un PDF" });
+    }
+    // Firma real del archivo: el MIME que manda el navegador se puede falsear.
+    for (const a of archivos) {
+      const fd = fs.openSync(a.path, "r");
+      const firma = Buffer.alloc(5);
+      try {
+        fs.readSync(fd, firma, 0, 5, 0);
+      } finally {
+        fs.closeSync(fd);
+      }
+      if (firma.toString("latin1") !== "%PDF-") {
+        borrarAnexosSubidos(archivos.map((x) => x.filename));
+        return res.status(400).json({ detail: `${a.originalname}: no es un PDF válido` });
+      }
+    }
+    const valores = archivos.map((a) => [
+      req.docAnexos.id_documento,
+      a.filename,
+      "application/pdf",
+      a.size,
+      path.join(PDF_DIR, a.filename),
+      false, // Anexo: nunca desplaza al PDF vigente del documento.
+      req.usuario.id,
+    ]);
+    const [r] = await pool.query(
+      `INSERT INTO adjuntos
+       (id_documento, nombre_archivo, tipo_mime, tamano_bytes, ruta, vigente, id_subido_por)
+       VALUES ?`,
+      [valores]
+    );
+    return res.status(201).json({
+      id_documento: req.docAnexos.id_documento,
+      anexos: archivos.map((a, i) => ({
+        id: r.insertId + i,
+        nombre_archivo: a.filename,
+        tamano_bytes: a.size,
+      })),
+    });
+  } catch (e) {
+    borrarAnexosSubidos(archivos.map((a) => a.filename));
+    return next(e);
+  }
+});
+// ============ AQUÍ TERMINA RUTA POST ANEXOS ============
 
 // ============ AQUÍ EMPIEZA RUTA PATCH CORREGIR DATOS ============
 // PATCH /api/documentos/:id/datos — el creador (o admin) corrige un documento

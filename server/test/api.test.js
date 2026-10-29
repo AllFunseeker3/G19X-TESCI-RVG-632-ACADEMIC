@@ -1,9 +1,10 @@
 // ============================================================================
 // ARCHIVO: server/test/api.test.js
 // FUNCIÓN GENERAL: pruebas automáticas de la API (node:test + supertest).
-//   Cubre 8 reglas críticas del back: bloqueo CC-01, contraseña actual
+//   Cubre 9 reglas críticas del back: bloqueo CC-01, contraseña actual
 //   incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo,
-//   PDF visible, flujo crear→corregir→aprobar y Super no crea Supers.
+//   PDF visible, flujo crear→corregir→aprobar, Super no crea Supers y
+//   anexos PDF persistidos.
 // FLUJO DE DATOS:
 //   - ENTRAN: app Express (sin abrir puerto), MariaDB de server/.env.test
 //     (BD aislada `sislegal_test`) y los 5 usuarios base de maestro.sql.
@@ -24,6 +25,15 @@ if (!process.env.DB_NAME) process.env.DB_NAME = "sislegal_test";
 if (!/_test$/.test(process.env.DB_NAME)) {
   throw new Error("Las pruebas deben usar una BD *_test (ej. sislegal_test)");
 }
+// Carpeta de PDFs: misma variable (PDF_DIR) y mismo valor por omisión que
+// routes/ia.js y routes/documentos.js. Se resuelve a absoluta ANTES de cargar
+// index.js para que la prueba y la API escriban en el mismo sitio aunque el
+// proceso se lance desde otra carpeta.
+const RAIZ_SERVER = path.join(__dirname, "..");
+const PDF_DIR = process.env.PDF_DIR
+  ? path.resolve(RAIZ_SERVER, process.env.PDF_DIR)
+  : path.join(RAIZ_SERVER, "..", "documentos", "Sistema legal");
+process.env.PDF_DIR = PDF_DIR;
 const request = require("supertest");
 const app = require("../index");
 const pool = require("../db");
@@ -35,14 +45,14 @@ const ADMIN = { correo: "admin@sislegal.mx", contrasena: "Admin123*" };
 const LEGAL = { correo: "legal@sislegal.mx", contrasena: "Legal123*" };
 const SUPERLEGAL = { correo: "superlegal@sislegal.mx", contrasena: "SuperLegal123*" };
 const OPERATIVO = { correo: "operativo@sislegal.mx", contrasena: "Operativo123*" };
-const PDF_DIR = path.join(__dirname, "..", "..", "documentos", "Sistema legal");
 
 let adminToken = null; // Token Bearer del admin para los casos.
 let legalToken = null; // Token de Legal (puede ver cartas de su área).
 let superLegalToken = null; // Token de Super Legal (gestiona su área).
 let operativoToken = null; // Token del rol sin permiso de cartas/clientes.
 let usuarioTemporalId = null; // Usuario creado en el caso 1 (se borra al final).
-const documentosCreados = []; // IDs creados en los casos 4, 5, 6 y 7.
+const documentosCreados = []; // IDs creados en los casos 4, 5, 6, 7 y 9.
+const archivosAnexosCreados = []; // Nombres de anexos del caso 9 (se borran al final).
 let foliosPrevios = []; // Foto de la tabla folios antes de las pruebas.
 // ============ AQUÍ TERMINA CONSTANTES Y ESTADO ============
 
@@ -292,18 +302,77 @@ test("Superusuario no puede crear otro Superusuario", async () => {
 });
 // ============ AQUÍ TERMINA CASO 8 ============
 
+// ============ AQUÍ EMPIEZA CASO 9: ANEXOS PDF ============
+// El formulario sube los anexos después de crear el documento. Deben quedar
+// registrados en `adjuntos` (vigente = FALSE), poder descargarse y rechazar
+// cualquier archivo que no sea PDF.
+test("Anexos: el PDF se guarda, se descarga y el no-PDF se rechaza", async () => {
+  const alta = await request(app)
+    .post("/api/documentos")
+    .set(bearer(adminToken))
+    .send({ id_tipo: "carta-poder", datos: {} });
+  assert.equal(alta.status, 201, JSON.stringify(alta.body));
+  documentosCreados.push(alta.body.id);
+
+  const pdf = Buffer.from("%PDF-1.4\n% anexo de prueba\n%%EOF\n");
+  const subida = await request(app)
+    .post(`/api/documentos/${alta.body.id}/anexos`)
+    .set(bearer(adminToken))
+    .attach("archivos", pdf, { filename: "anexo-prueba.pdf", contentType: "application/pdf" });
+  assert.equal(subida.status, 201, JSON.stringify(subida.body));
+  assert.equal(subida.body.anexos.length, 1);
+
+  const nombre = subida.body.anexos[0].nombre_archivo;
+  archivosAnexosCreados.push(nombre);
+  assert.match(nombre, /^anexo-\d+-[a-f0-9]{8}-anexo-prueba\.pdf$/);
+
+  const descarga = await request(app)
+    .get(`/api/ia/pdf/${nombre}`)
+    .set(bearer(adminToken));
+  assert.equal(descarga.status, 200);
+
+  const [filas] = await pool.query(
+    "SELECT vigente, tipo_mime FROM adjuntos WHERE nombre_archivo = ?",
+    [nombre]
+  );
+  assert.equal(filas.length, 1);
+  assert.equal(filas[0].vigente, 0); // No desplaza al PDF vigente del documento.
+  assert.equal(filas[0].tipo_mime, "application/pdf");
+
+  const malo = await request(app)
+    .post(`/api/documentos/${alta.body.id}/anexos`)
+    .set(bearer(adminToken))
+    .attach("archivos", Buffer.from("no soy pdf"), {
+      filename: "nota.txt",
+      contentType: "text/plain",
+    });
+  assert.equal(malo.status, 400);
+});
+// ============ AQUÍ TERMINA CASO 9 ============
+
 // ============ AQUÍ EMPIEZA LIMPIEZA ============
 // Deja la BD como estaba: sin documentos/avisos temporales, sin el usuario
 // de prueba y con el contador de folios en su valor previo.
 after(async () => {
   try {
     if (documentosCreados.length) {
-      const ids = documentosCreados.join(",");
-      await pool.query(`DELETE FROM notificaciones WHERE id_documento IN (${ids})`);
-      await pool.query(`DELETE FROM documentos WHERE id_documento IN (${ids})`);
+      // mysql2 expande el arreglo en un marcador IN (?) sin interpolar SQL.
+      await pool.query(
+        "DELETE FROM notificaciones WHERE id_documento IN (?)",
+        [documentosCreados]
+      );
+      await pool.query(
+        "DELETE FROM documentos WHERE id_documento IN (?)",
+        [documentosCreados]
+      );
     }
     if (usuarioTemporalId) {
       await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [usuarioTemporalId]);
+    }
+    // Archivos de anexos del caso 9: el DELETE del documento ya borra sus
+    // adjuntos en CASCADE, pero el PDF del disco lo quita esta limpieza.
+    for (const nombre of archivosAnexosCreados) {
+      fs.rmSync(path.join(PDF_DIR, nombre), { force: true });
     }
     // Restaura la tabla folios completa (los casos 4, 5, 6 y 7 consumieron números).
     await pool.query("DELETE FROM folios");

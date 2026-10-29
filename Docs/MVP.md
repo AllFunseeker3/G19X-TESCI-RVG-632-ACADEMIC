@@ -45,7 +45,7 @@
 
 - SSO Entra, refresh-token, 2FA, bloqueo intentos. JWT 8 h sin refresh (conexión BD ya rotada a `sislegal` el 30/09).
 - Firma e.firma, buzón tributario, Poder Judicial.
-- Subida real de fotos/anexos al servidor (viven en memoria del form; solo el PDF final persiste).
+- Subida real de fotos al servidor (viven en memoria del form; el PDF final y los anexos PDF ya persisten).
 - Vencimientos en Inicio, versionado semántico plantillas, PWA/móvil, CI, Postgres/Azure, soporte 24/7.
 
 ---
@@ -124,6 +124,6 @@ Si IA da `Servicio IA apagado` prende `:8001`. Si da `Modelo saturado (429)` esp
 
 ## 8. Después del MVP 
 
-V1: subida real anexos + manual + refresh-token (README y Docker ya hechos).
+V1: manual + refresh-token (anexos PDF ya se guardan desde 2026-10-28; README y Docker ya hechos).
 V2: key de paga (3-15s, sin 429, streaming, `IA_PRE_FORMALIZAR=0`), validación jurídica asistida, QR en PDF.
 V3: firma, buzón, CI, Postgres/Azure solo si lo exige la escuela (re-plan).

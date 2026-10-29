@@ -122,6 +122,32 @@ export const cambiarEstado = (id, estado, comentario) =>
   });
 export const agregarAdjunto = (id, adjunto) =>
   api(`/documentos/${id}/adjuntos`, { metodo: "POST", cuerpo: adjunto });
+// Sube los PDF anexos del formulario (multipart, campo "archivos"). El back los
+// registra en `adjuntos` con vigente = FALSE; no desplazan al PDF del documento.
+export const subirAnexos = async (id, archivos) => {
+  const t = leerToken();
+  const fd = new FormData();
+  archivos.forEach((a) => fd.append("archivos", a, a.name));
+  let res;
+  try {
+    res = await fetch(`${BASE}/documentos/${id}/anexos`, {
+      method: "POST",
+      headers: t ? { Authorization: `Bearer ${t}` } : {},
+      body: fd,
+    });
+  } catch {
+    window.dispatchEvent(new Event(EVENTO_SIN_CONEXION));
+    throw new Error("Sin conexión con el servidor");
+  }
+  const datos = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    guardarToken(null);
+    window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA));
+    throw new Error(datos.detail ?? "Sesión expirada, ingresa de nuevo");
+  }
+  if (!res.ok) throw new Error(datos.detail ?? `Error ${res.status}`);
+  return datos;
+};
 export const eliminarDocumento = (id) =>
   api(`/documentos/${id}`, { metodo: "DELETE" });
 // ============ AQUÍ TERMINA DOCUMENTOS ============

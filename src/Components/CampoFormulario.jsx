@@ -190,9 +190,14 @@ export default function CampoFormulario({
         </Button>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
           {archivos.length > 0
-            ? `Se adjunta(n) ${archivos.length} documento(s) como anexo: ${archivos.map(nombreArchivo).join(', ')}`
-            : 'Solo se permiten archivos PDF'}
+            ? `${archivos.length} documento(s) anexo(s): ${archivos.map(nombreArchivo).join(', ')}`
+            : 'Solo se permiten archivos PDF (máx. 10 MB)'}
         </Typography>
+        {archivos.some((a) => typeof a === 'string') && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+            Los anexos ya guardados no se quitan desde el formulario.
+          </Typography>
+        )}
         {archivos.length > 0 && (
           <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             {archivos.map((a, i) => (
@@ -208,6 +213,8 @@ export default function CampoFormulario({
                 <IconButton
                   size="small"
                   aria-label={`Quitar ${nombreArchivo(a)}`}
+                  title={typeof a === 'string' ? 'Anexo ya guardado: no se quita desde el formulario' : undefined}
+                  disabled={typeof a === 'string'}
                   onClick={() => onQuitarAnexo?.(i)}
                 >
                   <CloseIcon fontSize="small" />
