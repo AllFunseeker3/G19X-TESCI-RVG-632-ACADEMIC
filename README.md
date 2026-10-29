@@ -63,7 +63,7 @@ Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área 
 
 ### 3.2 Puesta en marcha — Opción A: local (15 min)
 
-**Requisitos:** Node 20+, Python 3.12+, MariaDB 10.6+/11+ en 3306, key OpenRouter `:free`.
+**Requisitos:** Node 22.12+ (probado en 24), Python 3.12+, MariaDB 10.6+/11+ en 3306, key OpenRouter `:free`.
 
 ```bash
 npm install
@@ -86,7 +86,7 @@ JWT_HORAS=8
 API_PORT=8000
 # ai-service/.env (copia de ai-service/.env.example)
 OPENROUTER_API_KEY=sk-or-v1-TU-CLAVE
-IA_MODEL=qwen/qwen3.8-27b:free
+IA_MODEL=google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free
 IA_PORT=8001
 IA_PRE_FORMALIZAR=1
 ```
@@ -150,6 +150,21 @@ docker compose up --build web         # rebuild solo web tras cambiar front
 - PDFs en volumen compartido `pdfs` (`PDF_DIR=/app/pdfs` en api e ia).
 - Si `ports are not available ... 8000`: para tu API local (`Ctrl+C` en `npm run todo`). La IA de Docker no usa el `8001` del host; solo el uvicorn local lo ocupa.
 - Si `db unhealthy`: `docker inspect sislegal-db-1 --format "{{json .State.Health}}"` (ya corregido a `mariadb-admin`).
+- Si `ports are not available ... 3306`: otro MariaDB/MySQL local ocupa el puerto; agrega `DB_PORT=3307` en `.env` y la BD queda en `127.0.0.1:3307` (no toques tu servidor local).
+- Si el build falla con `npm error code EIDLETIMEOUT` (red lenta al registry): vuelve a lanzar `docker compose up --build -d`; reutiliza las capas ya compiladas y suele terminar en segundos.
+
+### 3.2c Prueba de punta a punta (clon nuevo)
+
+Ruta mínima para validar una instalación desde cero, sin datos previos:
+
+1. `copy .env.docker.example .env` y llena `JWT_SECRET` + `OPENROUTER_API_KEY`.
+2. `docker compose up --build -d` hasta ver `db healthy` y `api`/`ia`/`web` arriba (`docker compose ps`).
+3. `http://localhost:8000/api/salud` responde `{"ok":true,...}` con `tipos_documento:11, campos_tipo:137, permisos_rol:20, usuarios:5`.
+4. `http://localhost:8080` → `admin@sislegal.mx / Admin123*` → `/Menu`.
+5. Cartas → Carta Poder → captura los campos → **Generar documento** → **Redactar** (modelo free: 40-150 s; si sale 429, espera 1 min y usa **Volver a datos** → **Redactar**) → **Confirmar y guardar**.
+6. Alerta con `Documento #N` y folio `CP-AAAA-NNN` → `/Revision` → **Revisar** → **Aprobar** → queda `aprobado` con PDF vigente descargable.
+
+En el ensayo del 2026-10-28 se validaron login, los 17 campos, la redacción IA (140 s) y el guardado con folio `CP-2026-001`; la IA free es el paso lento y con modelos de razonamiento puede tardar hasta ~3 min por llamada. Si algo falla: `docker compose logs api ia`.
 
 ### 3.3 Uso diario por rol (rutas)
 1. Crear: `/Menu` → categoría/tipo → cliente → capturar → IA → Confirmar → Descargar PDF (folio en alerta).
@@ -160,7 +175,7 @@ docker compose up --build web         # rebuild solo web tras cambiar front
 6. Gestionar: `/Usuarios` → alta/editar rol/baja-reactivar. `/Inicio` para KPIs y búsqueda.
 
 ### 3.4 Reglas que deben respetar
-Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, fotos del form viven en memoria y los anexos PDF sí se guardan al confirmar (quedan en `adjuntos` y se descargan con el mismo permiso del documento), IA free tarda 20-90s y puede dar 429 → esperar 1 min.
+Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, fotos del form viven en memoria y los anexos PDF sí se guardan al confirmar (quedan en `adjuntos` y se descargan con el mismo permiso del documento), IA free tarda 40-150s y puede dar 429 → esperar 1 min o cambiar `IA_MODEL`.
 
 ---
 

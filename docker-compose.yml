@@ -25,7 +25,7 @@ services:
     environment:
       IA_PORT: 8001
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Pon tu key en .env docker (ver .env.docker.example)}
-      IA_MODEL: ${IA_MODEL:-qwen/qwen3.8-27b:free}
+      IA_MODEL: ${IA_MODEL:-google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free}
       IA_PROVIDER: ${IA_PROVIDER:-openrouter}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       IA_PRE_FORMALIZAR: ${IA_PRE_FORMALIZAR:-1}

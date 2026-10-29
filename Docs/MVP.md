@@ -112,7 +112,7 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 
 1. `/Ingreso` → `admin@sislegal.mx / Admin123*`.
 2. `/Menu` → categoría Cartas + Carta Poder → verifica formulario.
-4. Elige cliente Acme (verificado), captura, `Generar documento con IA` → verifica Resumen → Redactar → espera 20-90s free → pide una corrección → Confirmar y guardar → Descargar PDF.
+4. Elige cliente Acme (verificado), captura, `Generar documento con IA` → verifica Resumen → Redactar → espera 40-150s free → pide una corrección → Confirmar y guardar → Descargar PDF.
 5. `/Revision` → En revisión → dictamina Rechazar sin comentario (debe bloquear) → Rechazar con motivo.
 6. `/Seguimiento` → verifica motivo + Editar y corregir → corrige → vuelve a revisión.
 7. `/Revision` → Revisar documento → sube el PDF → verifica clasificación/veredicto → Editar genera carta nueva.
