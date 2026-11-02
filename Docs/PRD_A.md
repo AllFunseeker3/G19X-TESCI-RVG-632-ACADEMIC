@@ -80,7 +80,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 1. Analizar los procesos documentales — HECHO (catálogo 11 tipos fijado).
 2. Diseñar la arquitectura tecnológica — HECHO (Express+MariaDB+React+FastAPI-IA, documentada en §8).
 3. Implementar automatización y validación jurídica — HECHO parcial (automatización + validación formal + formalización IA; validación jurídica de fondo sigue siendo humana).
-4. Validar la calidad de los documentos — HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 8 casos de API con node:test/supertest sobre `sislegal_test`; validación jurídica de fondo sigue siendo humana).
+4. Validar la calidad de los documentos — HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 9 casos de API con node:test/supertest sobre `sislegal_test`; validación jurídica de fondo sigue siendo humana).
 5. Elaborar documentación técnica y plan de soporte — PARCIAL (este PRD + `AGENTS.md` + comentarios en código; falta manual de usuario final y plan multinivel formal).
 ---
 
@@ -162,7 +162,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 - OCR / extracción de PDFs históricos. No hay Document Intelligence.
 - SSO Entra ID, refresh-token, bloqueo por intentos, 2FA.
 - Versionado semántico de plantillas (solo historial de documentos).
-- Subida real de fotos/anexos al servidor (viven en memoria del form; solo el PDF final se guarda).
+- Subida real de fotos al servidor (viven en memoria del formulario; solo el PDF final se guarda). Los anexos PDF del oficio-petición **sí** se guardan al confirmar (`POST /api/documentos/:id/anexos`).
 - App móvil, PWA offline, push fuera de la campanita in-app.
 - CI/CD, observabilidad centralizada, pruebas E2E de navegador.
 - Módulo Vencimientos en Inicio.
@@ -256,7 +256,7 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 3. Arquitectura — componentes/APIs — Entregable arquitectura — HECHO
 4. Planificación — backlog/cronograma — Entregable plan — HECHO
 5. Desarrollo — generación/validación/versiones/aprobación — Entregable sistema — HECHO
-6. Pruebas — funcional/integración/documental — Entregable QA — HECHO (8 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
+6. Pruebas — funcional/integración/documental — Entregable QA — HECHO (9 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
 7. Documentación — manuales — Entregable manual — PARCIAL
 8. Mantenimiento — soporte/plantillas — Entregable plan — PENDIENTE
 9. Capacitación — admin/usuarios — Entregable acta — PENDIENTE
@@ -271,5 +271,5 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 **Aceptación global:**
 - Crear los 11 tipos de punta a punta y verlos en Revisión/Seguimiento tras recargar.
 - Rechazo sin comentario bloqueado (400). Borrado con Dialog propio.
-- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 8/8 contra `sislegal_test`.
+- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 9/9 contra `sislegal_test`.
 - Trazabilidad por folio + historial + notificaciones verificables.

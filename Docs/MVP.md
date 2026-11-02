@@ -77,6 +77,7 @@ PATCH /api/documentos/:id/datos {datos, id_cliente} (borrador/rechazado, vuelve 
 PATCH /api/documentos/:id/estado {estado, comentario} (rechazo exige comentario)
 DELETE /api/documentos/:id
 GET /api/documentos/:id (detalle + historial + adjuntos)
+POST /api/documentos/:id/anexos (multipart, campo "archivos", hasta 10 PDF de 10 MB; solo creador o admin; documento en borrador o rechazado) → {id_documento, anexos:[{id, nombre_archivo, tamano_bytes}]}
 POST /api/ia/redactar {id_tipo, datos} → {contenido, modelo}
 POST /api/ia/corregir {contenido, instruccion, id_tipo} → {contenido}
 POST /api/ia/pdf {id_tipo, datos, contenido, id_documento} → {archivo}
@@ -96,7 +97,7 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 - [x] KPIs/dona sin fijos
 - [x] Login/logout + rutas protegidas
 - [x] `npm run build` OK (warning chunk preexistente), `npx eslint .` limpio, `node --check` OK, `py_compile` OK, `db:test` OK (MariaDB 12.3.3, 11/137/20)
-- [x] 8 pruebas automáticas de API con `node:test` + `supertest` (`npm test` en `server/`, contra `sislegal_test`): bloqueo CC-01 (403), contraseña actual incorrecta (401), clientes sin `cartas.ver` (403), rechazo sin comentario (400), folio consecutivo, descarga PDF solo si el adjunto es visible, flujo crear→corregir→aprobar y Super que no puede crear otro Super
+- [x] 9 pruebas automáticas de API con `node:test` + `supertest` (`npm test` en `server/`, contra `sislegal_test`): bloqueo CC-01 (403), contraseña actual incorrecta (401), clientes sin `cartas.ver` (403), rechazo sin comentario (400), folio consecutivo, descarga PDF solo si el adjunto es visible, flujo crear→corregir→aprobar, Super que no puede crear otro Super y anexos PDF del formulario (se guardan, se descargan y el no-PDF se rechaza)
 - [x] 1280px y 390px sin traslapes (labels fijos, escala 87.5%)
 - [x] README con 5 puntos + ejecución local y Docker + credenciales demo (14/10); formulario sin precarga (21/10)
 - [x] Docker: 4 Up, db healthy, `/api/salud` 11/137/20/5, IA interna 11 plantillas, web 200 (21/10); API/web/BD en loopback y binding de BD verificado el 26/10
@@ -112,6 +113,7 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 
 1. `/Ingreso` → `admin@sislegal.mx / Admin123*`.
 2. `/Menu` → categoría Cartas + Carta Poder → verifica formulario.
+3. `/Menu` → Oficio de Petición → captura lo mínimo y en **Anexos** adjunta un PDF de menos de 10 MB → `Generar documento con IA` → Confirma; el aviso debe decir «N anexo(s) guardado(s) en el servidor» → `/Revision` → **Revisar** → **Aprobar** → **Ver PDF** del vigente y verifica el anexo con la etiqueta **Anexo**. El anexo solo se sube mientras el documento está en borrador o rechazado.
 4. Elige cliente Acme (verificado), captura, `Generar documento con IA` → verifica Resumen → Redactar → espera 40-150s free → pide una corrección → Confirmar y guardar → Descargar PDF.
 5. `/Revision` → En revisión → dictamina Rechazar sin comentario (debe bloquear) → Rechazar con motivo.
 6. `/Seguimiento` → verifica motivo + Editar y corregir → corrige → vuelve a revisión.

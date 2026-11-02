@@ -474,14 +474,19 @@ export default function Revision() {
                                     <List dense>
                                         {seleccionado.adjuntos.map((a, idx) => {
                                             // ADJ-01: el back ordena vigente primero; si falta el flag (API sin reiniciar), el primero es el actual.
-                                            const esVigente = (a.vigente === undefined || a.vigente === null) ? idx === 0 : Boolean(Number(a.vigente));
+                                            // ANEXOS: los PDF del formulario se guardan con vigente=false y nombre `anexo-...`;
+                                            // sin esta distinción aparecerían como "Versión anterior".
+                                            const esAnexo = /^anexo-/.test(String(a.nombre_archivo || ''));
+                                            const esVigente = !esAnexo && ((a.vigente === undefined || a.vigente === null) ? idx === 0 : Boolean(Number(a.vigente)));
+                                            const etiquetaPdf = esAnexo ? 'Anexo' : (esVigente ? 'Actual' : 'Versión anterior');
+                                            const colorPdf = esAnexo ? 'default' : (esVigente ? 'success' : 'default');
                                             return (
                                             <ListItem key={a.id} disablePadding sx={{ py: 0.5 }}>
                                                 <ListItemText
                                                     primary={a.nombre_archivo}
                                                     secondary={a.subido_en ? String(a.subido_en).slice(0, 16).replace('T', ' ') : ''}
                                                 />
-                                                <Chip size="small" label={esVigente ? 'Actual' : 'Versión anterior'} color={esVigente ? 'success' : 'default'} sx={{ mr: 1, flexShrink: 0 }} />
+                                                <Chip size="small" label={etiquetaPdf} color={colorPdf} sx={{ mr: 1, flexShrink: 0 }} />
                                                 {(admin || esSuper || puedeDictaminar(seleccionado)) && (
                                                     <Button
                                                         size="small"

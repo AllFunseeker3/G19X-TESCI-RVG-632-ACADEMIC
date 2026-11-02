@@ -61,7 +61,7 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
 - Salud: `GET http://localhost:8000/api/salud` → con `maestro.sql` limpio: 11 tipos, 137 campos, 20 permisos, 5 usuarios. (La BD local de trabajo puede tener altas reales; el número canónico es 5.)
 - Verificación BD sin servidor: `cd server; npm run db:test`
 - BD de pruebas aislada: `server/.env.test` (ignorado; plantilla `.env.test.example`) apunta a `sislegal_test`. Recrear: `cd server; npm run db:test:prep` (borra solo bases `*_test`). `npm test` aborta si `DB_NAME` no termina en `_test`.
-- Pruebas automáticas de API: `cd server; npm test` (node:test + supertest; 8 casos; usa `sislegal_test`; limpia sus datos y restaura folios)
+- Pruebas automáticas de API: `cd server; npm test` (node:test + supertest; 9 casos; usa `sislegal_test`; limpia sus datos y restaura folios)
 - Seguridad (21/10/2026, 26/10/2026): `server/.dockerignore` y `ai-service/.dockerignore` evitan secretos en imágenes; Docker publica API, web y BD solo en `127.0.0.1` (`127.0.0.1:${DB_PORT:-3306}:3306`) y la IA solo es interna (`ia:8001`). `GET /api/clientes` exige admin o `cartas.ver`; las descargas de PDF validan `docVisible` o que el archivo lo haya generado el mismo usuario hace ≤10 min; `POST /api/documentos/:id/adjuntos` es solo admin.
 
 ## Datos
