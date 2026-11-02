@@ -105,6 +105,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 - Validación manual bloqueante con `errores`. Solo `id==='fecha'` trae hoy auto.
 - Flujo: `Generar documento con IA` → valida → **Resumen** (`ResumenDocumento.jsx`, verificar datos) → botón Redactar con IA → Dialog IA solo-lectura + `ProgresoIA.jsx` (fases + cronómetro, sin spinner) + cuadro retro "¿Algo está mal?" + Corregir con IA repetible → Confirmar y guardar crea doc + PDF.
 - Modo `?editar=` precarga + banner con motivo, `PATCH /:id/datos` (solo creador/admin en borrador/rechazado, vuelve a borrador + re-avisa).
+- Anexos PDF de punta a punta: `POST /api/documentos/:id/anexos` (multipart `archivos`, hasta 10 PDF de 10 MB, creador o admin, solo en borrador/rechazado, valida firma `%PDF-`), `subirAnexos()` en `api.js`, subida con botón **Reintentar anexos** en `GenerarCarta` y aviso «Se adjuntará(n) … al confirmar» en `ResumenDocumento`; se registran en `adjuntos` con `vigente=0`. Las fotos siguen en memoria.
 
 **IA (`ai-service/main.py` 425 líneas):**
 - `TIPOS_IA` 11 + `ESTRUCTURAS_IA` + `PROMPT_CARTA_PODER` machote exacto + `PROMPT_GENERICO`.
