@@ -20,9 +20,11 @@ import {
   nombreTipo, camposDeTipo, categoriaDeTipo,
 } from '../lib/tiposDocumentos';
 import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descargarPDF, generarPDF, redactarConIA, corregirConIA, subirAnexos } from '../lib/api.js';
+import { formatearHoyDDMMAAAA } from '../lib/fechas';
+import { validarDocumento } from '../lib/validarDocumento';
 import PageHeader from '../Components/PageHeader';
 import ProgresoIA from '../Components/ProgresoIA';
-import CampoFormulario, { esFechaValida, formatearHoyDDMMAAAA } from '../Components/CampoFormulario';
+import CampoFormulario from '../Components/CampoFormulario';
 import SeccionFormulario from '../Components/SeccionFormulario';
 import SelectorCategoriaTipo from '../Components/SelectorCategoriaTipo';
 import DestinatarioOpcional from '../Components/DestinatarioOpcional';
@@ -478,55 +480,18 @@ export default function GenerarCarta() {
   // ============ AQUÍ TERMINA LIMPIAR Y DESTINATARIO ============
 
   // ============ AQUÍ EMPIEZA VALIDACIÓN Y SUBMIT ============
-  // Revisa requeridos/formatos y abre el resumen solo si no hay errores.
-  const validar = () => {
-    const nuevosErrores = {};
-    if (categoria === '') nuevosErrores.categoria = 'Seleccione la categoría';
-    if (tipoDoc === '') nuevosErrores.tipoDoc = 'Seleccione el tipo de documento';
-    camposVisibles.forEach((c) => {
-      const valor = datos[c.id];
-      if (c.tipo === 'fotos') {
-        if (c.requerido && (!Array.isArray(valor) || valor.length === 0)) {
-          nuevosErrores[c.id] = 'Agregue al menos una foto';
-        }
-      } else if (c.tipo === 'anexos') {
-        if (c.requerido && (!Array.isArray(valor) || valor.length === 0)) {
-          nuevosErrores[c.id] = 'Agregue al menos un anexo PDF';
-        }
-      } else if (c.tipo === 'check' || c.tipo === 'switch') {
-        if (c.requerido && !valor) {
-          nuevosErrores[c.id] = 'Debe aceptar esta opción';
-        }
-      } else if (c.tipo === 'fecha') {
-        if (c.requerido && !(valor ?? '').toString().trim()) {
-          nuevosErrores[c.id] = 'Este campo es obligatorio';
-        } else if ((valor ?? '').toString().trim() && !esFechaValida(valor)) {
-          nuevosErrores[c.id] = 'Fecha inválida (dd/mm/aaaa)';
-        }
-      } else if (c.tipo === 'moneda') {
-        if (c.requerido && !(valor ?? '').toString().trim()) {
-          nuevosErrores[c.id] = 'Este campo es obligatorio';
-        } else if ((valor ?? '').toString().trim() && Number.isNaN(Number(valor))) {
-          nuevosErrores[c.id] = 'Monto inválido';
-        }
-      } else if (c.requerido && !(valor ?? '').toString().trim()) {
-        nuevosErrores[c.id] = 'Este campo es obligatorio';
-      }
-      if (c.tipo === 'email' && (valor ?? '').toString().trim()) {
-        const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
-        if (!ok) nuevosErrores[c.id] = 'Correo inválido';
-      }
-    });
-    if (mostrarDestinatario && agregarDestinatario && !(datos.destinatario ?? '').toString().trim()) {
-      nuevosErrores.destinatario = 'Este campo es obligatorio';
-    }
-    return nuevosErrores;
-  };
-
+  // Revisa requeridos/formatos (lib/validarDocumento.js) y abre el resumen solo si no hay errores.
   const handleSubmit = (event) => {
     event.preventDefault();
     // Paso 1: valida y abre el Resumen para verificar datos antes de redactar.
-    const nuevosErrores = validar();
+    const nuevosErrores = validarDocumento({
+      categoria,
+      tipoDoc,
+      campos: camposVisibles,
+      datos,
+      mostrarDestinatario,
+      agregarDestinatario,
+    });
     setErrores(nuevosErrores);
     if (Object.keys(nuevosErrores).length > 0) return;
     setErrorGuardar('');
