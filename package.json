@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "api": "npm start --prefix server",
-    "todo": "concurrently -n api,web -c green,blue \"npm start --prefix server\" \"npm run dev\""
+    "todo": "concurrently -n api,web -c green,blue \"npm start --prefix server\" \"npm run dev\"",
+    "docker:web": "docker compose up -d --build --no-deps web",
+    "docker:api": "docker compose up -d --build api",
+    "docker:ia": "docker compose up -d --build ia"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
