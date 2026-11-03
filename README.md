@@ -32,7 +32,7 @@ Un residente crea cualquiera de los 11 tipos, la IA redacta y formaliza, se gene
 | Avisos | Funcionamiento | 9 | `autoridadDestino` + RFC obligatorios |
 | Notificaciones | General | 9 | Acuse switch (Nombre/Firma/Fecha/Hora) |
 
-Campos: texto, area (`filas`), fecha `dd/mm/aaaa` con máscara + picker nativo, email, selección, moneda, fotos, check, switch, anexos solo-PDF. `mostrarSi` condicional con limpieza auto. Solo `id==='fecha'` trae hoy auto. Los anexos se validan por firma `%PDF-` en el navegador (`src/lib/anexos.js`) y se suben al confirmar (`POST /api/documentos/:id/anexos`, máx. 10 archivos de 10 MB), quedando en `adjuntos` con `vigente=FALSE`; las fotos del formulario siguen viviendo en memoria.
+Campos: texto, area (`filas`), fecha `dd/mm/aaaa` con máscara + picker nativo, email, selección, moneda, fotos, check, switch, anexos solo-PDF. `mostrarSi` condicional con limpieza auto. Solo `id==='fecha'` trae hoy auto. Los anexos se validan por firma `%PDF-` en el navegador (`src/lib/anexos.js`) y se suben al confirmar (`POST /api/documentos/:id/anexos`, máx. 10 archivos de 10 MB), quedando en `adjuntos` con `vigente=FALSE` y descargándose aparte desde `/Revision` (el PDF final solo los menciona). Las fotos del formulario siguen viviendo en memoria.
 
 ### 2.2 Generar (`/Menu`)
 Selector Categoría → Tipo dependiente, autocomplete Clientes (chip Sin verificar, solo rellena vacíos), validación bloqueante con `errores`. Flujo: `Generar documento con IA` → **Resumen** (verificar) → Redactar (preview solo-lectura + `ProgresoIA` por fases + cronómetro) → cuadro *¿Algo está mal?* + Corregir repetible → Confirmar crea + PDF. Modo `?editar=` precarga + banner con motivo (vuelve a borrador + re-avisa).
