@@ -114,7 +114,7 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 
 1. `/Ingreso` → `admin@sislegal.mx / Admin123*`.
 2. `/Menu` → categoría Cartas + Carta Poder → verifica formulario.
-3. `/Menu` → Oficio de Petición → captura lo mínimo y en **Anexos** adjunta un PDF de menos de 10 MB → `Generar documento con IA` → Confirma; el aviso debe decir «N anexo(s) guardado(s) en el servidor» → `/Revision` → **Revisar** → **Aprobar** → **Ver PDF** del vigente y verifica el anexo con la etiqueta **Anexo**. El anexo solo se sube mientras el documento está en borrador o rechazado.
+3. `/Menu` → Oficio de Petición → captura lo mínimo y en **Anexos** adjunta un PDF de menos de 10 MB → `Generar documento con IA` → Confirma; el aviso debe decir «N anexo(s) guardado(s) en el servidor» → `/Revision` → **Revisar** → **Aprobar** → **Ver PDF** del vigente y **descarga el anexo** (aparece con la etiqueta **Anexo**). El anexo solo se sube mientras el documento está en borrador o rechazado.
 4. Elige cliente Acme (verificado), captura, `Generar documento con IA` → verifica Resumen → Redactar → espera 40-150s free → pide una corrección → Confirmar y guardar → Descargar PDF.
 5. `/Revision` → En revisión → dictamina Rechazar sin comentario (debe bloquear) → Rechazar con motivo.
 6. `/Seguimiento` → verifica motivo + Editar y corregir → corrige → vuelve a revisión.
