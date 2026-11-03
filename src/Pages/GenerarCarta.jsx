@@ -13,7 +13,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, Button, Divider, Alert, TextField, Autocomplete, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
   CATEGORIAS, tiposDeCategoria, nombreCategoria,
@@ -23,7 +22,7 @@ import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descarg
 import { formatearHoyDDMMAAAA } from '../lib/fechas';
 import { validarDocumento } from '../lib/validarDocumento';
 import PageHeader from '../Components/PageHeader';
-import ProgresoIA from '../Components/ProgresoIA';
+import DialogoRedaccionIA from '../Components/DialogoRedaccionIA';
 import CampoFormulario from '../Components/CampoFormulario';
 import SeccionFormulario from '../Components/SeccionFormulario';
 import SelectorCategoriaTipo from '../Components/SelectorCategoriaTipo';
@@ -1101,77 +1100,27 @@ export default function GenerarCarta() {
 
       {/* Preview de la redacción IA (solo lectura + retro para corregir) */}
       {/* ============ AQUÍ EMPIEZA DIÁLOGO IA ============ */}
-      <Dialog open={iaAbierto} onClose={() => !iaCargando && !guardando && setIaAbierto(false)} maxWidth="md" fullWidth>
-        <DialogTitle color="encabezado.main" fontWeight="bold">
-          Generando redacción: {nombreTipo(categoria, tipoDoc)}
-        </DialogTitle>
-        <DialogContent dividers>
-          {(iaCargando || iaCorrigiendo || guardando) && (
-            <ProgresoIA
-              fases={iaFases}
-              indice={iaFase}
-              progreso={iaProgreso}
-              segundos={iaSegundos}
-              modelo={iaModelo}
-            />
-          )}
-          {iaError && (
-            <Alert severity="error" sx={{ mb: 2 }}>{iaError}</Alert>
-          )}
-          {errorGuardar && (
-            <Alert severity="error" sx={{ mb: 2 }}>{errorGuardar}</Alert>
-          )}
-          {iaTexto && (
-            <>
-              <Typography
-                variant="body1"
-                sx={{ whiteSpace: 'pre-wrap', mb: 2 }}
-              >
-                {iaTexto}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                Modelo: {iaModelo} · Revisa el texto antes de guardar.
-              </Typography>
-              <TextField
-                label="¿Algo está mal? Describe qué corregir (ej. cambia la vigencia a 1 año, agrega el folio...)"
-                multiline
-                minRows={2}
-                fullWidth
-                value={iaRetro}
-                onChange={(e) => setIaRetro(e.target.value)}
-                disabled={iaCargando || iaCorrigiendo || guardando}
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleCorregirIA}
-                  disabled={iaCargando || iaCorrigiendo || guardando || !iaTexto || !(iaRetro ?? '').trim()}
-                  sx={{ borderColor: 'encabezado.main', color: 'encabezado.main' }}
-                >
-                  {iaCorrigiendo ? 'Corrigiendo...' : 'Corregir'}
-                </Button>
-              </Box>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleVolverADatos} disabled={iaCargando || iaCorrigiendo || guardando} sx={{ color: 'encabezado.main' }}>
-            Volver a datos
-          </Button>
-          <Button onClick={() => setIaAbierto(false)} disabled={iaCargando || iaCorrigiendo || guardando} sx={{ color: 'encabezado.main' }}>
-            Cerrar
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleGuardarFinal}
-            disabled={iaCargando || iaCorrigiendo || guardando || !iaTexto}
-          >
-            {guardando ? 'Generando...' : 'Confirmar y guardar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DialogoRedaccionIA
+        abierto={iaAbierto}
+        titulo={`Generando redacción: ${nombreTipo(categoria, tipoDoc)}`}
+        cargando={iaCargando}
+        corrigiendo={iaCorrigiendo}
+        guardando={guardando}
+        fases={iaFases}
+        fase={iaFase}
+        progreso={iaProgreso}
+        segundos={iaSegundos}
+        modelo={iaModelo}
+        errorIa={iaError}
+        errorGuardar={errorGuardar}
+        texto={iaTexto}
+        retro={iaRetro}
+        onRetro={setIaRetro}
+        onCerrar={() => setIaAbierto(false)}
+        onCorregir={handleCorregirIA}
+        onVolver={handleVolverADatos}
+        onGuardar={handleGuardarFinal}
+      />
       {/* ============ AQUÍ TERMINA DIÁLOGO IA ============ */}
 
     </Box>
