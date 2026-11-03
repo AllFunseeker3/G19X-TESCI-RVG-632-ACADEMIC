@@ -183,16 +183,14 @@ export default function Ingreso() {
                             }}
                         >
                             <Typography variant="h5" fontWeight={800} letterSpacing={0}>
-                                SR
+                                SL
                             </Typography>
                         </Box>
                         <Typography variant="h3" fontWeight={800} sx={{ fontSize: { xs: '2rem', md: '2.6rem' } }}>
-                            Sistema de
-                            <br />
-                            Residencias
+                            SisLegal
                         </Typography>
                         <Typography sx={{ mt: 2, maxWidth: 320, opacity: 0.85 }}>
-                            Gestiona tus cartas y documentos de residencia desde un solo lugar.
+                            Gestiona tus cartas y documentos desde un solo lugar.
                         </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ mt: 5, opacity: 0.75 }}>
