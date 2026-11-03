@@ -21,6 +21,7 @@ import {
 import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descargarPDF, generarPDF, redactarConIA, corregirConIA, subirAnexos } from '../lib/api.js';
 import { formatearHoyDDMMAAAA } from '../lib/fechas';
 import { validarDocumento } from '../lib/validarDocumento';
+import { archivosAnexosPendientes, datosSerializables } from '../lib/documento';
 import PageHeader from '../Components/PageHeader';
 import DialogoRedaccionIA from '../Components/DialogoRedaccionIA';
 import CamposDocumento from '../Components/CamposDocumento';
@@ -498,25 +499,7 @@ export default function GenerarCarta() {
   // ============ AQUÍ TERMINA VALIDACIÓN Y SUBMIT ============
 
   // ============ AQUÍ EMPIEZA SERIALIZACIÓN E IA ============
-  // Convierte datos a JSON seguro (File[] de fotos/anexos -> nombres).
-  const datosSerializables = () => {
-    const plano = {};
-    Object.entries(datos).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
-        plano[k] = v.map((a) => (typeof a === 'string' ? a : a?.name ?? ''));
-      } else {
-        plano[k] = v;
-      }
-    });
-    return plano;
-  };
-
-  // Archivos PDF del formulario que aún no viven en el servidor (los nombres
-  // que vienen de ?editar= son strings y no se re-suben).
-  const archivosAnexosPendientes = () => campos
-    .filter((c) => c.tipo === 'anexos')
-    .flatMap((c) => (Array.isArray(datos[c.id]) ? datos[c.id] : []))
-    .filter((a) => a && typeof a !== 'string');
+  // La conversión a JSON seguro y los anexos pendientes viven en lib/documento.js.
 
   // ============ AQUÍ EMPIEZA PROGRESO ESTIMADO IA ============
   // El back es una petición HTTP sin progreso real: se estima 0→90% por timer
@@ -559,7 +542,7 @@ export default function GenerarCarta() {
       esPoder ? 75 : 50,
     );
     try {
-      const r = await redactarConIA(tipoDoc, datosSerializables());
+      const r = await redactarConIA(tipoDoc, datosSerializables(datos));
       setIaTexto(r.contenido ?? '');
       setIaModelo(r.modelo ?? '');
       setIaProgreso(100);
@@ -615,7 +598,7 @@ export default function GenerarCarta() {
       let folioDoc = null;
       if (editandoId) {
         const act = await actualizarDocumento(editandoId, {
-          datos: datosSerializables(),
+          datos: datosSerializables(datos),
           id_cliente: datos.id_cliente ?? null,
           ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
         });
@@ -623,7 +606,7 @@ export default function GenerarCarta() {
       } else {
         const creado = await crearDocumento({
           id_tipo: tipoDoc,
-          datos: datosSerializables(),
+          datos: datosSerializables(datos),
           id_cliente: datos.id_cliente ?? null,
           ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
         });
@@ -634,14 +617,14 @@ export default function GenerarCarta() {
       setIaProgreso(60);
       let archivo = null;
       try {
-        const pdf = await generarPDF(tipoDoc, datosSerializables(), idDoc, iaTexto || '');
+        const pdf = await generarPDF(tipoDoc, datosSerializables(datos), idDoc, iaTexto || '');
         archivo = pdf.archivo ?? null;
       } catch (ePdf) {
         setErrorGuardar(`Documento #${idDoc} guardado, pero el PDF falló: ${ePdf.message}`);
       }
       // Anexos: se suben solo después de existir el documento (necesitan su id).
       // Si fallan, el panel de éxito lo dice y ofrece reintentar sin duplicar.
-      const pendientes = archivosAnexosPendientes();
+      const pendientes = archivosAnexosPendientes(campos, datos);
       let anexosGuardados = 0;
       let avisoAnexos = '';
       if (pendientes.length > 0) {
@@ -667,7 +650,7 @@ export default function GenerarCarta() {
   // Reintenta SOLO la subida de anexos de un documento ya guardado.
   const handleReintentarAnexos = async () => {
     if (!guardado?.id || reintentandoAnexos) return;
-    const pendientes = archivosAnexosPendientes();
+    const pendientes = archivosAnexosPendientes(campos, datos);
     if (pendientes.length === 0) return;
     setReintentandoAnexos(true);
     try {
