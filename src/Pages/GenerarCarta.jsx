@@ -22,6 +22,7 @@ import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descarg
 import { formatearHoyDDMMAAAA } from '../lib/fechas';
 import { validarDocumento } from '../lib/validarDocumento';
 import { archivosAnexosPendientes, datosSerializables } from '../lib/documento';
+import { clasificarAnexos, mensajeAnexosInvalidos, sinAnexosConNombre } from '../lib/anexos';
 import PageHeader from '../Components/PageHeader';
 import DialogoRedaccionIA from '../Components/DialogoRedaccionIA';
 import CamposDocumento from '../Components/CamposDocumento';
@@ -399,25 +400,26 @@ export default function GenerarCarta() {
     e.target.value = '';
   };
 
-  const handleAnexos = (id) => (e) => {
+  const handleAnexos = (id) => async (e) => {
     const elegidos = Array.from(e.target.files ?? []);
-    const noPdf = elegidos.filter((f) => {
-      const esPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-      return !esPdf;
-    });
-    if (noPdf.length > 0) {
-      setErrores((prev) => ({ ...prev, [id]: 'Solo se permiten archivos PDF' }));
-      e.target.value = '';
+    e.target.value = '';
+    if (elegidos.length === 0) return;
+    // La extensión y el MIME se pueden falsear: se exige la firma %PDF- real,
+    // la misma que valida el servidor, para no aceptar algo que luego rechaza.
+    const { validos, invalidos } = await clasificarAnexos(elegidos);
+    if (validos.length > 0) {
+      setDatos((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), ...validos] }));
+    }
+    if (invalidos.length > 0) {
+      setErrores((prev) => ({ ...prev, [id]: mensajeAnexosInvalidos(invalidos, validos.length) }));
       return;
     }
-    setDatos((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), ...elegidos] }));
     setErrores((prev) => {
       if (!prev[id]) return prev;
       const copia = { ...prev };
       delete copia[id];
       return copia;
     });
-    e.target.value = '';
   };
 
   const handleQuitarAnexo = (id) => (indice) => {
@@ -653,10 +655,21 @@ export default function GenerarCarta() {
     if (!guardado?.id || reintentandoAnexos) return;
     const pendientes = archivosAnexosPendientes(campos, datos);
     if (pendientes.length === 0) return;
+    // Quita del formulario lo que no sea PDF: si sigue ahí, el reintento
+    // volvería a fallar siempre por el mismo archivo.
+    const { validos, invalidos } = await clasificarAnexos(pendientes);
+    if (invalidos.length > 0) {
+      setDatos((prev) => sinAnexosConNombre(prev, invalidos));
+      setGuardado((prev) => ({
+        ...prev,
+        avisoAnexos: `${mensajeAnexosInvalidos(invalidos)}. Se quitaron del formulario.`,
+      }));
+    }
+    if (validos.length === 0) return;
     setReintentandoAnexos(true);
     try {
-      const subidos = await subirAnexos(guardado.id, pendientes);
-      const n = subidos.anexos?.length ?? pendientes.length;
+      const subidos = await subirAnexos(guardado.id, validos);
+      const n = subidos.anexos?.length ?? validos.length;
       setGuardado((prev) => ({
         ...prev,
         anexos: (prev.anexos ?? 0) + n,
