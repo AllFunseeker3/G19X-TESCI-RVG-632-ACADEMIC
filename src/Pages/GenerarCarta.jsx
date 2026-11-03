@@ -25,6 +25,7 @@ import { archivosAnexosPendientes, datosSerializables } from '../lib/documento';
 import PageHeader from '../Components/PageHeader';
 import DialogoRedaccionIA from '../Components/DialogoRedaccionIA';
 import CamposDocumento from '../Components/CamposDocumento';
+import AlertaGuardado from '../Components/AlertaGuardado';
 import SelectorCategoriaTipo from '../Components/SelectorCategoriaTipo';
 import DestinatarioOpcional from '../Components/DestinatarioOpcional';
 import ResumenDocumento from '../Components/ResumenDocumento';
@@ -803,35 +804,14 @@ export default function GenerarCarta() {
             {/* ============ AQUÍ TERMINA GRID CAMPOS POR TIPO ============ */}
 
             {/* ============ AQUÍ EMPIEZA ALERTA GUARDADO ============ */}
-            {guardado && (
-              <Alert
-                severity={guardado.avisoAnexos ? 'warning' : 'success'}
-                sx={{ mt: 2 }}
-                onClose={() => setGuardado(null)}
-              >
-                Documento #{guardado.id}{guardado.folio ? ` (folio ${guardado.folio})` : ''} {editandoId ? 'corregido (regresó a revisión con redacción IA' : 'guardado en revisión (con redacción IA'}
-                {guardado.archivo ? ' y PDF' : ''}).
-                {guardado.anexos > 0 && ` ${guardado.anexos} anexo(s) guardado(s) en el servidor.`}
-                {guardado.archivo && (
-                  <Button size="small" onClick={handleDescargarPDF} sx={{ ml: 1, color: 'encabezado.main' }}>
-                    Descargar PDF
-                  </Button>
-                )}
-                {guardado.avisoAnexos && (
-                  <Box component="span" sx={{ display: 'block', mt: 1 }}>
-                    <strong>{guardado.avisoAnexos}</strong>
-                    <Button
-                      size="small"
-                      onClick={handleReintentarAnexos}
-                      disabled={reintentandoAnexos}
-                      sx={{ ml: 1 }}
-                    >
-                      {reintentandoAnexos ? 'Reintentando...' : 'Reintentar anexos'}
-                    </Button>
-                  </Box>
-                )}
-              </Alert>
-            )}
+            <AlertaGuardado
+              guardado={guardado}
+              editandoId={editandoId}
+              reintentandoAnexos={reintentandoAnexos}
+              onDescargar={handleDescargarPDF}
+              onReintentar={handleReintentarAnexos}
+              onCerrar={() => setGuardado(null)}
+            />
             {/* ============ AQUÍ TERMINA ALERTA GUARDADO ============ */}
 
             {/* ============ AQUÍ EMPIEZA BOTONES ACCIÓN ============ */}
