@@ -12,7 +12,7 @@ import {
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   Typography, List, ListItem, ListItemText, Alert, CircularProgress,
 } from '@mui/material';
-import { esFechaValida } from './CampoFormulario';
+import { esFechaValida } from '../lib/fechas';
 
 // ============ AQUÍ EMPIEZA HELPERS de formato ============
 // Convierte ISO yyyy-mm-dd -> dd/mm/aaaa; si ya es dd/mm/aaaa lo deja tal cual.

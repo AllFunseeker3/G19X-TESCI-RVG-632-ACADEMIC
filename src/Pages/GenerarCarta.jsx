@@ -6,24 +6,26 @@
 //   - ENTRAN: lib/tiposDocumentos.js (CATEGORIAS, tipos, campos con mostrarSi).
 //   - PASO 1: ResumenDocumento.jsx verifica datos -> PASO 2: preview IA
 //     (solo lectura + retro) -> PASO 3: Confirmar guarda doc + PDF.
-// QUÉ MODIFICAR SI hay cambios: Box por tipo abajo; mostrarDestinatario excluye
-//   9 tipos con destinatario fijo; solo id==='fecha' lleva hoy auto.
+// QUÉ MODIFICAR SI hay cambios: secciones por tipo en Components/CamposDocumento.jsx;
+//   mostrarDestinatario excluye 9 tipos con destinatario fijo; solo id==='fecha' lleva hoy auto.
 // ============================================================================
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, Button, Divider, Alert, TextField, Autocomplete, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
   CATEGORIAS, tiposDeCategoria, nombreCategoria,
   nombreTipo, camposDeTipo, categoriaDeTipo,
 } from '../lib/tiposDocumentos';
 import { crearDocumento, actualizarDocumento, getDocumento, getClientes, descargarPDF, generarPDF, redactarConIA, corregirConIA, subirAnexos } from '../lib/api.js';
+import { formatearHoyDDMMAAAA } from '../lib/fechas';
+import { validarDocumento } from '../lib/validarDocumento';
+import { archivosAnexosPendientes, datosSerializables } from '../lib/documento';
 import PageHeader from '../Components/PageHeader';
-import ProgresoIA from '../Components/ProgresoIA';
-import CampoFormulario, { esFechaValida, formatearHoyDDMMAAAA } from '../Components/CampoFormulario';
-import SeccionFormulario from '../Components/SeccionFormulario';
+import DialogoRedaccionIA from '../Components/DialogoRedaccionIA';
+import CamposDocumento from '../Components/CamposDocumento';
+import AlertaGuardado from '../Components/AlertaGuardado';
 import SelectorCategoriaTipo from '../Components/SelectorCategoriaTipo';
 import DestinatarioOpcional from '../Components/DestinatarioOpcional';
 import ResumenDocumento from '../Components/ResumenDocumento';
@@ -478,55 +480,18 @@ export default function GenerarCarta() {
   // ============ AQUÍ TERMINA LIMPIAR Y DESTINATARIO ============
 
   // ============ AQUÍ EMPIEZA VALIDACIÓN Y SUBMIT ============
-  // Revisa requeridos/formatos y abre el resumen solo si no hay errores.
-  const validar = () => {
-    const nuevosErrores = {};
-    if (categoria === '') nuevosErrores.categoria = 'Seleccione la categoría';
-    if (tipoDoc === '') nuevosErrores.tipoDoc = 'Seleccione el tipo de documento';
-    camposVisibles.forEach((c) => {
-      const valor = datos[c.id];
-      if (c.tipo === 'fotos') {
-        if (c.requerido && (!Array.isArray(valor) || valor.length === 0)) {
-          nuevosErrores[c.id] = 'Agregue al menos una foto';
-        }
-      } else if (c.tipo === 'anexos') {
-        if (c.requerido && (!Array.isArray(valor) || valor.length === 0)) {
-          nuevosErrores[c.id] = 'Agregue al menos un anexo PDF';
-        }
-      } else if (c.tipo === 'check' || c.tipo === 'switch') {
-        if (c.requerido && !valor) {
-          nuevosErrores[c.id] = 'Debe aceptar esta opción';
-        }
-      } else if (c.tipo === 'fecha') {
-        if (c.requerido && !(valor ?? '').toString().trim()) {
-          nuevosErrores[c.id] = 'Este campo es obligatorio';
-        } else if ((valor ?? '').toString().trim() && !esFechaValida(valor)) {
-          nuevosErrores[c.id] = 'Fecha inválida (dd/mm/aaaa)';
-        }
-      } else if (c.tipo === 'moneda') {
-        if (c.requerido && !(valor ?? '').toString().trim()) {
-          nuevosErrores[c.id] = 'Este campo es obligatorio';
-        } else if ((valor ?? '').toString().trim() && Number.isNaN(Number(valor))) {
-          nuevosErrores[c.id] = 'Monto inválido';
-        }
-      } else if (c.requerido && !(valor ?? '').toString().trim()) {
-        nuevosErrores[c.id] = 'Este campo es obligatorio';
-      }
-      if (c.tipo === 'email' && (valor ?? '').toString().trim()) {
-        const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
-        if (!ok) nuevosErrores[c.id] = 'Correo inválido';
-      }
-    });
-    if (mostrarDestinatario && agregarDestinatario && !(datos.destinatario ?? '').toString().trim()) {
-      nuevosErrores.destinatario = 'Este campo es obligatorio';
-    }
-    return nuevosErrores;
-  };
-
+  // Revisa requeridos/formatos (lib/validarDocumento.js) y abre el resumen solo si no hay errores.
   const handleSubmit = (event) => {
     event.preventDefault();
     // Paso 1: valida y abre el Resumen para verificar datos antes de redactar.
-    const nuevosErrores = validar();
+    const nuevosErrores = validarDocumento({
+      categoria,
+      tipoDoc,
+      campos: camposVisibles,
+      datos,
+      mostrarDestinatario,
+      agregarDestinatario,
+    });
     setErrores(nuevosErrores);
     if (Object.keys(nuevosErrores).length > 0) return;
     setErrorGuardar('');
@@ -535,25 +500,7 @@ export default function GenerarCarta() {
   // ============ AQUÍ TERMINA VALIDACIÓN Y SUBMIT ============
 
   // ============ AQUÍ EMPIEZA SERIALIZACIÓN E IA ============
-  // Convierte datos a JSON seguro (File[] de fotos/anexos -> nombres).
-  const datosSerializables = () => {
-    const plano = {};
-    Object.entries(datos).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
-        plano[k] = v.map((a) => (typeof a === 'string' ? a : a?.name ?? ''));
-      } else {
-        plano[k] = v;
-      }
-    });
-    return plano;
-  };
-
-  // Archivos PDF del formulario que aún no viven en el servidor (los nombres
-  // que vienen de ?editar= son strings y no se re-suben).
-  const archivosAnexosPendientes = () => campos
-    .filter((c) => c.tipo === 'anexos')
-    .flatMap((c) => (Array.isArray(datos[c.id]) ? datos[c.id] : []))
-    .filter((a) => a && typeof a !== 'string');
+  // La conversión a JSON seguro y los anexos pendientes viven en lib/documento.js.
 
   // ============ AQUÍ EMPIEZA PROGRESO ESTIMADO IA ============
   // El back es una petición HTTP sin progreso real: se estima 0→90% por timer
@@ -596,7 +543,7 @@ export default function GenerarCarta() {
       esPoder ? 75 : 50,
     );
     try {
-      const r = await redactarConIA(tipoDoc, datosSerializables());
+      const r = await redactarConIA(tipoDoc, datosSerializables(datos));
       setIaTexto(r.contenido ?? '');
       setIaModelo(r.modelo ?? '');
       setIaProgreso(100);
@@ -652,7 +599,7 @@ export default function GenerarCarta() {
       let folioDoc = null;
       if (editandoId) {
         const act = await actualizarDocumento(editandoId, {
-          datos: datosSerializables(),
+          datos: datosSerializables(datos),
           id_cliente: datos.id_cliente ?? null,
           ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
         });
@@ -660,7 +607,7 @@ export default function GenerarCarta() {
       } else {
         const creado = await crearDocumento({
           id_tipo: tipoDoc,
-          datos: datosSerializables(),
+          datos: datosSerializables(datos),
           id_cliente: datos.id_cliente ?? null,
           ...(iaTexto ? { contenido: iaTexto, modelo_ia: iaModelo } : {}),
         });
@@ -671,14 +618,14 @@ export default function GenerarCarta() {
       setIaProgreso(60);
       let archivo = null;
       try {
-        const pdf = await generarPDF(tipoDoc, datosSerializables(), idDoc, iaTexto || '');
+        const pdf = await generarPDF(tipoDoc, datosSerializables(datos), idDoc, iaTexto || '');
         archivo = pdf.archivo ?? null;
       } catch (ePdf) {
         setErrorGuardar(`Documento #${idDoc} guardado, pero el PDF falló: ${ePdf.message}`);
       }
       // Anexos: se suben solo después de existir el documento (necesitan su id).
       // Si fallan, el panel de éxito lo dice y ofrece reintentar sin duplicar.
-      const pendientes = archivosAnexosPendientes();
+      const pendientes = archivosAnexosPendientes(campos, datos);
       let anexosGuardados = 0;
       let avisoAnexos = '';
       if (pendientes.length > 0) {
@@ -704,7 +651,7 @@ export default function GenerarCarta() {
   // Reintenta SOLO la subida de anexos de un documento ya guardado.
   const handleReintentarAnexos = async () => {
     if (!guardado?.id || reintentandoAnexos) return;
-    const pendientes = archivosAnexosPendientes();
+    const pendientes = archivosAnexosPendientes(campos, datos);
     if (pendientes.length === 0) return;
     setReintentandoAnexos(true);
     try {
@@ -742,37 +689,6 @@ export default function GenerarCarta() {
   };
   // ============ AQUÍ TERMINA SERIALIZACIÓN E IA ============
 
-  // ============ AQUÍ EMPIEZA RENDER HELPERS ============
-  // Resuelven campos por id y los pintan (area/fotos/anexos a ancho completo).
-  const campoPorId = (id) => campos.find((c) => c.id === id);
-  const renderCampo = (campo) => (
-    <CampoFormulario
-      campo={campo}
-      valor={datos[campo.id]}
-      error={errores[campo.id]}
-      ayudaVisible={campoEnfocado === campo.id}
-      onChange={handleCampoChange(campo)}
-      onFocus={() => setCampoEnfocado(campo.id)}
-      onBlur={() => setCampoEnfocado(null)}
-      onQuitarAnexo={campo.tipo === 'anexos' ? handleQuitarAnexo(campo.id) : undefined}
-    />
-  );
-  const renderGrupo = (ids) => ids
-    .map(campoPorId)
-    .filter(Boolean)
-    .filter(esVisible)
-    .map((campo) => (
-      <Box
-        key={campo.id}
-        sx={(campo.tipo === 'area' || campo.tipo === 'fotos' || campo.tipo === 'anexos')
-          ? { gridColumn: { xs: 'auto', md: '1 / -1' } }
-          : undefined}
-      >
-        {renderCampo(campo)}
-      </Box>
-    ));
-
-  // ============ AQUÍ TERMINA RENDER HELPERS ============
 
   return (
     // ============ AQUÍ EMPIEZA CONTENEDOR GENERAR CARTA ============
@@ -874,228 +790,28 @@ export default function GenerarCarta() {
             )}
 
             {/* ============ AQUÍ EMPIEZA GRID CAMPOS POR TIPO ============ */}
-            <Box sx={{
-              display: 'grid',
-              gap: 3,
-              mt: 2,
-              gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-            }}>
-              {tipoDoc === 'carta-responsiva' ? (
-                <>
-                  <SeccionFormulario titulo="Datos de las personas" columnas={4}>
-                    {renderGrupo(['quienEntrega', 'tipoIdEntrega', 'folioEntrega', 'puestoEntrega', 'quienRecibe', 'tipoIdRecibe', 'folioRecibe'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Datos del bien" columnas={3}>
-                    {renderGrupo(['tipoBien', 'descripcion', 'marca', 'modelo', 'noSerie', 'estadoFisico', 'especifiqueDetalles', 'valorEstimado', 'fotos'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Condiciones y préstamo" columnas={3}>
-                    {renderGrupo(['condiciones', 'lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'carta-renuncia' ? (
-                <>
-                  <SeccionFormulario titulo="Datos del empleado" columnas={2}>
-                    {renderGrupo(['empleado', 'numeroEmpleado', 'puesto', 'empresa'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Detalles de la renuncia" columnas={2}>
-                    {renderGrupo(['ultimoDia', 'motivo', 'especifiqueMotivo'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Lugar y fecha" columnas={2}>
-                    {renderGrupo(['lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'carta-poder' ? (
-                <>
-                  <SeccionFormulario titulo="Datos del otorgante" columnas={3}>
-                    {renderGrupo(['otorgante', 'tipoDocOtorgante', 'idOtorgante'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Datos del apoderado" columnas={3}>
-                    {renderGrupo(['apoderado', 'tipoDocApoderado', 'idApoderado'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Objeto y límites del poder" columnas={1}>
-                    {renderGrupo(['facultades', 'limites'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Testigos" columnas={3}>
-                    {renderGrupo(['testigo1Nombre', 'testigo1TipoDoc', 'testigo1Id', 'testigo2Nombre', 'testigo2TipoDoc', 'testigo2Id'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Vigencia y firma" columnas={3}>
-                    {renderGrupo(['vigencia', 'lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'carta-intencion' ? (
-                <>
-                  <SeccionFormulario titulo="Parte Emisora (Quien propone)" columnas={2}>
-                    {renderGrupo(['emisoraNombre', 'emisoraTipoId', 'emisoraFolio', 'emisoraRepresentante'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Parte Receptora (Con quien se acuerda)" columnas={2}>
-                    {renderGrupo(['receptoraNombre', 'receptoraTipoId', 'receptoraFolio', 'receptoraRepresentante'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Detalles del Acuerdo" columnas={2}>
-                    {renderGrupo(['objeto', 'confidencialidad', 'vinculante'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Cierre y Jurisdicción" columnas={3}>
-                    {renderGrupo(['vigencia', 'lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'oficio-peticion' ? (
-                <>
-                  <SeccionFormulario titulo="Destinatario" columnas={3}>
-                    {renderGrupo(['nombreDestinatario', 'cargoDestinatario', 'dependenciaDestinatario'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Remitente" columnas={2}>
-                    {renderGrupo(['nombreRemitente', 'cargoRemitente'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Contenido de la petición" columnas={2}>
-                    {renderGrupo(['folio', 'asunto', 'peticion', 'ccp', 'ccpDetalle', 'anexos', 'fundamentarArt8'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Lugar y fecha" columnas={2}>
-                    {renderGrupo(['lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'oficio-comision' ? (
-                <>
-                  <SeccionFormulario titulo="Comisionado" columnas={3}>
-                    {renderGrupo(['nombreComisionado', 'cargoComisionado', 'numeroEmpleadoComisionado'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Detalles de la comisión" columnas={2}>
-                    {renderGrupo(['folio', 'destino', 'fechaInicio', 'fechaFin', 'motivo'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Quien comisiona" columnas={2}>
-                    {renderGrupo(['nombreAutoriza', 'cargoAutoriza'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Viáticos" columnas={2}>
-                    {renderGrupo(['viaticos', 'montoViaticos'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Lugar y fecha de emisión" columnas={2}>
-                    {renderGrupo(['lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'oficio-resolucion' ? (
-                <>
-                  <SeccionFormulario titulo="Destinatario" columnas={2}>
-                    {renderGrupo(['nombreDestinatario', 'cargoDestinatario'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Antecedentes y datos generales" columnas={2}>
-                    {renderGrupo(['folio', 'referenciaOrigen', 'interesado', 'asunto', 'sentido'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Considerandos" columnas={1}>
-                    {renderGrupo(['considerandos'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Puntos resolutivos" columnas={1}>
-                    {renderGrupo(['puntosResolutivos'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Autoridad que resuelve" columnas={2}>
-                    {renderGrupo(['nombreResuelve', 'cargoResuelve'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Lugar y fecha" columnas={2}>
-                    {renderGrupo(['lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'aviso-privacidad' ? (
-                <>
-                  <SeccionFormulario titulo="Responsable" columnas={3}>
-                    {renderGrupo(['razonSocial', 'domicilio', 'tipoAviso'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Datos y finalidad" columnas={1}>
-                    {renderGrupo(['datosRecabados', 'finalidad'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Transferencia" columnas={2}>
-                    {renderGrupo(['transferencia', 'transferenciaDetalle'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Contacto y fecha" columnas={2}>
-                    {renderGrupo(['contactoArco', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'aviso-rescision' ? (
-                <>
-                  <SeccionFormulario titulo="Trabajador" columnas={3}>
-                    {renderGrupo(['trabajador', 'numeroEmpleado', 'puesto'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Causa y fundamento" columnas={1}>
-                    {renderGrupo(['causa', 'fundamentoLegal'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Representante" columnas={2}>
-                    {renderGrupo(['nombreRepresentante', 'cargoRepresentante'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Lugar y fecha" columnas={3}>
-                    {renderGrupo(['lugar', 'fechaRescision', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'aviso-funcionamiento' ? (
-                <>
-                  <SeccionFormulario titulo="Autoridad y establecimiento" columnas={2}>
-                    {renderGrupo(['autoridadDestino', 'establecimiento', 'rfc', 'giro'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Domicilio y responsable" columnas={3}>
-                    {renderGrupo(['domicilio', 'responsable', 'horario'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Fechas" columnas={2}>
-                    {renderGrupo(['fechaApertura', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : tipoDoc === 'notificacion-general' ? (
-                <>
-                  <SeccionFormulario titulo="Destinatario" columnas={3}>
-                    {renderGrupo(['destinatario', 'domicilio', 'expediente'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Quien notifica" columnas={2}>
-                    {renderGrupo(['nombreNotifica', 'cargoNotifica'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Contenido" columnas={1}>
-                    {renderGrupo(['extracto'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Acuse de recibo" columnas={1}>
-                    {renderGrupo(['acuseRecibo'])}
-                  </SeccionFormulario>
-                  <SeccionFormulario titulo="Lugar y fecha" columnas={2}>
-                    {renderGrupo(['lugar', 'fecha'])}
-                  </SeccionFormulario>
-                </>
-              ) : (
-                camposVisibles.map((campo) => (
-                  <Box
-                    key={campo.id}
-                    sx={(campo.tipo === 'area' || campo.tipo === 'fotos' || campo.tipo === 'anexos')
-                      ? { gridColumn: { xs: 'auto', md: '1 / -1' } }
-                      : undefined}
-                  >
-                    {renderCampo(campo)}
-                  </Box>
-                ))
-              )}
-            </Box>
+            <CamposDocumento
+              tipoDoc={tipoDoc}
+              camposVisibles={camposVisibles}
+              datos={datos}
+              errores={errores}
+              campoEnfocado={campoEnfocado}
+              onFocusCampo={setCampoEnfocado}
+              onBlurCampo={() => setCampoEnfocado(null)}
+              onChangeCampo={handleCampoChange}
+              onQuitarAnexo={handleQuitarAnexo}
+            />
             {/* ============ AQUÍ TERMINA GRID CAMPOS POR TIPO ============ */}
 
             {/* ============ AQUÍ EMPIEZA ALERTA GUARDADO ============ */}
-            {guardado && (
-              <Alert
-                severity={guardado.avisoAnexos ? 'warning' : 'success'}
-                sx={{ mt: 2 }}
-                onClose={() => setGuardado(null)}
-              >
-                Documento #{guardado.id}{guardado.folio ? ` (folio ${guardado.folio})` : ''} {editandoId ? 'corregido (regresó a revisión con redacción IA' : 'guardado en revisión (con redacción IA'}
-                {guardado.archivo ? ' y PDF' : ''}).
-                {guardado.anexos > 0 && ` ${guardado.anexos} anexo(s) guardado(s) en el servidor.`}
-                {guardado.archivo && (
-                  <Button size="small" onClick={handleDescargarPDF} sx={{ ml: 1, color: 'encabezado.main' }}>
-                    Descargar PDF
-                  </Button>
-                )}
-                {guardado.avisoAnexos && (
-                  <Box component="span" sx={{ display: 'block', mt: 1 }}>
-                    <strong>{guardado.avisoAnexos}</strong>
-                    <Button
-                      size="small"
-                      onClick={handleReintentarAnexos}
-                      disabled={reintentandoAnexos}
-                      sx={{ ml: 1 }}
-                    >
-                      {reintentandoAnexos ? 'Reintentando...' : 'Reintentar anexos'}
-                    </Button>
-                  </Box>
-                )}
-              </Alert>
-            )}
+            <AlertaGuardado
+              guardado={guardado}
+              editandoId={editandoId}
+              reintentandoAnexos={reintentandoAnexos}
+              onDescargar={handleDescargarPDF}
+              onReintentar={handleReintentarAnexos}
+              onCerrar={() => setGuardado(null)}
+            />
             {/* ============ AQUÍ TERMINA ALERTA GUARDADO ============ */}
 
             {/* ============ AQUÍ EMPIEZA BOTONES ACCIÓN ============ */}
@@ -1136,77 +852,27 @@ export default function GenerarCarta() {
 
       {/* Preview de la redacción IA (solo lectura + retro para corregir) */}
       {/* ============ AQUÍ EMPIEZA DIÁLOGO IA ============ */}
-      <Dialog open={iaAbierto} onClose={() => !iaCargando && !guardando && setIaAbierto(false)} maxWidth="md" fullWidth>
-        <DialogTitle color="encabezado.main" fontWeight="bold">
-          Generando redacción: {nombreTipo(categoria, tipoDoc)}
-        </DialogTitle>
-        <DialogContent dividers>
-          {(iaCargando || iaCorrigiendo || guardando) && (
-            <ProgresoIA
-              fases={iaFases}
-              indice={iaFase}
-              progreso={iaProgreso}
-              segundos={iaSegundos}
-              modelo={iaModelo}
-            />
-          )}
-          {iaError && (
-            <Alert severity="error" sx={{ mb: 2 }}>{iaError}</Alert>
-          )}
-          {errorGuardar && (
-            <Alert severity="error" sx={{ mb: 2 }}>{errorGuardar}</Alert>
-          )}
-          {iaTexto && (
-            <>
-              <Typography
-                variant="body1"
-                sx={{ whiteSpace: 'pre-wrap', mb: 2 }}
-              >
-                {iaTexto}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                Modelo: {iaModelo} · Revisa el texto antes de guardar.
-              </Typography>
-              <TextField
-                label="¿Algo está mal? Describe qué corregir (ej. cambia la vigencia a 1 año, agrega el folio...)"
-                multiline
-                minRows={2}
-                fullWidth
-                value={iaRetro}
-                onChange={(e) => setIaRetro(e.target.value)}
-                disabled={iaCargando || iaCorrigiendo || guardando}
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleCorregirIA}
-                  disabled={iaCargando || iaCorrigiendo || guardando || !iaTexto || !(iaRetro ?? '').trim()}
-                  sx={{ borderColor: 'encabezado.main', color: 'encabezado.main' }}
-                >
-                  {iaCorrigiendo ? 'Corrigiendo...' : 'Corregir'}
-                </Button>
-              </Box>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleVolverADatos} disabled={iaCargando || iaCorrigiendo || guardando} sx={{ color: 'encabezado.main' }}>
-            Volver a datos
-          </Button>
-          <Button onClick={() => setIaAbierto(false)} disabled={iaCargando || iaCorrigiendo || guardando} sx={{ color: 'encabezado.main' }}>
-            Cerrar
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleGuardarFinal}
-            disabled={iaCargando || iaCorrigiendo || guardando || !iaTexto}
-          >
-            {guardando ? 'Generando...' : 'Confirmar y guardar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DialogoRedaccionIA
+        abierto={iaAbierto}
+        titulo={`Generando redacción: ${nombreTipo(categoria, tipoDoc)}`}
+        cargando={iaCargando}
+        corrigiendo={iaCorrigiendo}
+        guardando={guardando}
+        fases={iaFases}
+        fase={iaFase}
+        progreso={iaProgreso}
+        segundos={iaSegundos}
+        modelo={iaModelo}
+        errorIa={iaError}
+        errorGuardar={errorGuardar}
+        texto={iaTexto}
+        retro={iaRetro}
+        onRetro={setIaRetro}
+        onCerrar={() => setIaAbierto(false)}
+        onCorregir={handleCorregirIA}
+        onVolver={handleVolverADatos}
+        onGuardar={handleGuardarFinal}
+      />
       {/* ============ AQUÍ TERMINA DIÁLOGO IA ============ */}
 
     </Box>
