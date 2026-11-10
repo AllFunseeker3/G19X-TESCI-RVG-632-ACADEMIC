@@ -35,7 +35,7 @@ Roles académicos y roles del software van separados (ver §7). Ningún asesor a
 
 **IA (local `:8001`; en Docker solo red interna):**
 - FastAPI + Uvicorn + LangChain (+ `langchain-openai`, `langchain-google-genai`) + `reportlab`
-- Proveedor real: **OpenRouter** (`https://openrouter.ai/api/v1`), modelo default `qwen/qwen3.8-27b:free` con fallback multi-modelo por lista en coma (`gemma-4-26b, gemma-4-31b, nemotron-3-ultra`). Key Google guardada solo como alternativa (probada con 503/404, hoy no usada).
+- Proveedor real: **OpenRouter** (`https://openrouter.ai/api/v1`). `IA_MODEL` se define en `ai-service/.env` (admite lista separada por comas y se prueba en orden); el default de `ai-service/.env.example` es `google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free`. Key Google guardada solo como alternativa (probada con 503/404, hoy no usada).
 - Endpoints: `GET /salud`, `POST /redactar`, `POST /corregir`, `POST /pdf`
 - PDFs en `documentos/Sistema legal/` (ignorada en git), formato institucional carta-poder + genérico 10 tipos
 - Credenciales en `ai-service/.env` (ignorado por git). Flag `IA_PRE_FORMALIZAR=1`.

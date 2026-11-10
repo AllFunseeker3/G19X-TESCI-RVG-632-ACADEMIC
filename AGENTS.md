@@ -45,9 +45,10 @@ Orden explícita del usuario tras el incidente §25 (otro modelo revirtió el fr
   ni en git) + `IA_MODEL` con el ID exacto del modelo elegido en
   openrouter.ai/models (de preferencia uno marcado `:free`).
   Headers recomendados: `HTTP-Referer` (URL de la app) y `X-Title: SisLegal`.
-- Implementación actual: el backend en uso es **Express + MariaDB**
-  y la BD es MariaDB. **FastAPI NO está eliminado: aún no se incorpora**
-  (está pendiente integrarlo según el stack oficial).
+- Implementación actual: el backend principal es **Express + MariaDB**
+  y la BD es MariaDB. **FastAPI sí está incorporado, pero solo como
+  `ai-service/`** (microservicio de IA en el puerto 8001, detrás del proxy
+  Express); no sustituye al backend principal del CRUD.
 - La interfaz se está haciendo con **Material UI (MUI v9)**: todos los
   formularios, tablas, diálogos, tabs y navegación usan componentes MUI
   (`TextField`, `Select`/`NativeSelect`, `Checkbox`, `Switch`, `Button`,
