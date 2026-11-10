@@ -38,10 +38,10 @@ Campos: texto, area (`filas`), fecha `dd/mm/aaaa` con máscara + picker nativo, 
 Selector Categoría → Tipo dependiente, autocomplete Clientes (chip Sin verificar, solo rellena vacíos), validación bloqueante con `errores`. Flujo: `Generar documento con IA` → **Resumen** (verificar) → Redactar (preview solo-lectura + `ProgresoIA` por fases + cronómetro) → cuadro *¿Algo está mal?* + Corregir repetible → Confirmar crea + PDF. Modo `?editar=` precarga + banner con motivo (vuelve a borrador + re-avisa).
 
 ### 2.3 Revisión (`/Revision`)
-Bandeja real, *Creado por*, tab En revisión (=borrador), filtros, Borrar con Dialog MUI, dictamen admin/super (rechazo exige comentario 400), visor PDF 70vh, botón **Revisar documento**: sube PDF externo ≤10MB, la IA clasifica 1 de 11, extrae datos, da veredicto APROBABLE/CORREGIBLE/RECHAZABLE + hallazgos; Editar genera carta **nueva** con folio auto.
+Bandeja real, *Creado por*, tab En revisión (=borrador), filtros, Borrar con Dialog MUI, dictamen solo admin/super y nunca sobre el documento propio (rechazo exige comentario 400; transición inválida 409), visor PDF 70vh, botón **Revisar documento**: sube PDF externo ≤10MB, la IA clasifica 1 de 11, extrae datos, da veredicto APROBABLE/CORREGIBLE/RECHAZABLE + hallazgos; Editar genera carta **nueva** con folio auto.
 
 ### 2.4 Seguimiento (`/Seguimiento`)
-Timeline historial + adjuntos + responsable, motivo rojo/verde + *Editar y corregir* (`/Menu?editar=#id`, creador/admin en borrador/rechazado).
+Timeline historial + adjuntos (con visor PDF) + responsable, motivo rojo/verde + *Editar y corregir* (`/Menu?editar=#id`, creador/admin en borrador/rechazado).
 
 ### 2.5 Clientes (`/Clientes`), Usuarios (`/Usuarios`), Inicio, Config
 - Clientes: chips Verificado/Pendiente, tabs Todos/Pendientes, Verificar (admin/super), Persona/CURP vs Empresa/RFC, baja lógica. Solo roles con permiso de cartas ven/gestionan el directorio (Operativo/Super Operativo reciben 403); alta de no-privilegiado→pendiente, edición ajena sobre verificada→pendiente.
@@ -50,7 +50,7 @@ Timeline historial + adjuntos + responsable, motivo rojo/verde + *Editar y corre
 - Config: 4 acentos (azul #163172/rojo/verde/blanco) + oscuro, persiste localStorage. Plantillas oculta del menú (ruta `/Plantillas` viva).
 
 ### 2.6 Transversales
-Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`). Anexos del formulario: `POST /api/documentos/:id/anexos` (multer, 10 PDF de 10 MB, firma `%PDF-`) los guarda en `PDF_DIR` y los registra en `adjuntos`; si la subida falla, la pantalla lo dice y ofrece reintentar sin duplicar el documento. Pruebas automáticas de API con `node:test` + `supertest` (9 casos: bloqueo CC-01, contraseña actual incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo, descarga PDF autorizada, flujo crear→corregir→aprobar, Super que no crea Supers y anexos PDF persistidos); se ejecutan con `npm test` en `server/` contra una BD aislada `sislegal_test` y una carpeta de PDFs propia. Descargas PDF e IA validan documento/adjunto visible; Docker publica API, web y BD solo en `127.0.0.1` y no publica la IA.
+Auth JWT 8h + `RutaProtegida`/`VigilanteSesion` + heartbeat 30s, RBAC por área (`PermisosProvider.puede()`), notificaciones con hace-cuánto (30s refresh), folios `PREFIJO-AAAA-NNN` atómicos, adjuntos `vigente`, solo-PDF validado front+back, firmas poder en un `KeepTogether` (`splitByRow=0`). Anexos del formulario: `POST /api/documentos/:id/anexos` (multer, 10 PDF de 10 MB, firma `%PDF-`) los guarda en `PDF_DIR` y los registra en `adjuntos`; si la subida falla, la pantalla lo dice y ofrece reintentar sin duplicar el documento. Dictamen: solo admin/super y nunca el creador; `PATCH /:id/estado` valida transiciones (borrador→por_revisar, por_revisar→aprobado/rechazado, aprobado→notificado) y responde 409 a las no previstas. Pruebas automáticas de API con `node:test` + `supertest` (11 casos: bloqueo CC-01, contraseña actual incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo, descarga PDF autorizada, flujo crear→corregir→aprobar, Super que no crea Supers, anexos PDF persistidos, dictamen solo admin/super y transiciones inválidas 409); se ejecutan con `npm test` en `server/` contra una BD aislada `sislegal_test` y una carpeta de PDFs propia. Descargas PDF e IA validan documento/adjunto visible; Docker publica API, web y BD solo en `127.0.0.1` y no publica la IA.
 
 ---
 
@@ -99,7 +99,7 @@ IA_PRE_FORMALIZAR=1
 copy server\.env.test.example server\.env.test   # ignorado por git
 notepad server\.env.test                         # DB_PASSWORD + DB_ADMIN_PASSWORD
 npm run db:test:prep --prefix server             # recrea sislegal_test desde maestro.sql
-npm test --prefix server                         # 9/9 contra sislegal_test
+npm test --prefix server                         # 11/11 contra sislegal_test
 ```
 
 `server/.env.test.example` también trae `PDF_DIR=../documentos/Pruebas test`: las pruebas escriben sus PDF en esa carpeta y **no** en `documentos/Sistema legal`. Si se omite, `api.test.js` usa el mismo valor por omisión que `routes/ia.js` y `routes/documentos.js`. La ruta relativa se resuelve desde `server/` antes de cargar la API.
@@ -117,6 +117,8 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8001  # desde ai-service/
 ### 3.2b Puesta en marcha — Opción B: Docker (recomendada para demo)
 
 **Requisitos:** Docker Desktop Running + key OpenRouter `:free`. No necesitas Node/Python/MariaDB locales (van en contenedores).
+
+> **Sin `OPENROUTER_API_KEY` no arranca.** `docker-compose.yml:27` la exige con `:?` y `ai-service/main.py` fija el endpoint `https://openrouter.ai/api/v1`; si falta o es inválida, el contenedor `ia` falla con `Falta OPENROUTER_API_KEY en ai-service/.env` y `api` no termina de levantar. La key se define en el `.env` de Docker (paso siguiente).
 
 **Archivos Docker (ya en el repo):** `docker-compose.yml` (db + ia + api + web), `server/Dockerfile`, `ai-service/Dockerfile`, `Dockerfile.web` + `nginx.conf`, `.dockerignore` raíz y por servicio (`server/.dockerignore`, `ai-service/.dockerignore`), `.env.docker.example`.
 
@@ -152,6 +154,15 @@ docker compose up --build web         # rebuild solo web tras cambiar front
 - Si `db unhealthy`: `docker inspect sislegal-db-1 --format "{{json .State.Health}}"` (ya corregido a `mariadb-admin`).
 - Si `ports are not available ... 3306`: otro MariaDB/MySQL local ocupa el puerto; agrega `DB_PORT=3307` en `.env` y la BD queda en `127.0.0.1:3307` (no toques tu servidor local).
 - Si el build falla con `npm error code EIDLETIMEOUT` (red lenta al registry): vuelve a lanzar `docker compose up --build -d`; reutiliza las capas ya compiladas y suele terminar en segundos.
+- Si cambias el puerto publicado de `web` (8080) o de `api` (8000), actualiza también `CORS_ORIGINS` en `docker-compose.yml:53` con el origen nuevo (`http://localhost:<puerto>` y `http://127.0.0.1:<puerto>`); si no, el navegador bloquea las llamadas del front a la API.
+- **`npm test` con Docker:** la imagen `api` no lleva `test/` ni `supertest` (los excluye `server/.dockerignore` y el build usa `npm ci --only=production`), así que `docker compose exec api npm test` no funciona. Usa un contenedor desechable con el código montado y la BD de Docker:
+
+  ```powershell
+  docker compose up -d db
+  docker compose run --rm --no-deps -v "${PWD}\server:/app/server" -v "${PWD}\db:/app/db" -v /app/server/node_modules -w /app/server api sh -lc "npm ci && DB_NAME=sislegal_test DB_HOST=db DB_PORT=3306 DB_GRANT_HOST=% npm run db:test:prep && DB_NAME=sislegal_test DB_HOST=db DB_PORT=3306 npm test"
+  ```
+
+  Requiere `server/.env.test` (plantilla en §3.2) con la **misma contraseña root** que `DB_ROOT_PASSWORD` de tu `.env` Docker en `DB_ADMIN_PASSWORD`. `DB_GRANT_HOST=%` concede acceso desde la red de compose; el volumen anónimo de `node_modules` evita tocar los del host. La primera ejecución tarda por `npm ci`.
 
 ### 3.2c Prueba de punta a punta (clon nuevo)
 
@@ -168,14 +179,14 @@ En el ensayo del 2026-11-02 se repitieron sobre un clon limpio (contenedores, BD
 
 ### 3.3 Uso diario por rol (rutas)
 1. Crear: `/Menu` → categoría/tipo → cliente → capturar → IA → Confirmar → Descargar PDF (folio en alerta).
-2. Dictaminar: `/Revision` → En revisión → Aprobar o Rechazar con motivo → el creador recibe campanita.
+2. Dictaminar: `/Revision` → En revisión → Aprobar o Rechazar con motivo (solo admin/super y nunca tu propio documento) → el creador recibe campanita.
 3. Corregir: `/Seguimiento` → motivo → Editar y corregir → `/Menu?editar=` → Confirmar (nuevo PDF = Actual, anterior = histórico).
 4. Revisar externo: `/Revision` → Revisar documento → subir PDF → ver veredicto → Cerrar/Editar.
 5. Verificar cliente: `/Clientes` → tabs → Verificar (admin/super).
 6. Gestionar: `/Usuarios` → alta/editar rol/baja-reactivar. `/Inicio` para KPIs y búsqueda.
 
 ### 3.4 Reglas que deben respetar
-Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, fotos del form viven en memoria y los anexos PDF sí se guardan al confirmar (quedan en `adjuntos` y se descargan con el mismo permiso del documento), IA free tarda 40-150s y puede dar 429 → esperar 1 min o cambiar `IA_MODEL`.
+Fechas `dd/mm/aaaa`, anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, dictamen solo admin/super y nunca el propio documento, transiciones de estado inválidas responden 409, fotos del form viven en memoria y los anexos PDF sí se guardan al confirmar (quedan en `adjuntos` y se descargan con el mismo permiso del documento), IA free tarda 40-150s y puede dar 429 → esperar 1 min o cambiar `IA_MODEL`.
 
 ---
 
@@ -219,5 +230,5 @@ Como parte de la entrega académica, y atendiendo el criterio de la evaluación,
 
 - **Contratos:** ver `Docs/MVP.md §5` (auth, catálogo, documentos, IA redactar/corregir/revisar/pdf, clientes, notificaciones, usuarios).
 - **Modelo:** `db/maestro.sql` 14 tablas (areas, roles, puestos, categorias, permisos_rol, usuarios, clientes, tipos_documento, campos_tipo 137, documentos JSON+contenido+modelo_ia+id_cliente+folio, historial, adjuntos solo-PDF+vigente, notificaciones, folios).
-- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK, `npm test` 9/9 contra `sislegal_test` (API: CC-01, 401, clientes 403, rechazo 400, folio consecutivo, PDF autorizado, flujo crear→corregir→aprobar, Super no crea Supers y anexos PDF persistidos) + `/api/salud` con `usuarios:5` sobre `sislegal_test` + Docker 2026-10-21 (api/web en loopback, IA interna, `/api/salud` 200, web 200, login admin 200, imagen API sin `.env`) y 2026-10-26 (binding de BD verificado en `127.0.0.1`). Docs reales de prueba descritos en sesión interna.
+- **Verificado:** `eslint` limpio, `build` OK (warning chunk preexistente), `node --check`, `py_compile`, `db:test` OK, `npm test` 11/11 contra `sislegal_test` (API: CC-01, 401, clientes 403, rechazo 400, folio consecutivo, PDF autorizado, flujo crear→corregir→aprobar, Super no crea Supers, anexos PDF persistidos, dictamen solo admin/super y transiciones 409) + `/api/salud` con `usuarios:5` sobre `sislegal_test` + Docker 2026-10-21 (api/web en loopback, IA interna, `/api/salud` 200, web 200, login admin 200, imagen API sin `.env`) y 2026-10-26 (binding de BD verificado en `127.0.0.1`). Docs reales de prueba descritos en sesión interna.
 - **NO hace:** SSO/refresh/2FA, OCR, e.firma, subida de fotos, vencimientos, versionado plantillas, CI, Postgres/Azure, PWA.

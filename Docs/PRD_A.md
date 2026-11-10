@@ -65,7 +65,7 @@ Roles académicos y roles del software van separados (ver §7). Ningún asesor a
 **Matiz real 30/09/2026:**
 - Sí automatiza generación de 4 categorías + 11 tipos + 137 campos (`src/lib/tiposDocumentos.js` espejo de BD).
 - Sí incorpora IA para redactar + formalizar + corregir (`/redactar`, `/corregir`).
-- Sí gestiona aprobación (borrador→aprobado/rechazado) y trazabilidad (`documento_historial` + timeline en Seguimiento).
+- Sí gestiona aprobación (borrador → por_revisar → aprobado/rechazado; solo admin/super y nunca el creador) y trazabilidad (`documento_historial` + timeline en Seguimiento).
 - Control de versiones = historial por dictamen + regeneración de PDF, NO versionado semántico de plantillas.
 - Validación = formal (required, email, fecha dd/mm/aaaa, moneda, PDF-only) + formalización IA, NO validación jurídica automática contra códigos.
 
@@ -80,7 +80,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 1. Analizar los procesos documentales — HECHO (catálogo 11 tipos fijado).
 2. Diseñar la arquitectura tecnológica — HECHO (Express+MariaDB+React+FastAPI-IA, documentada en §8).
 3. Implementar automatización y validación jurídica — HECHO parcial (automatización + validación formal + formalización IA; validación jurídica de fondo sigue siendo humana).
-4. Validar la calidad de los documentos — HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 9 casos de API con node:test/supertest sobre `sislegal_test`; validación jurídica de fondo sigue siendo humana).
+4. Validar la calidad de los documentos - HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 11 casos de API con node:test/supertest sobre `sislegal_test`; validación jurídica de fondo sigue siendo humana).
 5. Elaborar documentación técnica y plan de soporte — PARCIAL (este PRD + `AGENTS.md` + comentarios en código; falta manual de usuario final y plan multinivel formal).
 ---
 
@@ -118,7 +118,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 - Guarda en `documentos/Sistema legal/` + registra adjunto solo-PDF si hay `id_documento`. Descarga con login `GET /api/ia/pdf/:archivo` → Blob → iframe 70vh (Revisión) o download (Generar).
 
 **Revisión (`Revision.jsx`):**
-- Bandeja real `GET /api/documentos`, columna Creado por (`LEFT JOIN usuarios`), tab En revisión (=borrador), filtros, Borrar con Dialog MUI propio (sin `window.confirm`), dictamen admin/super/modificar (rechazo exige comentario), visor PDF supervisores, `DELETE /:id` CASCADE.
+- Bandeja real `GET /api/documentos`, columna Creado por (`LEFT JOIN usuarios`), tab En revisión (=borrador), filtros, Borrar con Dialog MUI propio (sin `window.confirm`), dictamen solo admin/super y nunca el creador (rechazo exige comentario; transición inválida 409), visor PDF supervisores, `DELETE /:id` CASCADE.
 - Botón **Revisar documento** (REV-01, sin "IA" en etiqueta): sube PDF externo ≤10MB (`POST /api/ia/revisar` → `/revisar-pdf`), la IA clasifica 1 de 11 + extrae datos + veredicto APROBABLE/CORREGIBLE/RECHAZABLE; Editar guarda en `sessionStorage` y abre `/Menu?origen=revision-pdf` para generar carta **nueva**.
 
 **Plantillas (oculta 14/10):**
@@ -257,7 +257,7 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 3. Arquitectura — componentes/APIs — Entregable arquitectura — HECHO
 4. Planificación — backlog/cronograma — Entregable plan — HECHO
 5. Desarrollo — generación/validación/versiones/aprobación — Entregable sistema — HECHO
-6. Pruebas — funcional/integración/documental — Entregable QA — HECHO (9 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
+6. Pruebas - funcional/integración/documental - Entregable QA - HECHO (11 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
 7. Documentación — manuales — Entregable manual — PARCIAL
 8. Mantenimiento — soporte/plantillas — Entregable plan — PENDIENTE
 9. Capacitación — admin/usuarios — Entregable acta — PENDIENTE
@@ -272,5 +272,5 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 **Aceptación global:**
 - Crear los 11 tipos de punta a punta y verlos en Revisión/Seguimiento tras recargar.
 - Rechazo sin comentario bloqueado (400). Borrado con Dialog propio.
-- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 9/9 contra `sislegal_test`.
+- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 11/11 contra `sislegal_test`.
 - Trazabilidad por folio + historial + notificaciones verificables.
