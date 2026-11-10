@@ -134,10 +134,10 @@ export default function Ingreso() {
             sx={{
                 minHeight: 'calc(100vh - 16px)',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'flex-start', md: 'center' },
                 justifyContent: 'center',
                 px: { xs: 2, sm: 4 },
-                py: { xs: 3, md: 6 },
+                py: { xs: 2.5, sm: 4, md: 6 },
                 bgcolor: 'background.default',
             }}
         >
@@ -161,8 +161,8 @@ export default function Ingreso() {
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
-                        minHeight: { xs: 260, md: 540 },
-                        p: { xs: 4, sm: 6 },
+                        minHeight: { xs: 200, md: 540 },
+                        p: { xs: 3, sm: 6 },
                         color: 'primary.contrastText',
                         bgcolor: 'primary.main',
                         background: (theme) => `linear-gradient(145deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
@@ -175,7 +175,7 @@ export default function Ingreso() {
                                 height: 58,
                                 display: 'grid',
                                 placeItems: 'center',
-                                mb: 4,
+                                mb: { xs: 2, md: 4 },
                                 border: '1px solid',
                                 borderColor: 'primary.contrastText',
                                 borderRadius: 2,
@@ -193,14 +193,14 @@ export default function Ingreso() {
                             Gestiona tus cartas y documentos desde un solo lugar.
                         </Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ mt: 5, opacity: 0.75 }}>
+                    <Typography variant="body2" sx={{ mt: { xs: 3, md: 5 }, opacity: 0.75 }}>
                         Plataforma de gestión documental
                     </Typography>
                 </Box>
                 {/* ============ AQUÍ TERMINA PANEL LATERAL BIENVENIDA ============ */}
 
                 {/* ============ AQUÍ EMPIEZA FORMULARIO ACCESO ============ */}
-                <Box component="form" onSubmit={cambioPendiente ? handleCambio : handleLogin} sx={{ p: { xs: 4, sm: 6, md: 8 } }}>
+                <Box component="form" onSubmit={cambioPendiente ? handleCambio : handleLogin} sx={{ p: { xs: 3, sm: 6, md: 8 } }}>
                     {/* ============ AQUÍ EMPIEZA BOTÓN VOLVER AL LOGIN (CC-01) ============ */}
                     {cambioPendiente && (
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -216,7 +216,7 @@ export default function Ingreso() {
                         </Box>
                     )}
                     {/* ============ AQUÍ TERMINA BOTÓN VOLVER AL LOGIN (CC-01) ============ */}
-                    <Stack spacing={1} sx={{ mb: 4 }}>
+                    <Stack spacing={1} sx={{ mb: { xs: 3, md: 4 } }}>
                         <Typography variant="overline" color="encabezado.main" fontWeight={700} letterSpacing={1.2}>
                             {cambioPendiente ? 'Primer ingreso' : 'Acceso al sistema'}
                         </Typography>
@@ -392,7 +392,7 @@ export default function Ingreso() {
 
                     {/* ============ AQUÍ EMPIEZA OPCIONES ACCESO ============ */}
                     {!cambioPendiente && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 1, mt: 1.5, mb: 3 }}>
                         <FormControlLabel
                             control={<Checkbox size="small" color="primary" />}
                             label={<Typography variant="body2">Recordarme</Typography>}
