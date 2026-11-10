@@ -347,6 +347,32 @@ test("Anexos: el PDF se guarda, se descarga y el no-PDF se rechaza", async () =>
       contentType: "text/plain",
     });
   assert.equal(malo.status, 400);
+
+  // Lote mixto: el PDF bueno y uno falso en la misma petición. La ruta es
+  // todo-o-nada: rechaza el lote y tampoco guarda el archivo válido. El front
+  // ya filtra por firma antes de enviarlo, esto comprueba que el back no cede.
+  const [antes] = await pool.query(
+    "SELECT COUNT(*) AS n FROM adjuntos WHERE id_documento = ?",
+    [alta.body.id]
+  );
+  const mixto = await request(app)
+    .post(`/api/documentos/${alta.body.id}/anexos`)
+    .set(bearer(adminToken))
+    .attach("archivos", pdf, {
+      filename: "anexo-bueno.pdf",
+      contentType: "application/pdf",
+    })
+    .attach("archivos", Buffer.from("no soy pdf"), {
+      filename: "nota.pdf",
+      contentType: "application/pdf",
+    });
+  assert.equal(mixto.status, 400);
+  assert.match(mixto.body.detail, /no es un PDF válido/);
+  const [despues] = await pool.query(
+    "SELECT COUNT(*) AS n FROM adjuntos WHERE id_documento = ?",
+    [alta.body.id]
+  );
+  assert.equal(despues[0].n, antes[0].n); // Ni el anexo válido quedó guardado.
 });
 // ============ AQUÍ TERMINA CASO 9 ============
 
