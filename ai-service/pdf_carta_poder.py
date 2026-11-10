@@ -10,6 +10,7 @@
 # ============================================================================
 # ============ AQUÍ EMPIEZA IMPORTS ============
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -197,6 +198,50 @@ def generar_carta_poder(datos: dict, nombre_base: str = "carta-poder") -> dict:
     return {"archivo": archivo, "ruta": str(ruta), "bytes": ruta.stat().st_size}
 # ============ AQUÍ TERMINA FUNCIÓN GENERAR_CARTA_PODER ============
 
+# ============ AQUÍ EMPIEZA FUNCIÓN QUITAR ENCABEZADO REPETIDO ============
+def _normalizar_linea(texto: str) -> str:
+    """Minúsculas, sin acentos, markdown ni puntuación: solo para comparar."""
+    t = (texto or "").strip().lower()
+    t = re.sub(r"^[#*_\s]+|[#*_\s]+$", "", t)
+    t = unicodedata.normalize("NFD", t)
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9]+", " ", t).strip()
+
+
+def _quitar_encabezado_repetido(cuerpo: str, titulo: str, lugar: str, fecha: str) -> str:
+    """El generador ya dibuja el título y el lugar/fecha; la IA a veces los
+    repite al inicio del texto. Se quitan esas líneas para no duplicarlas,
+    pero se conservan folio/asunto (el PDF no los dibuja)."""
+    if not cuerpo:
+        return cuerpo
+    cabecera = {_normalizar_linea(titulo)} if titulo else set()
+    if lugar or fecha:
+        cabecera.add(_normalizar_linea(f"{lugar}, a {fecha}"))
+    lugar_n = _normalizar_linea(lugar)
+    fecha_n = _normalizar_linea(fecha)
+    piezas_fecha = [p for p in re.split(r"[^a-z0-9]+", fecha_n) if p and p != "de"]
+
+    def es_cabecera(linea: str) -> bool:
+        n = _normalizar_linea(linea)
+        if n in cabecera:
+            return True
+        # Variantes de redacción ("…, a 3 de noviembre del 2026"): solo si la
+        # línea abre con el lugar y trae día, mes y año, para no borrar prosa.
+        if not (lugar_n and piezas_fecha and n.startswith(lugar_n)):
+            return False
+        palabras = set(n.split())
+        return all(p in palabras for p in piezas_fecha)
+
+    bloques = [b.strip() for b in cuerpo.split("\n\n") if b.strip()]
+    # Solo se revisan los dos primeros bloques: ahí vive el encabezado.
+    for i in range(min(2, len(bloques))):
+        lineas = [ln for ln in bloques[i].split("\n") if ln.strip()]
+        restantes = [ln for ln in lineas if not es_cabecera(ln)]
+        if len(restantes) != len(lineas):
+            bloques[i] = "\n".join(restantes)
+    return "\n\n".join(b for b in bloques if b.strip())
+# ============ AQUÍ TERMINA FUNCIÓN QUITAR ENCABEZADO REPETIDO ============
+
 # ============ AQUÍ EMPIEZA FUNCIÓN GENERAR PDF GENÉRICO ============
 def generar_pdf_generico(titulo: str, datos: dict, contenido: str, nombre_base: str = "documento") -> dict:
     """PDF institucional genérico para los 10 tipos no carta-poder.
@@ -211,6 +256,9 @@ def generar_pdf_generico(titulo: str, datos: dict, contenido: str, nombre_base: 
     lugar = d.get("lugar", "")
     fecha = fecha_larga(d.get("fecha", ""))
     cuerpo = (contenido or "").strip()
+    if cuerpo:
+        # Evita que el título y el lugar/fecha salgan dos veces (IA + generador).
+        cuerpo = _quitar_encabezado_repetido(cuerpo, titulo, lugar, fecha)
     if not cuerpo:
         # Fallback: si no llegó la redacción IA (proxy sin reiniciar o IA saturada),
         # construye el cuerpo desde los datos para no dejar el PDF vacío.
