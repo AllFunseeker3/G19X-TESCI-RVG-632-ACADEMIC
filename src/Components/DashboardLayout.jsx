@@ -8,7 +8,7 @@
 // QUÉ MODIFICAR SI hay cambios: opciones del drawer o heartbeat, aquí mismo.
 // ============================================================================
 import { useEffect, useMemo, useState } from 'react';
-import { Box, AppBar, Toolbar, Drawer, Typography, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse, Avatar } from '@mui/material';
+import { Box, AppBar, Toolbar, Drawer, Typography, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse, Avatar, IconButton, useMediaQuery } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import CentroNotificaciones from './CentroNotificaciones';
 import EstadoConexion from './EstadoConexion';
@@ -25,6 +25,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import GroupIcon from '@mui/icons-material/Group';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import MenuIcon from '@mui/icons-material/Menu';
 
 const drawerWidth = 210;
 
@@ -32,6 +33,9 @@ const drawerWidth = 210;
 function MenuInterior({ children }) {
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
+    // En pantallas chicas el menú es temporal (Drawer) para no desbordar 390px.
+    const [movilAbierto, setMovilAbierto] = useState(false);
+    const esMovil = useMediaQuery('(max-width:900px)');
     const { puede, algunaCon } = usePermisos();
     const usuario = useMemo(() => leerUsuario(), []);
     const nombreUsuario = usuario?.nombre || 'Residente';
@@ -53,15 +57,26 @@ function MenuInterior({ children }) {
         <Box sx={{ display: 'flex' }}>
             {/* ============ AQUÍ EMPIEZA BARRA superior ============ */}
             <AppBar id="Barra superior" position="fixed" sx={{
-                width: `calc(100% - ${drawerWidth}px)`,
-                ml: `${drawerWidth}px`,
+                width: esMovil ? '100%' : `calc(100% - ${drawerWidth}px)`,
+                ml: esMovil ? 0 : `${drawerWidth}px`,
                 bgcolor: 'primary.main',
                 color: 'primary.contrastText',
                 boxShadow: 1,
             }}>
                 <Toolbar>
+                    {esMovil && (
+                        <IconButton
+                            color="inherit"
+                            edge="start"
+                            aria-label="Abrir menú"
+                            onClick={() => setMovilAbierto(true)}
+                            sx={{ mr: 1 }}
+                        >
+                            <MenuIcon />
+                        </IconButton>
+                    )}
                     <Typography variant="h6" noWrap component="div" fontWeight="bold" sx={{ flexGrow: 1 }}>
-                        Sistema de Residencias
+                        SisLegal
                     </Typography>
                     <CentroNotificaciones />
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
@@ -87,7 +102,10 @@ function MenuInterior({ children }) {
                         color: 'primary.contrastText'
                     },
                 }}
-                variant="permanent"
+                variant={esMovil ? 'temporary' : 'permanent'}
+                open={esMovil ? movilAbierto : true}
+                onClose={() => setMovilAbierto(false)}
+                ModalProps={{ keepMounted: true }}
                 anchor="left"
             >
                 <Toolbar>
@@ -96,7 +114,7 @@ function MenuInterior({ children }) {
                     </Typography>
                 </Toolbar>
 
-                <List>
+                <List onClick={() => { if (esMovil) setMovilAbierto(false); }}>
                     <ListItem disablePadding>
                         <ListItemButton component={Link} to="/Inicio">
                             <ListItemIcon><HomeIcon sx={{ color: 'primary.contrastText' }} /></ListItemIcon>

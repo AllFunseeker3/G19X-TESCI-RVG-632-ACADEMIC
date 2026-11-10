@@ -22,14 +22,16 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Box, Typography, NativeSelect, InputLabel, Card, CardContent, Button,
-  Grid, Stepper, Step, StepLabel, StepContent, Alert,
+  Grid, Stepper, Step, StepLabel, StepContent, Alert, Chip, List, ListItem,
+  ListItemText, Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import PageHeader from '../Components/PageHeader';
 // DATOS QUE SE MANDAN A ../Components/EstadoChip.jsx para procesamiento: estado={doc.estado}.
 import EstadoChip from '../Components/EstadoChip';
 // DATOS PROVENIENTES DE ../lib/api.js: lista y detalle reales (área/permiso del back).
-import { getDocumentos, getDocumento, leerUsuario } from '../lib/api.js';
+import { getDocumentos, getDocumento, leerUsuario, descargarPDF } from '../lib/api.js';
 // Etiquetas legibles de etapas (código API -> visible).
 import { estadoBonito } from '../lib/estados';
 // PERMISOS: el admin también puede corregir (el back lo revalida).
@@ -49,6 +51,12 @@ export default function Seguimiento() {
     // ESTADO: carga y errores de red (se muestran en Alert).
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
+    // Visor de los PDF adjuntos (Blob autenticado -> iframe).
+    const [pdfUrl, setPdfUrl] = useState(null);
+    const [pdfNombre, setPdfNombre] = useState('');
+    const [pdfAbierto, setPdfAbierto] = useState(false);
+    const [pdfCargando, setPdfCargando] = useState(false);
+    const [pdfError, setPdfError] = useState('');
     // ============ AQUÍ TERMINA ESTADOS SEGUIMIENTO ============
 
     // ============ AQUÍ EMPIEZA CARGA LISTA ============
@@ -107,6 +115,36 @@ export default function Seguimiento() {
     const puedeEditar = Boolean(doc)
         && (doc.estado === 'borrador' || doc.estado === 'rechazado')
         && (admin || yo?.id === doc.id_creador);
+
+    // HANDLER: descarga el adjunto con token y lo muestra en un Dialog.
+    const verPDF = async (nombre) => {
+        if (!nombre || pdfCargando) return;
+        setPdfError('');
+        setPdfCargando(true);
+        try {
+            const blob = await descargarPDF(nombre);
+            setPdfUrl(URL.createObjectURL(blob));
+            setPdfNombre(nombre);
+            setPdfAbierto(true);
+        } catch (e) {
+            setPdfError(e.message || 'No se pudo abrir el PDF');
+        } finally {
+            setPdfCargando(false);
+        }
+    };
+
+    // HANDLER: cierra el visor y libera el Blob.
+    const cerrarPDF = () => {
+        setPdfAbierto(false);
+        setPdfUrl(null);
+        setPdfNombre('');
+        setPdfError('');
+    };
+
+    // Libera el Blob al desmontar o al reemplazarlo por otro adjunto.
+    useEffect(() => () => {
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    }, [pdfUrl]);
 
     return (
         // SECCIÓN JSX: contenedor raíz (id preexistente conservado).
@@ -189,6 +227,49 @@ export default function Seguimiento() {
                                             ? `: ${ultimaAprobacion.comentario ?? ''}` : ''}.
                                     </Alert>
                                 )}
+                                {/* SECCIÓN JSX: PDF del documento y anexos con visor. */}
+                                <Box id="Box-Seguimiento-PDFs" sx={{ mt: 2 }}>
+                                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                                        Documentos PDF
+                                    </Typography>
+                                    {(!doc.adjuntos || doc.adjuntos.length === 0) ? (
+                                        <Typography variant="body2" color="text.secondary">
+                                            Sin PDF registrado.
+                                        </Typography>
+                                    ) : (
+                                        <List dense>
+                                            {doc.adjuntos.map((a, idx) => {
+                                                const esAnexo = /^anexo-/.test(String(a.nombre_archivo || ''));
+                                                const esVigente = !esAnexo && ((a.vigente === undefined || a.vigente === null) ? idx === 0 : Boolean(Number(a.vigente)));
+                                                const etiqueta = esAnexo ? 'Anexo' : (esVigente ? 'Actual' : 'Versión anterior');
+                                                return (
+                                                    <ListItem key={a.id} disablePadding sx={{ py: 0.5 }}>
+                                                        <ListItemText
+                                                            primary={a.nombre_archivo}
+                                                            secondary={a.subido_en ? String(a.subido_en).slice(0, 16).replace('T', ' ') : ''}
+                                                        />
+                                                        <Chip size="small" label={etiqueta} color={esVigente ? 'success' : 'default'} sx={{ mr: 1, flexShrink: 0 }} />
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            startIcon={<PictureAsPdfIcon />}
+                                                            disabled={pdfCargando}
+                                                            onClick={() => verPDF(a.nombre_archivo)}
+                                                            sx={{ flexShrink: 0 }}
+                                                        >
+                                                            {pdfCargando ? 'Abriendo…' : 'Ver PDF'}
+                                                        </Button>
+                                                    </ListItem>
+                                                );
+                                            })}
+                                        </List>
+                                    )}
+                                    {pdfError && (
+                                        <Alert severity="error" sx={{ mt: 1 }} onClose={() => setPdfError('')}>
+                                            {pdfError}
+                                        </Alert>
+                                    )}
+                                </Box>
                                 {puedeEditar && (
                                     <Button
                                         component={Link}
@@ -245,6 +326,29 @@ export default function Seguimiento() {
             </Grid>
             )}
             {/* ============ AQUÍ TERMINA FICHA Y LÍNEA DE TIEMPO ============ */}
+
+            {/* ============ AQUÍ EMPIEZA VISOR PDF SEGUIMIENTO ============ */}
+            <Dialog open={pdfAbierto} onClose={cerrarPDF} maxWidth="lg" fullWidth>
+                <DialogTitle color="encabezado.main" fontWeight="bold">
+                    {pdfNombre || 'Documento PDF'}
+                </DialogTitle>
+                <DialogContent dividers>
+                    {pdfUrl && (
+                        <Box
+                            component="iframe"
+                            src={pdfUrl}
+                            title={pdfNombre}
+                            sx={{ width: '100%', height: '70vh', border: 'none' }}
+                        />
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cerrarPDF} color="primary">
+                        Cerrar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* ============ AQUÍ TERMINA VISOR PDF SEGUIMIENTO ============ */}
         </Box>
         // ============ AQUÍ TERMINA CONTENEDOR SEGUIMIENTO ============
     );

@@ -37,7 +37,7 @@ import PageHeader from '../Components/PageHeader';
 import EstadoChip from '../Components/EstadoChip';
 import ProgresoIA from '../Components/ProgresoIA';
 // DATOS PROVENIENTES DE ../lib/api.js: bandeja real (ya filtrada por área/permiso).
-import { getDocumentos, getDocumento, cambiarEstado, eliminarDocumento, descargarPDF, revisarPDFconIA } from '../lib/api.js';
+import { getDocumentos, getDocumento, cambiarEstado, eliminarDocumento, descargarPDF, revisarPDFconIA, leerUsuario } from '../lib/api.js';
 // Conversión código API <-> etiqueta visible (ver ../lib/estados.js).
 import { estadoBonito } from '../lib/estados';
 import { categoriaDeTipo } from '../lib/tiposDocumentos';
@@ -99,6 +99,8 @@ export default function Revision() {
     const [borrando, setBorrando] = useState(false);
     // PERMISOS: admin/super dictaminan; eliminar exige permiso por categoría.
     const { puede, admin, super: esSuper } = usePermisos();
+    // Usuario logueado: sirve para impedir que el creador dicte su documento.
+    const yo = leerUsuario();
     // ============ AQUÍ TERMINA ESTADOS REVISIÓN ============
     // ============ AQUÍ EMPIEZA REVISIÓN PDF EXTERNO CON IA ============
     // Subir un PDF externo: la IA lo clasifica (11 tipos), extrae datos y revisa.
@@ -310,10 +312,11 @@ export default function Revision() {
         }
     };
 
-    // CÁLCULO: ¿puede dictaminar esta fila? (borrador/por_revisar + admin/super/modificar).
+    // CÁLCULO: ¿puede dictaminar esta fila? Solo admin/super y nunca su creador.
     const puedeDictaminar = (doc) =>
         (doc.estado === 'por_revisar' || doc.estado === 'borrador')
-        && (admin || esSuper || puede(doc.categoria, 'modificar'));
+        && (admin || esSuper)
+        && yo?.id !== doc.id_creador;
     // CÁLCULO: ¿puede borrar esta fila? (admin o eliminar en su categoría).
     const puedeBorrar = (doc) => admin || puede(doc.categoria, 'eliminar');
     // ============ AQUÍ TERMINA HANDLERS DICTAMEN ============
@@ -487,7 +490,7 @@ export default function Revision() {
                                                     secondary={a.subido_en ? String(a.subido_en).slice(0, 16).replace('T', ' ') : ''}
                                                 />
                                                 <Chip size="small" label={etiquetaPdf} color={colorPdf} sx={{ mr: 1, flexShrink: 0 }} />
-                                                {(admin || esSuper || puedeDictaminar(seleccionado)) && (
+                                                {(admin || esSuper || puede(seleccionado.categoria, 'ver')) && (
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
@@ -543,7 +546,7 @@ export default function Revision() {
                                 variant="contained"
                                 color="error"
                                 disabled={!puedeDictaminar(seleccionado) || !comentario.trim()}
-                                title={!puedeDictaminar(seleccionado) ? 'Solo en revisión con permiso (admin/super/modificar)' : (!comentario.trim() ? 'Escribe el motivo del rechazo' : 'Rechazar')}
+                                title={!puedeDictaminar(seleccionado) ? 'Solo admin/super, y nunca tu propio documento' : (!comentario.trim() ? 'Escribe el motivo del rechazo' : 'Rechazar')}
                                 onClick={() => dictaminar('rechazado')}
                             >
                                 Rechazar
@@ -552,7 +555,7 @@ export default function Revision() {
                                 variant="contained"
                                 color="success"
                                 disabled={!puedeDictaminar(seleccionado)}
-                                title={puedeDictaminar(seleccionado) ? 'Aprobar' : 'Solo en revisión con permiso (admin/super/modificar)'}
+                                title={puedeDictaminar(seleccionado) ? 'Aprobar' : 'Solo admin/super, y nunca tu propio documento'}
                                 onClick={() => dictaminar('aprobado')}
                             >
                                 Aprobar
