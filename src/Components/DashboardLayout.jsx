@@ -26,6 +26,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 
 const drawerWidth = 210;
 
@@ -53,6 +54,12 @@ function MenuInterior({ children }) {
         navigate('/Ingreso', { replace: true });
     };
 
+    // Cierra el menú temporal al elegir una ruta final. No se usa en el botón
+    // "Cartas", que solo despliega el colapso y debe dejar el menú abierto.
+    const cerrarSiMovil = () => {
+        if (esMovil) setMovilAbierto(false);
+    };
+
     return (
         <Box sx={{ display: 'flex' }}>
             {/* ============ AQUÍ EMPIEZA BARRA superior ============ */}
@@ -68,8 +75,9 @@ function MenuInterior({ children }) {
                         <IconButton
                             color="inherit"
                             edge="start"
-                            aria-label="Abrir menú"
-                            onClick={() => setMovilAbierto(true)}
+                            aria-label={movilAbierto ? 'Cerrar menú' : 'Abrir menú'}
+                            aria-expanded={movilAbierto}
+                            onClick={() => setMovilAbierto((v) => !v)}
                             sx={{ mr: 1 }}
                         >
                             <MenuIcon />
@@ -81,7 +89,7 @@ function MenuInterior({ children }) {
                     <CentroNotificaciones />
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
                         <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.contrastText', color: 'primary.main' }}>{inicial}</Avatar>
-                        <Typography variant="body2" fontWeight="bold">
+                        <Typography variant="body2" fontWeight="bold" sx={{ display: { xs: 'none', md: 'block' } }}>
                             {nombreUsuario}
                         </Typography>
                     </Box>
@@ -108,15 +116,24 @@ function MenuInterior({ children }) {
                 ModalProps={{ keepMounted: true }}
                 anchor="left"
             >
-                <Toolbar>
+                <Toolbar sx={{ justifyContent: 'space-between' }}>
                     <Typography variant="h6" noWrap component="div" fontWeight="bold">
                         Menú
                     </Typography>
+                    {esMovil && (
+                        <IconButton
+                            aria-label="Cerrar menú"
+                            onClick={() => setMovilAbierto(false)}
+                            sx={{ color: 'primary.contrastText' }}
+                        >
+                            <CloseIcon />
+                        </IconButton>
+                    )}
                 </Toolbar>
 
-                <List onClick={() => { if (esMovil) setMovilAbierto(false); }}>
+                <List>
                     <ListItem disablePadding>
-                        <ListItemButton component={Link} to="/Inicio">
+                        <ListItemButton component={Link} to="/Inicio" onClick={cerrarSiMovil}>
                             <ListItemIcon><HomeIcon sx={{ color: 'primary.contrastText' }} /></ListItemIcon>
                             <ListItemText primary="Inicio" />
                         </ListItemButton>
@@ -131,20 +148,20 @@ function MenuInterior({ children }) {
                     </ListItemButton>
                     <Collapse in={open} timeout="auto" unmountOnExit>
                         <List component="div" disablePadding>
-                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Menu">
+                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Menu" onClick={cerrarSiMovil}>
                                 <ListItemText primary="Generar carta" />
                             </ListItemButton>
 
-                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Revision">
+                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Revision" onClick={cerrarSiMovil}>
                                 <ListItemText primary="Revisar cartas" />
                             </ListItemButton>
 
-                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Seguimiento">
+                            <ListItemButton sx={{ pl: 4 }} component={Link} to="/Seguimiento" onClick={cerrarSiMovil}>
                                 <ListItemText primary="Seguimiento" />
                             </ListItemButton>
 
                             {puede('cartas', 'ver') && (
-                                <ListItemButton sx={{ pl: 4 }} component={Link} to="/Clientes">
+                                <ListItemButton sx={{ pl: 4 }} component={Link} to="/Clientes" onClick={cerrarSiMovil}>
                                     <ListItemText primary="Clientes" />
                                 </ListItemButton>
                             )}
@@ -163,7 +180,7 @@ function MenuInterior({ children }) {
 
                     {puede('*', 'gestionar') && (
                         <ListItem disablePadding>
-                            <ListItemButton component={Link} to="/Usuarios">
+                            <ListItemButton component={Link} to="/Usuarios" onClick={cerrarSiMovil}>
                                 <ListItemIcon><GroupIcon sx={{ color: 'primary.contrastText' }} /></ListItemIcon>
                                 <ListItemText primary="Usuarios" />
                             </ListItemButton>
@@ -171,14 +188,14 @@ function MenuInterior({ children }) {
                     )}
 
                     <ListItem disablePadding>
-                        <ListItemButton component={Link} to="/Configuracion">
+                        <ListItemButton component={Link} to="/Configuracion" onClick={cerrarSiMovil}>
                             <ListItemIcon><SettingsIcon sx={{ color: 'primary.contrastText' }} /></ListItemIcon>
                             <ListItemText primary="Configuración" />
                         </ListItemButton>
                     </ListItem>
 
                     <ListItem disablePadding>
-                        <ListItemButton onClick={handleLogout}>
+                        <ListItemButton onClick={() => { cerrarSiMovil(); handleLogout(); }}>
                             <ListItemIcon><LogoutIcon sx={{ color: 'primary.contrastText' }} /></ListItemIcon>
                             <ListItemText primary="Cerrar sesión" />
                         </ListItemButton>
@@ -194,7 +211,7 @@ function MenuInterior({ children }) {
                 sx={{
                     flexGrow: 1,
                     bgcolor: 'background.default',
-                    p: 3,
+                    p: { xs: 2, sm: 3 },
                 }}
             >
                 <Toolbar />
