@@ -27,7 +27,7 @@ export default function Configuracion() {
     <Box sx={{ p: 2, width: '100%' }}>
       {/* ============ AQUÍ EMPIEZA TARJETA CONFIGURACIÓN ============ */}
       <Card sx={{ maxWidth: 920, mx: 'auto', borderRadius: 3 }}>
-        <CardContent sx={{ p: 4 }}>
+        <CardContent sx={{ p: { xs: 3, md: 4 } }}>
           <Typography variant="h4" fontWeight={800} color="encabezado.main" sx={{ mb: 1 }}>
             Configuración
           </Typography>
@@ -37,7 +37,7 @@ export default function Configuracion() {
 
           <Stack spacing={3}>
             {/* ============ AQUÍ EMPIEZA SECCIÓN MODO OSCURO ============ */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', gap: 2 }}>
               <Box>
                 <Typography variant="h6" fontWeight={700}>Modo oscuro</Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -56,7 +56,7 @@ export default function Configuracion() {
               <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
                 Color del menú
               </Typography>
-              <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} flexWrap="wrap" useFlexGap>
                 {/* Un botón por acento; el activo va resaltado. */}
                 {LISTA_ACENTOS.map((item) => (
                   <Button
@@ -65,6 +65,7 @@ export default function Configuracion() {
                     onClick={() => elegirAcento(item.id)}
                     sx={{
                       minWidth: 140,
+                      width: { xs: '100%', md: 'auto' },
                       borderRadius: 2,
                       textTransform: 'none',
                       bgcolor: accentId === item.id ? item.main : 'transparent',
@@ -85,7 +86,7 @@ export default function Configuracion() {
             <Divider />
 
             {/* ============ AQUÍ EMPIEZA SECCIÓN TEMA ACTUAL ============ */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', gap: 2 }}>
               <Box>
                 <Typography variant="h6" fontWeight={700}>Tema actual</Typography>
                 <Typography variant="body2" color="text.secondary">

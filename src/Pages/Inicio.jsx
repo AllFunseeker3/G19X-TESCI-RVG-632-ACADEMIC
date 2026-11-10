@@ -302,7 +302,7 @@ export default function Inicio() {
     {/* SECCIÓN JSX: accesos directos (id preexistente conservado).
         DATOS QUE SE MANDAN A GenerarCarta.jsx (/Menu), Revision.jsx, plantillas.jsx y Seguimiento.jsx
         para procesamiento: Card-Link con to={a.to}. */}
-    <Box id="Accesos directos" sx={{width: '100%', mt: 3}}>
+    <Box id="Accesos directos" sx={{ display: { xs: 'none', md: 'block' }, width: '100%', mt: 3 }}>
       <Typography variant="h6" fontWeight="bold" sx={{mb: 2, color:'text.secondary'}}>
         Accesos directos
       </Typography>
