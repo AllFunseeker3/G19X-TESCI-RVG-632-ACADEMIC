@@ -1,10 +1,11 @@
 // ============================================================================
 // ARCHIVO: server/test/api.test.js
 // FUNCIÓN GENERAL: pruebas automáticas de la API (node:test + supertest).
-//   Cubre 9 reglas críticas del back: bloqueo CC-01, contraseña actual
+//   Cubre 11 reglas críticas del back: bloqueo CC-01, contraseña actual
 //   incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo,
-//   PDF visible, flujo crear→corregir→aprobar, Super no crea Supers y
-//   anexos PDF persistidos.
+//   PDF visible, flujo crear→corregir→aprobar, Super no crea Supers, anexos
+//   PDF persistidos, dictamen solo admin/super (nunca el creador) y
+//   transiciones de estado válidas.
 // FLUJO DE DATOS:
 //   - ENTRAN: app Express (sin abrir puerto), MariaDB de server/.env.test
 //     (BD aislada `sislegal_test`) y los 5 usuarios base de maestro.sql.
@@ -51,7 +52,7 @@ let legalToken = null; // Token de Legal (puede ver cartas de su área).
 let superLegalToken = null; // Token de Super Legal (gestiona su área).
 let operativoToken = null; // Token del rol sin permiso de cartas/clientes.
 let usuarioTemporalId = null; // Usuario creado en el caso 1 (se borra al final).
-const documentosCreados = []; // IDs creados en los casos 4, 5, 6, 7 y 9.
+const documentosCreados = []; // IDs creados en los casos 4, 5, 6, 7, 9, 10 y 11.
 const archivosAnexosCreados = []; // Nombres de anexos del caso 9 (se borran al final).
 let foliosPrevios = []; // Foto de la tabla folios antes de las pruebas.
 // ============ AQUÍ TERMINA CONSTANTES Y ESTADO ============
@@ -375,6 +376,110 @@ test("Anexos: el PDF se guarda, se descarga y el no-PDF se rechaza", async () =>
   assert.equal(despues[0].n, antes[0].n); // Ni el anexo válido quedó guardado.
 });
 // ============ AQUÍ TERMINA CASO 9 ============
+
+// ============ AQUÍ EMPIEZA CASO 10: DICTAMEN SOLO ADMIN/SUPER ============
+// Aprobar/rechazar exige es_super o admin, y nadie puede dictaminar un
+// documento que él mismo creó (aunque sea admin).
+test("Dictamen: solo admin/super y nunca el creador", async () => {
+  const altaLegal = await request(app)
+    .post("/api/documentos")
+    .set(bearer(legalToken))
+    .send({ id_tipo: "carta-poder", datos: {} });
+  assert.equal(altaLegal.status, 201, JSON.stringify(altaLegal.body));
+  documentosCreados.push(altaLegal.body.id);
+
+  // Legal tiene "modificar" en su área, pero no es super/admin: 403.
+  const legalIntenta = await request(app)
+    .patch(`/api/documentos/${altaLegal.body.id}/estado`)
+    .set(bearer(legalToken))
+    .send({ estado: "aprobado", comentario: "Intento de Legal" });
+  assert.equal(legalIntenta.status, 403, JSON.stringify(legalIntenta.body));
+  assert.match(legalIntenta.body.detail, /super|administrador/i);
+
+  // El admin que creó el documento tampoco puede dictaminarlo él mismo.
+  const altaAdmin = await request(app)
+    .post("/api/documentos")
+    .set(bearer(adminToken))
+    .send({ id_tipo: "carta-poder", datos: {} });
+  assert.equal(altaAdmin.status, 201, JSON.stringify(altaAdmin.body));
+  documentosCreados.push(altaAdmin.body.id);
+
+  const aRevision = await request(app)
+    .patch(`/api/documentos/${altaAdmin.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "por_revisar" });
+  assert.equal(aRevision.status, 200, JSON.stringify(aRevision.body));
+
+  const propio = await request(app)
+    .patch(`/api/documentos/${altaAdmin.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "aprobado", comentario: "Autoaprobación" });
+  assert.equal(propio.status, 403, JSON.stringify(propio.body));
+  assert.match(propio.body.detail, /propio/i);
+
+  // Un Super Legal (no creador) sí puede dictaminar el documento de Legal.
+  const legalEnvia = await request(app)
+    .patch(`/api/documentos/${altaLegal.body.id}/estado`)
+    .set(bearer(legalToken))
+    .send({ estado: "por_revisar" });
+  assert.equal(legalEnvia.status, 200, JSON.stringify(legalEnvia.body));
+
+  const superAprueba = await request(app)
+    .patch(`/api/documentos/${altaLegal.body.id}/estado`)
+    .set(bearer(superLegalToken))
+    .send({ estado: "aprobado", comentario: "Aprobado por Super Legal" });
+  assert.equal(superAprueba.status, 200, JSON.stringify(superAprueba.body));
+  assert.equal(superAprueba.body.estado, "aprobado");
+});
+// ============ AQUÍ TERMINA CASO 10 ============
+
+// ============ AQUÍ EMPIEZA CASO 11: TRANSICIONES DE ESTADO ============
+// Solo se permiten las transiciones declaradas; lo demás responde 409 y no
+// deja reabrir un aprobado para volver a editarlo con PATCH /datos.
+test("Transiciones: un aprobado no vuelve a borrador (409)", async () => {
+  const alta = await request(app)
+    .post("/api/documentos")
+    .set(bearer(legalToken))
+    .send({ id_tipo: "carta-poder", datos: {} });
+  assert.equal(alta.status, 201, JSON.stringify(alta.body));
+  documentosCreados.push(alta.body.id);
+
+  // Salto no permitido: borrador → aprobado (admin no es el creador).
+  const salto = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "aprobado", comentario: "Salto inválido" });
+  assert.equal(salto.status, 409, JSON.stringify(salto.body));
+  assert.match(salto.body.detail, /no válida/i);
+
+  // Ruta válida: borrador → por_revisar → aprobado.
+  const revision = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "por_revisar" });
+  assert.equal(revision.status, 200, JSON.stringify(revision.body));
+
+  const aprobado = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "aprobado", comentario: "Aprobado en prueba" });
+  assert.equal(aprobado.status, 200, JSON.stringify(aprobado.body));
+
+  // Regreso prohibido: aprobado → borrador responde 409.
+  const regreso = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/estado`)
+    .set(bearer(adminToken))
+    .send({ estado: "borrador" });
+  assert.equal(regreso.status, 409, JSON.stringify(regreso.body));
+
+  // Y como sigue aprobado, PATCH /datos también lo bloquea (400).
+  const correccion = await request(app)
+    .patch(`/api/documentos/${alta.body.id}/datos`)
+    .set(bearer(adminToken))
+    .send({ datos: { nombre: "Intento" } });
+  assert.equal(correccion.status, 400, JSON.stringify(correccion.body));
+});
+// ============ AQUÍ TERMINA CASO 11 ============
 
 // ============ AQUÍ EMPIEZA LIMPIEZA ============
 // Deja la BD como estaba: sin documentos/avisos temporales, sin el usuario

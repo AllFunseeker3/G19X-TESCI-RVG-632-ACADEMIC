@@ -35,6 +35,21 @@ const ESTADOS = new Set([
   "rechazado",
   "notificado",
 ]);
+
+// Transiciones permitidas por PATCH /:id/estado. Cualquier otra responde 409.
+// La corrección de un documento rechazado no usa esta ruta: PATCH /:id/datos
+// lo devuelve a borrador y exige ser el creador (o admin).
+const TRANSICIONES_VALIDAS = {
+  borrador: ["por_revisar", "rechazado"],
+  por_revisar: ["aprobado", "rechazado"],
+  aprobado: ["notificado"],
+  rechazado: ["por_revisar"],
+  notificado: [],
+};
+
+// Estados que constituyen un dictamen: solo un super o el admin pueden
+// aprobar/rechazar, y nunca sobre un documento que ellos mismos crearon.
+const ESTADOS_DICTAMEN = new Set(["aprobado", "rechazado"]);
 // ============ AQUÍ TERMINA ROUTER Y CONSTANTES ============
 
 // ============ AQUÍ EMPIEZA CONFIG DE ANEXOS (multer) ============
@@ -392,6 +407,26 @@ router.patch("/:id/estado", async (req, res, next) => {
       return res.status(400).json({ detail: "El rechazo exige un comentario con los motivos" });
     }
     const d = await docVisible(Number(req.params.id), req.usuario, "modificar");
+    // Dictamen: solo superusuario o admin, y nunca el creador del documento.
+    if (ESTADOS_DICTAMEN.has(estado)) {
+      if (!(req.usuario.admin || req.usuario.es_super)) {
+        return res.status(403).json({
+          detail: "Solo un superusuario o un administrador pueden aprobar o rechazar",
+        });
+      }
+      if (d.id_creador === req.usuario.id) {
+        return res.status(403).json({
+          detail: "No puedes dictaminar tu propio documento",
+        });
+      }
+    }
+    // Transiciones: un aprobado no vuelve a borrador y lo no previsto da 409.
+    const permitidas = TRANSICIONES_VALIDAS[d.estado] || [];
+    if (!permitidas.includes(estado)) {
+      return res.status(409).json({
+        detail: `Transición no válida: ${d.estado} → ${estado}`,
+      });
+    }
     await pool.query("UPDATE documentos SET estado = ? WHERE id_documento = ?", [
       estado,
       d.id_documento,
