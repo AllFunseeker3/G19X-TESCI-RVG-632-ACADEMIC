@@ -59,10 +59,16 @@ const ESTADOS_DICTAMEN = new Set(["aprobado", "rechazado"]);
 const MAX_ANEXO_BYTES = 10 * 1024 * 1024; // 10 MB por archivo.
 const MAX_ANEXOS = 10; // Tope por petición (evita lotes abusivos).
 
+// Multer/busboy entrega el filename del multipart como latin1 aunque el
+// navegador lo mande en UTF-8. Se decodifica antes de limpiar para no guardar
+// "PeticiÃ³n_aÃ±o" como "Petici-n-a-o".
+const decodificarNombreOriginal = (original) =>
+  Buffer.from(String(original || ""), "latin1").toString("utf8");
+
 // QUÉ HACE: nombre de disco seguro y único (sin acentos, espacios ni "../").
 function nombreAnexoUnico(original) {
   const limpio = path
-    .basename(String(original || "anexo.pdf"))
+    .basename(decodificarNombreOriginal(original) || "anexo.pdf")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\.pdf$/i, "")
@@ -526,10 +532,49 @@ function borrarAnexosSubidos(nombres) {
   }
 }
 
+// Nombres que el formulario intentó subir en esta petición. El front manda
+// `nombres` (JSON) ANTES de los archivos para que multer lo lea aunque el
+// lote se rechace; si no viene (cliente viejo), se usan los ya procesados.
+function nombresAnexosIntentados(req) {
+  try {
+    const lista = JSON.parse(req.body?.nombres ?? "[]");
+    if (Array.isArray(lista)) {
+      return lista.map((n) => String(n || "").trim()).filter(Boolean);
+    }
+  } catch (eJson) {
+    console.error("Campo nombres inválido:", eJson.message);
+  }
+  return (req.files || [])
+    .map((a) => decodificarNombreOriginal(a.originalname))
+    .filter(Boolean);
+}
+
+// QUÉ HACE: deja datos.anexos igual a lo que de verdad quedó en `adjuntos`:
+// quita los nombres del lote que no se guardaron y agrega los aceptados con
+// su nombre original legible (no el nombre interno de disco).
+async function reconciliarAnexos(doc, { quitar = [], agregar = [] } = {}) {
+  if (!doc?.id_documento) return;
+  const datos = typeof doc.datos === "string" ? JSON.parse(doc.datos) : { ...(doc.datos || {}) };
+  const previos = Array.isArray(datos.anexos) ? datos.anexos : [];
+  const quitarSet = new Set(quitar.map((n) => String(n || "")));
+  const siguientes = previos
+    .map((n) => (typeof n === "string" ? n : n?.name ?? ""))
+    .filter((n) => n && !quitarSet.has(n));
+  for (const n of agregar) {
+    const nombre = String(n || "");
+    if (nombre && !siguientes.includes(nombre)) siguientes.push(nombre);
+  }
+  datos.anexos = siguientes;
+  await pool.query(
+    "UPDATE documentos SET datos = ? WHERE id_documento = ?",
+    [JSON.stringify(datos), doc.id_documento]
+  );
+}
+
 // Envuelve multer para limpiar lo ya escrito si un archivo del lote falla
 // (tamaño, tipo o límite de cantidad) y responder siempre en JSON.
 function recibirAnexos(req, res, next) {
-  subidaAnexos.array("archivos", MAX_ANEXOS)(req, res, (err) => {
+  subidaAnexos.array("archivos", MAX_ANEXOS)(req, res, async (err) => {
     if (err) {
       borrarAnexosSubidos((req.files || []).map((a) => a.filename));
       const status = err.code === "LIMIT_FILE_SIZE" ? 413 : err.status || 400;
@@ -537,6 +582,15 @@ function recibirAnexos(req, res, next) {
         err.code === "LIMIT_FILE_SIZE"
           ? "Cada anexo debe pesar 10 MB o menos"
           : err.message || "No se pudieron subir los anexos";
+      // El lote es todo-o-nada: nada quedó guardado, así que nada debe quedar
+      // listado en datos.anexos.
+      try {
+        await reconciliarAnexos(req.docAnexos, {
+          quitar: nombresAnexosIntentados(req),
+        });
+      } catch (eDatos) {
+        console.error("Reconciliación de anexos:", eDatos.message);
+      }
       return res.status(status).json({ detail });
     }
     return next();
@@ -545,8 +599,10 @@ function recibirAnexos(req, res, next) {
 
 router.post("/:id/anexos", autorizarAnexos, recibirAnexos, async (req, res, next) => {
   const archivos = req.files || [];
+  const intentados = nombresAnexosIntentados(req);
   try {
     if (!archivos.length) {
+      await reconciliarAnexos(req.docAnexos, { quitar: intentados });
       return res.status(400).json({ detail: "Adjunte al menos un PDF" });
     }
     // Firma real del archivo: el MIME que manda el navegador se puede falsear.
@@ -560,7 +616,10 @@ router.post("/:id/anexos", autorizarAnexos, recibirAnexos, async (req, res, next
       }
       if (firma.toString("latin1") !== "%PDF-") {
         borrarAnexosSubidos(archivos.map((x) => x.filename));
-        return res.status(400).json({ detail: `${a.originalname}: no es un PDF válido` });
+        await reconciliarAnexos(req.docAnexos, { quitar: intentados });
+        return res.status(400).json({
+          detail: `${decodificarNombreOriginal(a.originalname)}: no es un PDF válido`,
+        });
       }
     }
     const valores = archivos.map((a) => [
@@ -578,6 +637,11 @@ router.post("/:id/anexos", autorizarAnexos, recibirAnexos, async (req, res, next
        VALUES ?`,
       [valores]
     );
+    // datos.anexos refleja solo lo aceptado y conserva el nombre original.
+    await reconciliarAnexos(req.docAnexos, {
+      quitar: intentados,
+      agregar: archivos.map((a) => decodificarNombreOriginal(a.originalname)),
+    });
     return res.status(201).json({
       id_documento: req.docAnexos.id_documento,
       anexos: archivos.map((a, i) => ({
@@ -588,6 +652,11 @@ router.post("/:id/anexos", autorizarAnexos, recibirAnexos, async (req, res, next
     });
   } catch (e) {
     borrarAnexosSubidos(archivos.map((a) => a.filename));
+    try {
+      await reconciliarAnexos(req.docAnexos, { quitar: intentados });
+    } catch (eDatos) {
+      console.error("Reconciliación de anexos:", eDatos.message);
+    }
     return next(e);
   }
 });

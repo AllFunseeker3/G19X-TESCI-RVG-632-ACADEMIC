@@ -78,7 +78,7 @@ PATCH /api/documentos/:id/datos {datos, id_cliente} (borrador/rechazado, vuelve 
 PATCH /api/documentos/:id/estado {estado, comentario} (rechazo exige comentario; dictamen solo admin/super y nunca el creador; transiciones inválidas 409)
 DELETE /api/documentos/:id
 GET /api/documentos/:id (detalle + historial + adjuntos)
-POST /api/documentos/:id/anexos (multipart, campo "archivos", hasta 10 PDF de 10 MB; solo creador o admin; documento en borrador o rechazado) → {id_documento, anexos:[{id, nombre_archivo, tamano_bytes}]}
+POST /api/documentos/:id/anexos (multipart, campo "archivos", hasta 10 PDF de 10 MB; solo creador o admin; documento en borrador o rechazado) → {id_documento, anexos:[{id, nombre_archivo, tamano_bytes}]}; el campo "nombres" (JSON, antes de los archivos) permite dejar datos.anexos solo con los aceptados y con su nombre original decodificado de latin1 a UTF-8
 POST /api/ia/redactar {id_tipo, datos} → {contenido, modelo}
 POST /api/ia/corregir {contenido, instruccion, id_tipo} → {contenido}
 POST /api/ia/pdf {id_tipo, datos, contenido, id_documento} → {archivo}

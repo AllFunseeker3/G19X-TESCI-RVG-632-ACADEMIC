@@ -127,6 +127,9 @@ export const agregarAdjunto = (id, adjunto) =>
 export const subirAnexos = async (id, archivos) => {
   const t = leerToken();
   const fd = new FormData();
+  // El back usa estos nombres para dejar datos.anexos solo con lo aceptado.
+  // Van ANTES de los archivos para que multer los lea aunque rechace el lote.
+  fd.append("nombres", JSON.stringify(archivos.map((a) => a.name)));
   archivos.forEach((a) => fd.append("archivos", a, a.name));
   let res;
   try {

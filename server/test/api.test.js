@@ -374,6 +374,58 @@ test("Anexos: el PDF se guarda, se descarga y el no-PDF se rechaza", async () =>
     [alta.body.id]
   );
   assert.equal(despues[0].n, antes[0].n); // Ni el anexo válido quedó guardado.
+
+  // Consistencia de datos.anexos: el rechazado no se lista y el aceptado
+  // conserva su nombre original bien escrito (latin1 -> UTF-8).
+  const conAnexos = await request(app)
+    .post("/api/documentos")
+    .set(bearer(adminToken))
+    .send({
+      id_tipo: "carta-poder",
+      datos: { anexos: ["Petición_año.pdf", "disfrazado.pdf"] },
+    });
+  assert.equal(conAnexos.status, 201, JSON.stringify(conAnexos.body));
+  documentosCreados.push(conAnexos.body.id);
+
+  const loteRechazado = await request(app)
+    .post(`/api/documentos/${conAnexos.body.id}/anexos`)
+    .set(bearer(adminToken))
+    .field("nombres", JSON.stringify(["Petición_año.pdf", "disfrazado.pdf"]))
+    .attach("archivos", pdf, {
+      filename: "Petición_año.pdf",
+      contentType: "application/pdf",
+    })
+    .attach("archivos", Buffer.from("no soy pdf"), {
+      filename: "disfrazado.pdf",
+      contentType: "application/pdf",
+    });
+  assert.equal(loteRechazado.status, 400, JSON.stringify(loteRechazado.body));
+
+  const trasRechazo = await request(app)
+    .get(`/api/documentos/${conAnexos.body.id}`)
+    .set(bearer(adminToken));
+  assert.equal(trasRechazo.status, 200);
+  assert.deepEqual(trasRechazo.body.datos.anexos, []); // Nada quedó guardado.
+
+  const nombreConAcento = await request(app)
+    .post(`/api/documentos/${conAnexos.body.id}/anexos`)
+    .set(bearer(adminToken))
+    .field("nombres", JSON.stringify(["Petición_año.pdf"]))
+    .attach("archivos", pdf, {
+      filename: "Petición_año.pdf",
+      contentType: "application/pdf",
+    });
+  assert.equal(nombreConAcento.status, 201, JSON.stringify(nombreConAcento.body));
+  archivosAnexosCreados.push(nombreConAcento.body.anexos[0].nombre_archivo);
+  // Sin el arreglo de latin1 el disco diría "Petici-n-a-o.pdf".
+  assert.match(nombreConAcento.body.anexos[0].nombre_archivo, /-Peticion_ano\.pdf$/);
+  assert.doesNotMatch(nombreConAcento.body.anexos[0].nombre_archivo, /Ã|Â/);
+
+  const trasAceptar = await request(app)
+    .get(`/api/documentos/${conAnexos.body.id}`)
+    .set(bearer(adminToken));
+  assert.equal(trasAceptar.status, 200);
+  assert.deepEqual(trasAceptar.body.datos.anexos, ["Petición_año.pdf"]);
 });
 // ============ AQUÍ TERMINA CASO 9 ============
 
