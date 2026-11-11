@@ -10,9 +10,8 @@
 // ============================================================================
 // ============ AQUÍ EMPIEZA IMPORTS ============
 const express = require("express");
-const { randomInt } = require("crypto");
 const pool = require("../db");
-const { hashContrasena } = require("../auth");
+const { hashContrasena, generarContrasenaTemporal } = require("../auth");
 const { conAuth } = require("../middleware");
 // ============ AQUÍ TERMINA IMPORTS ============
 
@@ -46,17 +45,6 @@ function generarCorreo(nombreCompleto) {
   const paterno = partes[1].substring(0, 3).toLowerCase();
   const materno = partes.length > 2 ? partes[2].substring(0, 3).toLowerCase() : "xxx";
   return `${nombre}${paterno}${materno}@sislegal.mx`;
-}
-
-// QUÉ HACE: contraseña temporal por usuario: la parte del correo antes de "@"
-// + 8 caracteres aleatorios legibles (sin 0/O/1/l/I). Se muestra una sola vez
-// al crear (CC-01) y el usuario DEBE cambiarla en su primer ingreso.
-function generarContrasenaTemporal(correo) {
-  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  let sufijo = "";
-  for (let i = 0; i < 8; i++) sufijo += letras[randomInt(0, letras.length)];
-  const base = String(correo || "").split("@")[0] || "usuario";
-  return base + sufijo;
 }
 
 // QUÉ HACE: ¿puede el usuario actual crear un usuario con este rol/área?
@@ -381,6 +369,64 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 // ============ AQUÍ TERMINA RUTA PATCH ACTUALIZAR USUARIO ============
+
+// ============ AQUÍ EMPIEZA RUTA POST RESTABLECER CONTRASEÑA ============
+// POST /api/usuarios/:id/restablecer-contrasena — un gestor genera una
+// contraseña temporal para otro usuario; se muestra UNA sola vez en la
+// respuesta y el afectado DEBE cambiarla al ingresar (debe_cambiar_contrasena).
+// Reglas: admin a cualquiera (no a sí mismo); super solo a su área y nunca a
+// otro superusuario/administrador. También limpia la solicitud pendiente.
+router.post("/:id/restablecer-contrasena", async (req, res, next) => {
+  try {
+    const u = req.usuario;
+    if (!(await puedeGestionar(u)))
+      return res.status(403).json({ detail: "Sin permiso de gestión" });
+    const targetId = Number(req.params.id);
+    if (targetId === u.id)
+      return res.status(400).json({ detail: "No puedes restablecer tu propia contraseña" });
+    const [filas] = await pool.query(
+      `SELECT u.id_usuario, u.nombre, u.correo, u.id_area, u.activo,
+              r.nombre AS rol, r.es_super
+         FROM usuarios u JOIN roles r ON r.id_rol = u.id_rol
+        WHERE u.id_usuario = ?`,
+      [targetId]
+    );
+    const target = filas[0];
+    if (!target) return res.status(404).json({ detail: "Usuario no encontrado" });
+    if (!u.admin) {
+      if (target.id_area !== u.id_area)
+        return res.status(403).json({ detail: "Sin acceso a este usuario" });
+      // Un super no puede resetear a otro super ni al Administrador.
+      if (target.es_super || target.rol === "Administrador")
+        return res.status(403).json({ detail: "Solo el admin restablece a superusuarios" });
+    }
+    if (!target.activo)
+      return res.status(400).json({ detail: "El usuario está dado de baja" });
+    const temporal = generarContrasenaTemporal(target.correo);
+    await pool.query(
+      `UPDATE usuarios
+          SET hash_contrasena = ?, debe_cambiar_contrasena = TRUE,
+              solicitud_contrasena_en = NULL
+        WHERE id_usuario = ?`,
+      [hashContrasena(temporal), targetId]
+    );
+    // Aviso in-app al afectado (sin incluir la contraseña).
+    await pool.query(
+      `INSERT INTO notificaciones (id_usuario, tipo, titulo, detalle)
+       VALUES (?, 'contrasena_restablecida', ?, ?)`,
+      [
+        targetId,
+        "Contraseña restablecida",
+        "Tu supervisor generó una contraseña temporal. Úsala para ingresar y cámbiala de inmediato.",
+      ]
+    );
+    return res.json({ id: targetId, correo: target.correo, contrasena: temporal });
+  } catch (e) {
+    return next(e);
+  }
+});
+// ============ AQUÍ TERMINA RUTA POST RESTABLECER CONTRASEÑA ============
+
 
 // ============ AQUÍ EMPIEZA RUTA PATCH PERMISOS DEL ROL ============
 // PATCH /api/usuarios/roles/:id/permisos — prende/apaga un permiso del ROL.

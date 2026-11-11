@@ -131,6 +131,10 @@ export const login = (correo, contrasena) =>
 // CC-01: cambio de contraseña del usuario logueado (obligatorio en primer ingreso).
 export const cambiarContrasena = (actual, nueva) =>
   api("/auth/cambiar-contrasena", { metodo: "POST", cuerpo: { actual, nueva } });
+// Aviso a los superusuarios del área para que restablezcan la contraseña.
+// La respuesta es genérica (no revela si el correo existe).
+export const olvideContrasena = (correo) =>
+  api("/auth/olvide-contrasena", { metodo: "POST", cuerpo: { correo } });
 // ============ AQUÍ TERMINA AUTH ============
 
 // ============ AQUÍ EMPIEZA DOCUMENTOS ============
@@ -210,6 +214,10 @@ export const actualizarPermisoRol = (idRol, categoria, accion, valor) =>
   });
 export const bajaUsuario = (id) =>
   api(`/usuarios/${id}`, { metodo: "DELETE" });
+// Genera una contraseña temporal (se muestra una sola vez) y obliga al
+// afectado a cambiarla en su siguiente ingreso.
+export const restablecerContrasena = (id) =>
+  api(`/usuarios/${id}/restablecer-contrasena`, { metodo: "POST" });
 // ============ AQUÍ TERMINA USUARIOS ============
 
 // ============ AQUÍ EMPIEZA IA Y PDF ============

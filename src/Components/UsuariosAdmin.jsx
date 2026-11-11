@@ -24,9 +24,11 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import LockResetIcon from "@mui/icons-material/LockReset";
 import {
   getUsuarios, getRoles, getAreas, getPuestos, crearUsuario,
   getUsuario, actualizarUsuario, actualizarPermisoRol, bajaUsuario,
+  restablecerContrasena, leerUsuario,
 } from "../lib/api.js";
 import { usePermisos } from "./PermisosProvider.jsx";
 import SeccionFormulario from "./SeccionFormulario.jsx";
@@ -68,6 +70,11 @@ export default function UsuariosAdmin() {
   const [nuevoRol, setNuevoRol] = useState("");
   const [confirmarBaja, setConfirmarBaja] = useState(null);
   const [permisoEnCurso, setPermisoEnCurso] = useState(null); // "categoria:accion" mientras guarda
+  // Restablecer contraseña: usuario a confirmar + resultado (se muestra una vez).
+  const [confirmarReset, setConfirmarReset] = useState(null);
+  const [resetResultado, setResetResultado] = useState(null);
+  const [reseteando, setReseteando] = useState(false);
+  const usuarioActual = leerUsuario();
 
   // ============ AQUÍ EMPIEZA EFFECT carga inicial ============
   // CARGA inicial: usuarios (crítico) + catálogos (tolerante: si el server
@@ -223,6 +230,35 @@ export default function UsuariosAdmin() {
     } catch (e) {
       setError(e.message);
     }
+  };
+
+  // RESTABLECER CONTRASEÑA: genera una temporal (el back obliga el cambio al
+  // ingresar). Se muestra UNA sola vez en el diálogo de resultado.
+  const handleRestablecer = async () => {
+    if (!confirmarReset || reseteando) return;
+    setReseteando(true);
+    setError("");
+    try {
+      const r = await restablecerContrasena(confirmarReset.id);
+      setResetResultado({ nombre: confirmarReset.nombre, ...r });
+      setExito(`Contraseña restablecida para ${r.correo}`);
+      setConfirmarReset(null);
+      recargar();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setReseteando(false);
+    }
+  };
+
+  // ¿Se puede mostrar la llave para este usuario? El back valida igual.
+  // Un super solo restablece a usuarios normales de su área (no a supers ni
+  // al Administrador); nadie se restablece a sí mismo.
+  const puedeResetear = (u) => {
+    if (!u.activo) return false;
+    if (String(u.id) === String(usuarioActual?.id)) return false;
+    if (admin) return true;
+    return !(u.rol === "Administrador" || String(u.rol).startsWith("Superusuario"));
   };
 
   // TOGGLE DE PERMISO: prende/apaga un permiso del ROL del usuario en el
@@ -453,6 +489,13 @@ export default function UsuariosAdmin() {
                             <VisibilityIcon />
                           </IconButton>
                         </Tooltip>
+                        {puedeResetear(u) && (
+                          <Tooltip title="Restablecer contraseña (temporal)">
+                            <IconButton size="small" onClick={() => setConfirmarReset(u)} sx={{ color: 'encabezado.main' }}>
+                              <LockResetIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         {u.activo ? (
                           <Tooltip title="Dar de baja (activo=0, no se borra)">
                             <IconButton size="small" onClick={() => setConfirmarBaja(u.id)} color="error">
@@ -551,6 +594,14 @@ export default function UsuariosAdmin() {
             </Box>
           </DialogContent>
           <DialogActions>
+            {puedeResetear(detalle) && (
+              <Button
+                onClick={() => { setConfirmarReset(detalle); setDetalle(null); }}
+                sx={{ color: 'encabezado.main', textTransform: 'none' }}
+              >
+                Restablecer contraseña
+              </Button>
+            )}
             {detalle.activo ? (
               <Button onClick={() => { setDetalle(null); setConfirmarBaja(detalle.id); }} color="error">
                 Dar de baja
@@ -596,6 +647,63 @@ export default function UsuariosAdmin() {
         </Dialog>
       )}
       {/* ============ AQUÍ TERMINA DIÁLOGO confirmar baja ============ */}
+
+      {/* ============ AQUÍ EMPIEZA DIÁLOGO confirmar restablecimiento ============ */}
+      {confirmarReset && (
+        <Dialog open onClose={() => setConfirmarReset(null)} maxWidth="sm" fullWidth>
+          <DialogTitle>¿Restablecer la contraseña?</DialogTitle>
+          <DialogContent>
+            Se generará una contraseña temporal para <strong>{confirmarReset.nombre}</strong>{" "}
+            ({confirmarReset.correo}) y se mostrará una sola vez. Deberá cambiarla al
+            volver a ingresar.
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirmarReset(null)} color="inherit" disabled={reseteando}>
+              Cancelar
+            </Button>
+            <Button onClick={handleRestablecer} variant="contained" disabled={reseteando}>
+              {reseteando ? "Generando..." : "Restablecer"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+      {/* ============ AQUÍ TERMINA DIÁLOGO confirmar restablecimiento ============ */}
+
+      {/* ============ AQUÍ EMPIEZA DIÁLOGO contraseña temporal ============ */}
+      {resetResultado && (
+        <Dialog open onClose={() => setResetResultado(null)} maxWidth="sm" fullWidth>
+          <DialogTitle>Contraseña temporal</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Alert severity="warning">
+                Compártela con {resetResultado.nombre} por un medio seguro. Solo se muestra
+                esta vez y deberá cambiarla al ingresar.
+              </Alert>
+              <Typography variant="body2">
+                <strong>Correo:</strong> {resetResultado.correo}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Contraseña temporal:</strong>{" "}
+                <Box component="code" sx={{ fontSize: '1rem', wordBreak: 'break-all' }}>
+                  {resetResultado.contrasena}
+                </Box>
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => navigator.clipboard?.writeText(resetResultado.contrasena)}
+              sx={{ textTransform: 'none' }}
+            >
+              Copiar
+            </Button>
+            <Button onClick={() => setResetResultado(null)} variant="contained">
+              Entendido
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+      {/* ============ AQUÍ TERMINA DIÁLOGO contraseña temporal ============ */}
     </Box>
   );
 }

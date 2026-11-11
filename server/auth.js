@@ -11,6 +11,7 @@
 // ============ AQUÍ EMPIEZA IMPORTS ============
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { randomInt } = require("crypto");
 // ============ AQUÍ TERMINA IMPORTS ============
 
 // ============ AQUÍ EMPIEZA CONSTANTES ============
@@ -50,6 +51,25 @@ function leerToken(token) {
 }
 // ============ AQUÍ TERMINA FUNCIÓN LEERTOKEN ============
 
+// ============ AQUÍ EMPIEZA FUNCIÓN GENERARCONTRASEÑATEMPORAL ============
+// QUÉ HACE: contraseña temporal por usuario: la parte del correo antes de "@"
+// + 8 caracteres aleatorios legibles (sin 0/O/1/l/I). Se usa al crear (CC-01)
+// y al restablecer; el usuario DEBE cambiarla al ingresar.
+function generarContrasenaTemporal(correo) {
+  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let sufijo = "";
+  for (let i = 0; i < 8; i++) sufijo += letras[randomInt(0, letras.length)];
+  const base = String(correo || "").split("@")[0] || "usuario";
+  return base + sufijo;
+}
+// ============ AQUÍ TERMINA FUNCIÓN GENERARCONTRASEÑATEMPORAL ============
+
 // ============ AQUÍ EMPIEZA EXPORTS ============
-module.exports = { hashContrasena, verificar, crearToken, leerToken };
+module.exports = {
+  hashContrasena,
+  verificar,
+  crearToken,
+  leerToken,
+  generarContrasenaTemporal,
+};
 // ============ AQUÍ TERMINA EXPORTS ============

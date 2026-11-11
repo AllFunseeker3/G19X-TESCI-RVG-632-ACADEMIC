@@ -7,7 +7,8 @@
  *   - ENTRAN (DATOS PROVENIENTES DE): ../lib/api.js -> getNotificaciones()
  *     (server/routes/notificaciones.js; el back inserta una fila por
  *     super del área + admin en POST /api/documentos).
- *   - SALEN: links a /Revision (react-router). Si el servidor cae, api.js
+ *   - SALEN: links a /Revision (documentos) o /Usuarios (solicitudes de
+ *     contraseña) vía react-router. Si el servidor cae, api.js
  *     dispara el evento y app.jsx te lleva a /Ingreso.
  * QUÉ MODIFICAR SI hay cambios: cantidad a mostrar (MAX_LISTA), intervalo
  *   de refresco (CADA) o el destino de los links, aquí mismo.
@@ -95,6 +96,11 @@ export default function CentroNotificaciones() {
         marcarNotificacionLeida(id).catch(() => {});
         setAvisos((prev) => prev.map((a) => (a.id === id ? { ...a, leida: true } : a)));
     };
+
+    // Destino del aviso: las solicitudes de contraseña se atienden en Usuarios;
+    // el resto (documentos) sigue abriendo Revisión.
+    const destinoAviso = (a) =>
+        a.tipo === 'solicitud_contrasena' ? '/Usuarios' : '/Revision';
     // ============ AQUÍ TERMINA EFFECT carga inicial + refresco ============
 
     return (
@@ -132,7 +138,7 @@ export default function CentroNotificaciones() {
                     <MenuItem
                         key={a.id}
                         component={Link}
-                        to="/Revision"
+                        to={destinoAviso(a)}
                         onClick={() => tocarAviso(a.id)}
                         sx={{ whiteSpace: 'normal' }}
                     >

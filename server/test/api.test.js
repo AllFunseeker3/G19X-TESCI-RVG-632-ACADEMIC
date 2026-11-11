@@ -1,11 +1,12 @@
 // ============================================================================
 // ARCHIVO: server/test/api.test.js
 // FUNCIÓN GENERAL: pruebas automáticas de la API (node:test + supertest).
-//   Cubre 11 reglas críticas del back: bloqueo CC-01, contraseña actual
+//   Cubre 13 reglas críticas del back: bloqueo CC-01, contraseña actual
 //   incorrecta, permiso de clientes, rechazo sin motivo, folio consecutivo,
 //   PDF visible, flujo crear→corregir→aprobar, Super no crea Supers, anexos
-//   PDF persistidos, dictamen solo admin/super (nunca el creador) y
-//   transiciones de estado válidas.
+//   PDF persistidos, dictamen solo admin/super (nunca el creador),
+//   transiciones de estado válidas, solicitud de contraseña limitada al super
+//   del área y restablecimiento con cambio obligatorio.
 // FLUJO DE DATOS:
 //   - ENTRAN: app Express (sin abrir puerto), MariaDB de server/.env.test
 //     (BD aislada `sislegal_test`) y los 5 usuarios base de maestro.sql.
@@ -54,6 +55,7 @@ let operativoToken = null; // Token del rol sin permiso de cartas/clientes.
 let usuarioTemporalId = null; // Usuario creado en el caso 1 (se borra al final).
 const documentosCreados = []; // IDs creados en los casos 4, 5, 6, 7, 9, 10 y 11.
 const archivosAnexosCreados = []; // Nombres de anexos del caso 9 (se borran al final).
+const usuariosExtra = []; // Usuarios creados en los casos 12 y 13 (se borran al final).
 let foliosPrevios = []; // Foto de la tabla folios antes de las pruebas.
 // ============ AQUÍ TERMINA CONSTANTES Y ESTADO ============
 
@@ -68,6 +70,32 @@ async function login(correo, contrasena) {
 // QUÉ HACE: cabecera Authorization para supertest.
 function bearer(token) {
   return { Authorization: `Bearer ${token}` };
+}
+
+// QUÉ HACE: crea un usuario Legal y le pone una contraseña conocida (así deja
+// de tener el cambio obligatorio del alta). Devuelve el usuario creado.
+async function crearUsuarioLegalConClave(nombre, clave) {
+  const roles = await request(app)
+    .get("/api/usuarios/roles")
+    .set(bearer(adminToken));
+  assert.equal(roles.status, 200);
+  const rolLegal = roles.body.find((r) => r.nombre === "Legal");
+  assert.ok(rolLegal, "No se encontró el rol Legal");
+  const alta = await request(app)
+    .post("/api/usuarios")
+    .set(bearer(adminToken))
+    .send({ nombre, id_rol: rolLegal.id });
+  assert.equal(alta.status, 201, JSON.stringify(alta.body));
+  usuariosExtra.push(alta.body.id);
+
+  // Login con la temporal y cambio a la clave conocida.
+  const token = await login(alta.body.correo, alta.body.contrasena);
+  const cambio = await request(app)
+    .post("/api/auth/cambiar-contrasena")
+    .set(bearer(token))
+    .send({ actual: alta.body.contrasena, nueva: clave });
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+  return alta.body;
 }
 // ============ AQUÍ TERMINA HELPERS ============
 
@@ -533,6 +561,155 @@ test("Transiciones: un aprobado no vuelve a borrador (409)", async () => {
 });
 // ============ AQUÍ TERMINA CASO 11 ============
 
+// ============ AQUÍ EMPIEZA CASO 12: OLVIDÉ CONTRASEÑA ============
+// La solicitud avisa SOLO al super del área y solo una vez: no se puede pedir
+// otra mientras esté pendiente ni después del restablecimiento si el usuario
+// todavía no cambió su contraseña temporal.
+test("Olvidé contraseña: avisa al super del área y limita a una solicitud", async () => {
+  const u = await crearUsuarioLegalConClave("Olvido Prueba", "ClaveInicial123");
+
+  const consultarAvisos = async () => {
+    const [filas] = await pool.query(
+      `SELECT n.id_usuario, u.correo
+         FROM notificaciones n JOIN usuarios u ON u.id_usuario = n.id_usuario
+        WHERE n.tipo = 'solicitud_contrasena' AND n.detalle LIKE ?`,
+      [`%${u.correo}%`]
+    );
+    return filas;
+  };
+
+  const solicitud = await request(app)
+    .post("/api/auth/olvide-contrasena")
+    .send({ correo: u.correo });
+  assert.equal(solicitud.status, 200, JSON.stringify(solicitud.body));
+  assert.match(solicitud.body.mensaje, /supervisor/i);
+
+  // Un solo aviso y va al Super Legal (no al Operativo ni al admin).
+  const avisos = await consultarAvisos();
+  assert.equal(avisos.length, 1);
+  assert.equal(avisos[0].correo, SUPERLEGAL.correo);
+
+  const [estado] = await pool.query(
+    "SELECT solicitud_contrasena_en FROM usuarios WHERE id_usuario = ?",
+    [u.id]
+  );
+  assert.ok(estado[0].solicitud_contrasena_en, "Debe quedar marcada la solicitud");
+
+  // Segunda solicitud con una pendiente: no genera otro aviso.
+  const repetida = await request(app)
+    .post("/api/auth/olvide-contrasena")
+    .send({ correo: u.correo });
+  assert.equal(repetida.status, 200);
+  assert.equal((await consultarAvisos()).length, 1);
+
+  // El super la restablece: se limpia la solicitud y se obliga el cambio.
+  const reset = await request(app)
+    .post(`/api/usuarios/${u.id}/restablecer-contrasena`)
+    .set(bearer(superLegalToken));
+  assert.equal(reset.status, 200, JSON.stringify(reset.body));
+  assert.equal(reset.body.correo, u.correo);
+  const [trasReset] = await pool.query(
+    `SELECT solicitud_contrasena_en, debe_cambiar_contrasena
+       FROM usuarios WHERE id_usuario = ?`,
+    [u.id]
+  );
+  assert.equal(trasReset[0].solicitud_contrasena_en, null);
+  assert.equal(trasReset[0].debe_cambiar_contrasena, 1);
+
+  // Ya autorizada pero sin cambiar la temporal: tampoco se puede pedir otra.
+  const antesDeCambiar = await request(app)
+    .post("/api/auth/olvide-contrasena")
+    .send({ correo: u.correo });
+  assert.equal(antesDeCambiar.status, 200);
+  assert.equal((await consultarAvisos()).length, 1);
+
+  // Correo inexistente: misma respuesta genérica y sin avisos.
+  const fantasma = await request(app)
+    .post("/api/auth/olvide-contrasena")
+    .send({ correo: "nadie@sislegal.mx" });
+  assert.equal(fantasma.status, 200);
+  const [sinAviso] = await pool.query(
+    `SELECT COUNT(*) AS n FROM notificaciones
+      WHERE tipo = 'solicitud_contrasena' AND detalle LIKE ?`,
+    ["%nadie@sislegal.mx%"]
+  );
+  assert.equal(sinAviso[0].n, 0);
+});
+// ============ AQUÍ TERMINA CASO 12 ============
+
+// ============ AQUÍ EMPIEZA CASO 13: RESTABLECER CONTRASEÑA ============
+// La temporal funciona una vez, obliga el cambio y respeta el alcance:
+// un Super Legal no puede restablecer a Operativa ni a otro super/admin.
+test("Restablecer: la temporal obliga cambio y el super respeta su área", async () => {
+  const u = await crearUsuarioLegalConClave("Reset Prueba", "ClaveVieja12345");
+
+  const reset = await request(app)
+    .post(`/api/usuarios/${u.id}/restablecer-contrasena`)
+    .set(bearer(superLegalToken));
+  assert.equal(reset.status, 200, JSON.stringify(reset.body));
+  const base = u.correo.split("@")[0];
+  assert.ok(reset.body.contrasena.startsWith(base));
+  assert.equal(reset.body.contrasena.length, base.length + 8);
+
+  // La contraseña vieja deja de servir.
+  const vieja = await request(app)
+    .post("/api/auth/login")
+    .send({ correo: u.correo, contrasena: "ClaveVieja12345" });
+  assert.equal(vieja.status, 401);
+
+  // La temporal entra, pero obliga a cambiarla antes de usar la API.
+  const conTemporal = await request(app)
+    .post("/api/auth/login")
+    .send({ correo: u.correo, contrasena: reset.body.contrasena });
+  assert.equal(conTemporal.status, 200, JSON.stringify(conTemporal.body));
+  assert.equal(conTemporal.body.usuario.debe_cambiar_contrasena, true);
+
+  const bloqueo = await request(app)
+    .get("/api/documentos")
+    .set(bearer(conTemporal.body.token));
+  assert.equal(bloqueo.status, 403);
+  assert.equal(bloqueo.body.codigo, "CAMBIO_CONTRASENA_REQUERIDO");
+
+  const cambio = await request(app)
+    .post("/api/auth/cambiar-contrasena")
+    .set(bearer(conTemporal.body.token))
+    .send({ actual: reset.body.contrasena, nueva: "ClaveNueva12345" });
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+
+  const conNueva = await request(app)
+    .post("/api/auth/login")
+    .send({ correo: u.correo, contrasena: "ClaveNueva12345" });
+  assert.equal(conNueva.status, 200);
+  assert.equal(conNueva.body.usuario.debe_cambiar_contrasena, false);
+
+  const [estado] = await pool.query(
+    `SELECT debe_cambiar_contrasena, solicitud_contrasena_en
+       FROM usuarios WHERE id_usuario = ?`,
+    [u.id]
+  );
+  assert.equal(estado[0].debe_cambiar_contrasena, 0);
+  assert.equal(estado[0].solicitud_contrasena_en, null);
+
+  // Alcance: Operativa queda fuera del área del Super Legal.
+  const [op] = await pool.query("SELECT id_usuario FROM usuarios WHERE correo = ?", [
+    OPERATIVO.correo,
+  ]);
+  const ajeno = await request(app)
+    .post(`/api/usuarios/${op[0].id_usuario}/restablecer-contrasena`)
+    .set(bearer(superLegalToken));
+  assert.equal(ajeno.status, 403, JSON.stringify(ajeno.body));
+
+  // Nadie se restablece su propia contraseña (ni el admin).
+  const [ad] = await pool.query("SELECT id_usuario FROM usuarios WHERE correo = ?", [
+    ADMIN.correo,
+  ]);
+  const propio = await request(app)
+    .post(`/api/usuarios/${ad[0].id_usuario}/restablecer-contrasena`)
+    .set(bearer(adminToken));
+  assert.equal(propio.status, 400, JSON.stringify(propio.body));
+});
+// ============ AQUÍ TERMINA CASO 13 ============
+
 // ============ AQUÍ EMPIEZA LIMPIEZA ============
 // Deja la BD como estaba: sin documentos/avisos temporales, sin el usuario
 // de prueba y con el contador de folios en su valor previo.
@@ -552,6 +729,13 @@ after(async () => {
     if (usuarioTemporalId) {
       await pool.query("DELETE FROM usuarios WHERE id_usuario = ?", [usuarioTemporalId]);
     }
+    if (usuariosExtra.length) {
+      await pool.query("DELETE FROM usuarios WHERE id_usuario IN (?)", [usuariosExtra]);
+    }
+    // Avisos propios del flujo de contraseña (los del doc se borran arriba).
+    await pool.query(
+      "DELETE FROM notificaciones WHERE tipo IN ('solicitud_contrasena', 'contrasena_restablecida')"
+    );
     // Archivos de anexos del caso 9: el DELETE del documento ya borra sus
     // adjuntos en CASCADE, pero el PDF del disco lo quita esta limpieza.
     for (const nombre of archivosAnexosCreados) {

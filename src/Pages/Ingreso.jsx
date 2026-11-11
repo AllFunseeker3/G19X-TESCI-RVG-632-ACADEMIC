@@ -16,6 +16,11 @@ import {
     Box,
     Button,
     Checkbox,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
     FormControlLabel,
     IconButton,
     InputAdornment,
@@ -41,6 +46,7 @@ import {
     leerToken,
     leerUsuario,
     login,
+    olvideContrasena,
 } from '../lib/api.js';
 
 // ============ AQUÍ EMPIEZA INGRESO ============
@@ -68,6 +74,12 @@ export default function Ingreso() {
     const [confirmar, setConfirmar] = useState('');
     const [errorCambio, setErrorCambio] = useState('');
     const [guardandoCambio, setGuardandoCambio] = useState(false);
+    // "¿Olvidaste tu contraseña?": diálogo con correo y aviso al supervisor.
+    const [olvidoAbierto, setOlvidoAbierto] = useState(false);
+    const [correoOlvido, setCorreoOlvido] = useState('');
+    const [enviandoOlvido, setEnviandoOlvido] = useState(false);
+    const [avisoOlvido, setAvisoOlvido] = useState('');
+    const [errorOlvido, setErrorOlvido] = useState('');
     const mensajeError = cambioPendiente ? errorCambio : error;
     // ============ AQUÍ TERMINA ESTADOS INGRESO ============
 
@@ -130,6 +142,35 @@ export default function Ingreso() {
         window.location.assign('/Ingreso'); // Recarga limpia en el formulario de acceso.
     };
     // ============ AQUÍ TERMINA HANDLER VOLVER AL LOGIN (CC-01) ============
+
+    // ============ AQUÍ EMPIEZA HANDLER OLVIDÉ CONTRASEÑA ============
+    // Abre el diálogo con el correo ya escrito en el login (si lo hay).
+    const abrirOlvido = (e) => {
+        e.preventDefault();
+        setCorreoOlvido(correo.trim());
+        setAvisoOlvido('');
+        setErrorOlvido('');
+        setOlvidoAbierto(true);
+    };
+    // Envía la solicitud; la respuesta siempre es genérica por seguridad.
+    const handleOlvido = async (e) => {
+        e.preventDefault();
+        setAvisoOlvido('');
+        setErrorOlvido('');
+        setEnviandoOlvido(true);
+        try {
+            const r = await olvideContrasena(correoOlvido.trim());
+            setAvisoOlvido(
+                r.mensaje ||
+                'Si el correo está registrado, avisamos a un supervisor del área.'
+            );
+        } catch (err) {
+            setErrorOlvido(err.message || 'No se pudo enviar el aviso');
+        } finally {
+            setEnviandoOlvido(false);
+        }
+    };
+    // ============ AQUÍ TERMINA HANDLER OLVIDÉ CONTRASEÑA ============
 
     return (
         // ============ AQUÍ EMPIEZA CONTENEDOR INGRESO ============
@@ -407,7 +448,14 @@ export default function Ingreso() {
                             }
                             label={<Typography variant="body2">Recordarme</Typography>}
                         />
-                        <Link href="#" underline="hover" color="encabezado.main" variant="body2" fontWeight={700}>
+                        <Link
+                            href="#"
+                            underline="hover"
+                            color="encabezado.main"
+                            variant="body2"
+                            fontWeight={700}
+                            onClick={abrirOlvido}
+                        >
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </Box>
@@ -429,6 +477,53 @@ export default function Ingreso() {
                 </Box>
                 {/* ============ AQUÍ TERMINA FORMULARIO ACCESO ============ */}
             </Paper>
+            {/* ============ AQUÍ EMPIEZA DIÁLOGO OLVIDÉ CONTRASEÑA ============ */}
+            <Dialog open={olvidoAbierto} onClose={() => setOlvidoAbierto(false)} fullWidth maxWidth="xs">
+                <Box component="form" onSubmit={handleOlvido}>
+                    <DialogTitle>Recuperar contraseña</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText sx={{ mb: 2 }}>
+                            Escribe tu correo. Si está registrado, avisaremos a un supervisor de tu
+                            área para que te entregue una contraseña temporal.
+                        </DialogContentText>
+                        <TextField
+                            autoFocus
+                            fullWidth
+                            margin="dense"
+                            id="olvido-correo"
+                            type="email"
+                            label="Correo electrónico"
+                            value={correoOlvido}
+                            onChange={(e) => setCorreoOlvido(e.target.value)}
+                            disabled={Boolean(avisoOlvido)}
+                        />
+                        {errorOlvido && (
+                            <Alert severity="error" sx={{ mt: 2 }}>
+                                {errorOlvido}
+                            </Alert>
+                        )}
+                        {avisoOlvido && (
+                            <Alert severity="success" sx={{ mt: 2 }}>
+                                {avisoOlvido}
+                            </Alert>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOlvidoAbierto(false)} sx={{ textTransform: 'none' }}>
+                            Cerrar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={enviandoOlvido || Boolean(avisoOlvido) || !correoOlvido.trim()}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {enviandoOlvido ? 'Enviando...' : 'Enviar aviso'}
+                        </Button>
+                    </DialogActions>
+                </Box>
+            </Dialog>
+            {/* ============ AQUÍ TERMINA DIÁLOGO OLVIDÉ CONTRASEÑA ============ */}
         </Box>
         // ============ AQUÍ TERMINA CONTENEDOR INGRESO ============
     );

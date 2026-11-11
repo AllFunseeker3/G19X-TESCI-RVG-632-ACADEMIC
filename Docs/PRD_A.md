@@ -80,7 +80,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 1. Analizar los procesos documentales — HECHO (catálogo 11 tipos fijado).
 2. Diseñar la arquitectura tecnológica — HECHO (Express+MariaDB+React+FastAPI-IA, documentada en §8).
 3. Implementar automatización y validación jurídica — HECHO parcial (automatización + validación formal + formalización IA; validación jurídica de fondo sigue siendo humana).
-4. Validar la calidad de los documentos - HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 11 casos de API con node:test/supertest sobre `sislegal_test`; validación jurídica de fondo sigue siendo humana).
+4. Validar la calidad de los documentos - HECHO parcial (QA manual + build/lint + pruebas en vivo + suite de 13 casos de API con node:test/supertest sobre `sislegal_test`; validación jurídica de fondo sigue siendo humana).
 5. Elaborar documentación técnica y plan de soporte — PARCIAL (este PRD + `AGENTS.md` + comentarios en código; falta manual de usuario final y plan multinivel formal).
 ---
 
@@ -134,7 +134,7 @@ Desarrollar un sistema inteligente para la elaboración automatizada de cartas y
 - Tabla con chips Verificado/Pendiente, tabs Todos/Pendientes, Verificar, diálogo Persona/CURP vs Empresa/RFC, baja lógica. Solo admin o roles con `cartas.ver` consultan PII; Operativo/Super Operativo reciben 403. Alta por no-admin/super nace pendiente; edición ajena sobre verificada la regresa a pendiente.
 
 **Usuarios (`Usuarios.jsx` + `UsuariosAdmin.jsx` + `/api/usuarios`):**
-- Alta Nombre/paterno/materno, email auto ASCII, pass temporal (correo sin @ + 8 aleatorios; se cambia obligatoriamente al primer ingreso, CC-01), selector base Legal/Operativo/Administrador + switch super (solo admin). Matriz permisos clicable edita el ROL (`PATCH /roles/:id/permisos`). Baja lógica + reactivar. 5 usuarios base con hashes reales en `maestro.sql`.
+- Alta Nombre/paterno/materno, email auto ASCII, pass temporal (correo sin @ + 8 aleatorios; se cambia obligatoriamente al primer ingreso, CC-01), selector base Legal/Operativo/Administrador + switch super (solo admin). Matriz permisos clicable edita el ROL (`PATCH /roles/:id/permisos`). Baja lógica + reactivar. Restablecer contraseña con llave (temporal de una sola vez; el super solo a usuarios normales de su área) y «¿Olvidaste tu contraseña?» en el login, que avisa al super del mismo ámbito con límite de una solicitud pendiente. 5 usuarios base con hashes reales en `maestro.sql`.
 
 **Notificaciones (`CentroNotificaciones.jsx` + `/api/notificaciones`):**
 - Tabla `notificaciones`, badge no-leídas, últimas 10 con hace-cuánto, marca leída al abrir/clic, refresco 30s. Fan-out al crear/corregir (supers área + admins) y al dictaminar (solo creador + motivo si rechazo).
@@ -257,7 +257,7 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 3. Arquitectura — componentes/APIs — Entregable arquitectura — HECHO
 4. Planificación — backlog/cronograma — Entregable plan — HECHO
 5. Desarrollo — generación/validación/versiones/aprobación — Entregable sistema — HECHO
-6. Pruebas - funcional/integración/documental - Entregable QA - HECHO (11 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
+6. Pruebas - funcional/integración/documental - Entregable QA - HECHO (13 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
 7. Documentación — manuales — Entregable manual — PARCIAL
 8. Mantenimiento — soporte/plantillas — Entregable plan — PENDIENTE
 9. Capacitación — admin/usuarios — Entregable acta — PENDIENTE
@@ -272,5 +272,5 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 **Aceptación global:**
 - Crear los 11 tipos de punta a punta y verlos en Revisión/Seguimiento tras recargar.
 - Rechazo sin comentario bloqueado (400). Borrado con Dialog propio.
-- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 11/11 contra `sislegal_test`.
+- `npm run build` OK, `npx eslint .` limpio, `node --check` rutas OK, `py_compile` OK, `npm run db:test` OK, `npm test` (server) 13/13 contra `sislegal_test`.
 - Trazabilidad por folio + historial + notificaciones verificables.

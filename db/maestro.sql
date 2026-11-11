@@ -102,6 +102,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
   correo          VARCHAR(150) NOT NULL UNIQUE,
   hash_contrasena VARCHAR(255) NOT NULL,
   debe_cambiar_contrasena BOOLEAN NOT NULL DEFAULT FALSE, -- CC-01: obliga el cambio al primer ingreso.
+  -- Marca de la solicitud de "olvidé mi contraseña": NULL = sin solicitud.
+  -- Evita pedir otra mientras esté pendiente o hasta que cambie la temporal.
+  solicitud_contrasena_en TIMESTAMP NULL DEFAULT NULL,
   id_rol          INT NOT NULL,
   id_area         INT NOT NULL,
   puesto          VARCHAR(100) NULL,
@@ -116,6 +119,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
   CONSTRAINT fk_usuarios_area FOREIGN KEY (id_area)
     REFERENCES areas (id_area)
 ) ENGINE=InnoDB;
+-- Migración idempotente para bases ya creadas (MariaDB 11).
+ALTER TABLE usuarios
+  ADD COLUMN IF NOT EXISTS solicitud_contrasena_en TIMESTAMP NULL DEFAULT NULL;
 
 -- Clientes / contrapartes (destinatarios, empresas, dependencias).
 -- tipo_cliente distingue persona 'fisica' de 'moral'; curp solo aplica a físicas.
