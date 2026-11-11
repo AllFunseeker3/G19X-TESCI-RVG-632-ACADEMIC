@@ -18,14 +18,7 @@ import {
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CloseIcon from '@mui/icons-material/Close';
 import Etiqueta from './Etiqueta';
-import { isoA_ddmmaaaa } from '../lib/fechas';
-
-// Convierte dd/mm/aaaa -> ISO (para precargar el picker oculto).
-function ddmmaaaaA_iso(v) {
-  const m = typeof v === 'string' && v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return '';
-  return `${m[3]}-${m[2]}-${m[1]}`;
-}
+import { isoA_ddmmaaaa, ddmmaaaaA_iso } from '../lib/fechas';
 // ============ AQUÍ TERMINA HELPERS DE FECHA ============
 
 // ============ AQUÍ EMPIEZA COMPONENTE CAMPO genérico ============
@@ -231,7 +224,7 @@ export default function CampoFormulario({
   // ============ AQUÍ TERMINA TIPO ANEXOS (solo PDF) ============
 
   // ============ AQUÍ EMPIEZA TIPO FECHA ============
-  // ---- FECHA dd/mm/aaaa con máscara + picker nativo oculto ----
+  // ---- FECHA dd/mm/aaaa: solo se captura con el calendario ----
   if (campo.tipo === 'fecha') {
     const abrirPicker = () => {
       const el = pickerRef.current;
@@ -244,16 +237,26 @@ export default function CampoFormulario({
       }
     };
     const alElegirPicker = (e) => {
-      const iso = e.target.value;
-      const ddmmaa = isoA_ddmmaaaa(iso);
+      const ddmmaa = isoA_ddmmaaaa(e.target.value);
       if (!ddmmaa) return;
       // Reutiliza onChange del padre con un evento sintético { target: { value } }.
       onChange?.({ target: { value: ddmmaa } });
-      e.target.value = '';
     };
     const adornoCalendario = {
       endAdornment: (
         <InputAdornment position="end">
+          {/* Solo en campos opcionales: permite borrar sin usar el teclado. */}
+          {valor && !campo.requerido && (
+            <IconButton
+              aria-label="Limpiar fecha"
+              edge="end"
+              onClick={() => onChange?.({ target: { value: '' } })}
+              tabIndex={-1}
+              sx={{ color: 'encabezado.main' }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          )}
           <IconButton aria-label="Elegir fecha" edge="end" onClick={abrirPicker} tabIndex={-1} sx={{ color: 'encabezado.main' }}>
             <CalendarTodayIcon />
           </IconButton>
@@ -265,25 +268,38 @@ export default function CampoFormulario({
         <Etiqueta htmlFor={idCampo} requerido={campo.requerido}>
           {campo.etiqueta}
         </Etiqueta>
-        <TextField
-          {...comun}
-          type="text"
-          placeholder="dd/mm/aaaa"
-          inputProps={{ maxLength: 10, inputMode: 'numeric', placeholder: 'dd/mm/aaaa' }}
-          InputProps={adornoCalendario}
-          slotProps={{ input: adornoCalendario }}
-        />
-        <input
-          ref={pickerRef}
-          type="date"
-          hidden
-          aria-hidden
-          tabIndex={-1}
-          value=""
-          onChange={alElegirPicker}
-        />
-        {/* valor ISO precargado para el picker (no visible, solo referencia) */}
-        <input type="hidden" value={ddmmaaaaA_iso(valor)} readOnly />
+        <Box sx={{ position: 'relative' }}>
+          <TextField
+            {...comun}
+            type="text"
+            placeholder="dd/mm/aaaa"
+            inputProps={{ readOnly: true, maxLength: 10, placeholder: 'dd/mm/aaaa' }}
+            InputProps={adornoCalendario}
+            slotProps={{ input: adornoCalendario }}
+            sx={{ '& input': { cursor: 'default' } }}
+          />
+          {/* Picker nativo invisible SOBRE el botón: el navegador ancla ahí el
+              calendario (debajo del campo), no en la esquina superior izquierda. */}
+          <input
+            ref={pickerRef}
+            type="date"
+            aria-hidden="true"
+            tabIndex={-1}
+            value={ddmmaaaaA_iso(valor)}
+            onChange={alElegirPicker}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              width: 40,
+              height: 40,
+              opacity: 0,
+              pointerEvents: 'none',
+              border: 0,
+              padding: 0,
+            }}
+          />
+        </Box>
         {campo.ayuda && ayudaVisible && (
           <Box role="note" sx={{ mt: 1, px: 1.5, py: 1, bgcolor: 'rgba(2, 136, 210, 0.08)', borderLeft: '3px solid #0288d2', borderRadius: 1 }}>
             <Typography variant="caption" color="info.main">{campo.ayuda}</Typography>

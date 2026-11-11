@@ -38,4 +38,11 @@ export function isoA_ddmmaaaa(iso) {
   if (!m) return '';
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
+
+// Convierte dd/mm/aaaa -> ISO yyyy-mm-dd (para precargar el picker nativo).
+export function ddmmaaaaA_iso(v) {
+  const m = typeof v === 'string' && v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return '';
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
 // ============ AQUÍ TERMINA HELPERS DE FECHA ============

@@ -33,6 +33,8 @@ import {
 import { usePermisos } from "./PermisosProvider.jsx";
 import SeccionFormulario from "./SeccionFormulario.jsx";
 import Etiqueta from "./Etiqueta.jsx";
+import CampoFormulario from "./CampoFormulario.jsx";
+import { isoA_ddmmaaaa, ddmmaaaaA_iso } from "../lib/fechas.js";
 
 // ============ AQUÍ EMPIEZA HELPER generarCorreo ============
 // QUÉ HACE: genera correo automático 3+3+3 letras, sin acentos (igual que el back).
@@ -425,10 +427,13 @@ export default function UsuariosAdmin() {
                     <Etiqueta htmlFor="nuevo-telefono">Teléfono</Etiqueta>
                     <TextField id="nuevo-telefono" fullWidth variant="standard" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} type="tel" placeholder="Ej. 55 1234 5678" />
                   </Box>
-                  <Box>
-                    <Etiqueta htmlFor="nuevo-ingreso">Fecha de ingreso</Etiqueta>
-                    <TextField id="nuevo-ingreso" fullWidth variant="standard" type="date" value={form.fecha_ingreso} onChange={(e) => setForm({ ...form, fecha_ingreso: e.target.value })} InputLabelProps={{ shrink: true }} />
-                  </Box>
+                  <CampoFormulario
+                    campo={{ id: "nuevo-ingreso", etiqueta: "Fecha de ingreso", tipo: "fecha", requerido: false }}
+                    valor={isoA_ddmmaaaa(form.fecha_ingreso)}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, fecha_ingreso: ddmmaaaaA_iso(e.target.value) }))
+                    }
+                  />
                 </SeccionFormulario>
 
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
