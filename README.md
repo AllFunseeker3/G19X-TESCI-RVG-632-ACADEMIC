@@ -32,7 +32,7 @@ Un residente crea cualquiera de los 11 tipos, la IA redacta y formaliza, se gene
 | Avisos | Funcionamiento | 9 | `autoridadDestino` + RFC obligatorios |
 | Notificaciones | General | 9 | Acuse switch (Nombre/Firma/Fecha/Hora) |
 
-Campos: texto, area (`filas`), fecha `dd/mm/aaaa` (solo lectura: se captura únicamente con el botón del calendario y el picker se ancla debajo del botón), email, selección, moneda, fotos, check, switch, anexos solo-PDF. `mostrarSi` condicional con limpieza auto. Solo `id==='fecha'` trae hoy auto. Los anexos se validan por firma `%PDF-` en el navegador (`src/lib/anexos.js`) y se suben al confirmar (`POST /api/documentos/:id/anexos`, máx. 10 archivos de 10 MB), quedando en `adjuntos` con `vigente=FALSE` y descargándose aparte desde `/Revision` (el PDF final solo los menciona). Las fotos del formulario siguen viviendo en memoria.
+Campos: texto, area (`filas`), fecha `dd/mm/aaaa` (solo lectura real: teclado, pegado y arrastre bloqueados; se captura únicamente con el botón del calendario, que se ancla debajo del botón), email, selección, moneda, fotos, check, switch, anexos solo-PDF. `mostrarSi` condicional con limpieza auto. Solo `id==='fecha'` trae hoy auto. Los anexos se validan por firma `%PDF-` en el navegador (`src/lib/anexos.js`) y se suben al confirmar (`POST /api/documentos/:id/anexos`, máx. 10 archivos de 10 MB), quedando en `adjuntos` con `vigente=FALSE` y descargándose aparte desde `/Revision` (el PDF final solo los menciona). Las fotos del formulario siguen viviendo en memoria.
 
 ### 2.2 Generar (`/Menu`)
 Selector Categoría → Tipo dependiente, autocomplete Clientes (chip Sin verificar, solo rellena vacíos), validación bloqueante con `errores`. Flujo: `Generar documento con IA` → **Resumen** (verificar) → Redactar (preview solo-lectura + `ProgresoIA` por fases + cronómetro) → cuadro *¿Algo está mal?* + Corregir repetible → Confirmar crea + PDF. Modo `?editar=` precarga + banner con motivo (vuelve a borrador + re-avisa).
@@ -186,7 +186,7 @@ En el ensayo del 2026-11-02 se repitieron sobre un clon limpio (contenedores, BD
 6. Gestionar: `/Usuarios` → alta/editar rol/baja-reactivar. `/Inicio` para KPIs y búsqueda.
 
 ### 3.4 Reglas que deben respetar
-Fechas `dd/mm/aaaa` solo por calendario (el campo no acepta tecleo; el picker se ancla al botón), anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, dictamen solo admin/super y nunca el propio documento, transiciones de estado inválidas responden 409, fotos del form viven en memoria y los anexos PDF sí se guardan al confirmar (quedan en `adjuntos` y se descargan con el mismo permiso del documento), IA free tarda 40-150s y puede dar 429 → esperar 1 min o cambiar `IA_MODEL`.
+Fechas `dd/mm/aaaa` solo por calendario (el campo bloquea teclado, pegado, corte y arrastre; el picker se ancla al botón), anexos solo PDF (error explícito), destinatario opcional solo poder/intención, rechazo sin comentario se bloquea, dictamen solo admin/super y nunca el propio documento, transiciones de estado inválidas responden 409, fotos del form viven en memoria y los anexos PDF sí se guardan al confirmar (quedan en `adjuntos` y se descargan con el mismo permiso del documento), IA free tarda 40-150s y puede dar 429 → esperar 1 min o cambiar `IA_MODEL`.
 
 ---
 

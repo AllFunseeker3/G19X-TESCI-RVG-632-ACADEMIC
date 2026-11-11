@@ -242,6 +242,23 @@ export default function CampoFormulario({
       // Reutiliza onChange del padre con un evento sintético { target: { value } }.
       onChange?.({ target: { value: ddmmaa } });
     };
+    // Bloqueo total del teclado en el campo visible: solo el picker escribe.
+    // Se permite Tab/Escape (navegación) y las teclas modificadoras; Enter,
+    // Espacio y flecha abajo abren el calendario.
+    const alTeclear = (e) => {
+      if (['Tab', 'Escape', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
+      e.preventDefault();
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') abrirPicker();
+    };
+    // Cualquier intento de escritura, pegado, corte o arrastre se descarta.
+    const alEntrarTexto = (e) => e.preventDefault();
+    const sinTeclado = {
+      onBeforeInput: alEntrarTexto,
+      onKeyDown: alTeclear,
+      onPaste: alEntrarTexto,
+      onCut: alEntrarTexto,
+      onDrop: alEntrarTexto,
+    };
     const adornoCalendario = {
       endAdornment: (
         <InputAdornment position="end">
@@ -271,12 +288,21 @@ export default function CampoFormulario({
         <Box sx={{ position: 'relative' }}>
           <TextField
             {...comun}
+            onChange={() => {}} // El texto visible no se edita: solo lo llena el picker.
             type="text"
             placeholder="dd/mm/aaaa"
-            inputProps={{ readOnly: true, maxLength: 10, placeholder: 'dd/mm/aaaa' }}
-            InputProps={adornoCalendario}
-            slotProps={{ input: adornoCalendario }}
-            sx={{ '& input': { cursor: 'default' } }}
+            slotProps={{
+              input: adornoCalendario,
+              htmlInput: {
+                readOnly: true,
+                'aria-readonly': true,
+                maxLength: 10,
+                placeholder: 'dd/mm/aaaa',
+                inputMode: 'none',
+                ...sinTeclado,
+              },
+            }}
+            sx={{ '& input': { cursor: 'default', caretColor: 'transparent', userSelect: 'none' } }}
           />
           {/* Picker nativo invisible SOBRE el botón: el navegador ancla ahí el
               calendario (debajo del campo), no en la esquina superior izquierda. */}
