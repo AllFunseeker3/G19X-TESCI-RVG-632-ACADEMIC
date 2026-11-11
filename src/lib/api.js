@@ -2,7 +2,8 @@
 // ARCHIVO: src/lib/api.js
 // FUNCIÓN GENERAL: cliente HTTP del front hacia la API SisLegal (server/
 //   Express + MariaDB, misma superficie que el backend FastAPI de referencia).
-//   Guarda el JWT en localStorage ('sislegal-token') y lo manda como Bearer.
+//   Guarda el JWT en localStorage (Recordarme) o sessionStorage (sin marcar)
+//   bajo 'sislegal-token' y lo manda como Bearer.
 // FLUJO DE DATOS:
 //   - ENTRAN: VITE_API_URL de .env (default http://localhost:8000/api).
 //   - SALEN (DATOS QUE SE MANDAN A <archivo> para procesamiento):
@@ -29,27 +30,60 @@ export const EVENTO_SIN_CONEXION = "sislegal:sin-conexion";
 export const EVENTO_SESION_EXPIRADA = "sislegal:sesion-expirada";
 
 // QUÉ HACE: lee el JWT guardado (o null si no hay sesión).
-export const leerToken = () => window.localStorage.getItem(CLAVE_TOKEN);
-
-// QUÉ HACE: guarda/borra el JWT (login/logout). Al borrar también sale el usuario.
-export const guardarToken = (t) => {
-  if (t) window.localStorage.setItem(CLAVE_TOKEN, t);
-  else {
-    window.localStorage.removeItem(CLAVE_TOKEN);
-    window.localStorage.removeItem(CLAVE_USUARIO);
+export const leerToken = () => {
+  try {
+    return (
+      window.sessionStorage.getItem(CLAVE_TOKEN) ??
+      window.localStorage.getItem(CLAVE_TOKEN)
+    );
+  } catch {
+    return null;
   }
 };
 
-// QUÉ HACE: guarda el usuario del login (para mostrar su nombre en la UI).
+// QUÉ HACE: guarda/borra el JWT (login/logout). Con "Recordarme" marcado va a
+// localStorage (sobrevive al cierre del navegador); sin marcar, a
+// sessionStorage (muere al cerrar la pestaña). Al borrar sale también el usuario.
+export const guardarToken = (t, persistente = true) => {
+  try {
+    // Limpia ambos almacenes para no dejar una sesión vieja en el otro.
+    window.localStorage.removeItem(CLAVE_TOKEN);
+    window.sessionStorage.removeItem(CLAVE_TOKEN);
+    if (!t) {
+      window.localStorage.removeItem(CLAVE_USUARIO);
+      window.sessionStorage.removeItem(CLAVE_USUARIO);
+      return;
+    }
+    const almacen = persistente ? window.localStorage : window.sessionStorage;
+    almacen.setItem(CLAVE_TOKEN, t);
+  } catch {
+    // Almacenamiento no disponible: la sesión vive solo en memoria/pestaña.
+  }
+};
+
+// QUÉ HACE: guarda el usuario en el MISMO almacén donde vive la sesión.
 export const guardarUsuario = (u) => {
-  if (u) window.localStorage.setItem(CLAVE_USUARIO, JSON.stringify(u));
-  else window.localStorage.removeItem(CLAVE_USUARIO);
+  try {
+    const enSesion = window.sessionStorage.getItem(CLAVE_TOKEN) !== null;
+    const almacen = enSesion ? window.sessionStorage : window.localStorage;
+    const otro = enSesion ? window.localStorage : window.sessionStorage;
+    otro.removeItem(CLAVE_USUARIO);
+    if (u) almacen.setItem(CLAVE_USUARIO, JSON.stringify(u));
+    else {
+      window.localStorage.removeItem(CLAVE_USUARIO);
+      window.sessionStorage.removeItem(CLAVE_USUARIO);
+    }
+  } catch {
+    // Igual que con el token: si no hay storage, no se persiste.
+  }
 };
 
 // QUÉ HACE: lee el usuario guardado (o null). Lo usan el layout y el Inicio.
 export const leerUsuario = () => {
   try {
-    const raw = window.localStorage.getItem(CLAVE_USUARIO);
+    const raw =
+      window.sessionStorage.getItem(CLAVE_USUARIO) ??
+      window.localStorage.getItem(CLAVE_USUARIO);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;

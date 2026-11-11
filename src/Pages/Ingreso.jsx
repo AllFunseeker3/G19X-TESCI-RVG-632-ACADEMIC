@@ -7,7 +7,8 @@
 // FLUJO DE DATOS:
 //   - ENTRAN: credenciales del formulario hacia lib/api.js (login) y, en el
 //     paso 2, {actual, nueva} hacia cambiarContrasena.
-//   - SALEN: token/usuario a localStorage y navegación a Inicio.jsx.
+//   - SALEN: token/usuario a localStorage (Recordarme) o sessionStorage, y
+//     navegación a Inicio.jsx.
 // QUÉ MODIFICAR SI hay cambios: campos y handleLogin/handleCambio; estilos del Paper/Box.
 // ============================================================================
 import {
@@ -58,6 +59,7 @@ export default function Ingreso() {
     // el bundle no debe llevar una contraseña de administrador.
     const [correo, setCorreo] = useState('');
     const [contrasena, setContrasena] = useState('');
+    const [recordarme, setRecordarme] = useState(true);
     const [mostrarPassword, setMostrarPassword] = useState(false);
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(false);
@@ -78,7 +80,8 @@ export default function Ingreso() {
 
         try {
             const data = await login(correo.trim(), contrasena);
-            guardarToken(data.token);
+            // "Recordarme" decide si la sesión sobrevive al cerrar el navegador.
+            guardarToken(data.token, recordarme);
             guardarUsuario(data.usuario);
             if (data.usuario?.debe_cambiar_contrasena) {
                 // Contraseña temporal (CC-01): obliga el cambio antes de entrar.
@@ -394,7 +397,14 @@ export default function Ingreso() {
                     {!cambioPendiente && (
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 1, mt: 1.5, mb: 3 }}>
                         <FormControlLabel
-                            control={<Checkbox size="small" color="primary" />}
+                            control={
+                                <Checkbox
+                                    size="small"
+                                    color="primary"
+                                    checked={recordarme}
+                                    onChange={(e) => setRecordarme(e.target.checked)}
+                                />
+                            }
                             label={<Typography variant="body2">Recordarme</Typography>}
                         />
                         <Link href="#" underline="hover" color="encabezado.main" variant="body2" fontWeight={700}>
