@@ -245,8 +245,6 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 6. QA → Reporte QA — HECHO (Docs/Reporte QA.pdf + 13 casos de API automatizados + lint/build/node-check/py_compile + Docker verificado)
 7. Documentación → Manual — HECHO (Docs/Manual de usuario.pdf + README completo + código comentado)
 8. Mantenimiento → Plan — HECHO (Docs/Plan de mantenimiento.pdf)
-9. Capacitación → Acta — PENDIENTE `[PENDIENTE USUARIO: fecha y asistentes]`
-10. Cierre → Informe — PENDIENTE `[PENDIENTE USUARIO: fecha cierre estadías]`
 
 ---
 
@@ -260,8 +258,6 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 6. Pruebas - funcional/integración/documental - Entregable QA - HECHO (13 casos de API automatizados sobre `sislegal_test` + Docs/Reporte QA.pdf)
 7. Documentación — manuales — Entregable manual — HECHO (Docs/Manual de usuario.pdf)
 8. Mantenimiento — soporte/plantillas — Entregable plan — HECHO (Docs/Plan de mantenimiento.pdf)
-9. Capacitación — admin/usuarios — Entregable acta — PENDIENTE
-10. Cierre — lecciones — Entregable informe — PENDIENTE
 
 ---
 

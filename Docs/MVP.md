@@ -107,7 +107,6 @@ GET /api/usuarios/yo/permisos → {permisos, admin, super}
 - [x] Docker: 4 Up, db healthy, `/api/salud` 11/137/20/5, IA interna 11 plantillas, web 200 (21/10); API/web/BD en loopback y binding de BD verificado el 26/10
 - [x] LIM-01: 14 tablas, CRUD clientes sin `contacto` OK (14/10)
 - [x] Manual de usuario (`Docs/Manual de usuario.pdf`) y plan de mantenimiento (`Docs/Plan de mantenimiento.pdf`)
-- [ ] Acta de capacitación + informe de cierre `[PENDIENTE USUARIO: fechas y asistentes]`
 
 ---
 
