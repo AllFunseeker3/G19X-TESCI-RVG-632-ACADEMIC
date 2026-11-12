@@ -242,9 +242,9 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 3. Arquitectura → Doc arquitectura — HECHO (§8+§9)
 4. Planificación → Backlog — HECHO (sesión `ProyectoLegal.md` §§42-61)
 5. Desarrollo → Sistema funcional — HECHO (local 3 servicios + Docker 4 contenedores, 13+ docs en vivo)
-6. QA → Reporte QA — PARCIAL (manual + lint/build/node-check/py_compile + Docker verificado 14/10; falta reporte formal)
-7. Documentación → Manual — PARCIAL (README completo 14/10 + código comentado; falta manual usuario)
-8. Mantenimiento → Plan — PENDIENTE
+6. QA → Reporte QA — HECHO (Docs/Reporte QA.pdf + 13 casos de API automatizados + lint/build/node-check/py_compile + Docker verificado)
+7. Documentación → Manual — HECHO (Docs/Manual de usuario.pdf + README completo + código comentado)
+8. Mantenimiento → Plan — HECHO (Docs/Plan de mantenimiento.pdf)
 9. Capacitación → Acta — PENDIENTE `[PENDIENTE USUARIO: fecha y asistentes]`
 10. Cierre → Informe — PENDIENTE `[PENDIENTE USUARIO: fecha cierre estadías]`
 
@@ -257,9 +257,9 @@ Puertos: local 5173 web, 8000 API, 8001 IA. Docker: web/API/BD solo `127.0.0.1` 
 3. Arquitectura — componentes/APIs — Entregable arquitectura — HECHO
 4. Planificación — backlog/cronograma — Entregable plan — HECHO
 5. Desarrollo — generación/validación/versiones/aprobación — Entregable sistema — HECHO
-6. Pruebas - funcional/integración/documental - Entregable QA - HECHO (13 casos de API automatizados sobre `sislegal_test` + QA manual y evidencias)
-7. Documentación — manuales — Entregable manual — PARCIAL
-8. Mantenimiento — soporte/plantillas — Entregable plan — PENDIENTE
+6. Pruebas - funcional/integración/documental - Entregable QA - HECHO (13 casos de API automatizados sobre `sislegal_test` + Docs/Reporte QA.pdf)
+7. Documentación — manuales — Entregable manual — HECHO (Docs/Manual de usuario.pdf)
+8. Mantenimiento — soporte/plantillas — Entregable plan — HECHO (Docs/Plan de mantenimiento.pdf)
 9. Capacitación — admin/usuarios — Entregable acta — PENDIENTE
 10. Cierre — lecciones — Entregable informe — PENDIENTE
 
