@@ -255,7 +255,10 @@ router.post("/revisar", (req, res, next) => {
 router.get("/pdf/:archivo", async (req, res, next) => {
   try {
     const nombre = path.basename(String(req.params.archivo || "")); // Evita path traversal.
-    if (!/^[\w][\w\-.]*\.pdf$/i.test(nombre)) {
+    if (
+      nombre.includes("..") ||
+      !/^[\p{L}\p{N}\p{M}_][\p{L}\p{N}\p{M}._-]*\.pdf$/iu.test(nombre)
+    ) {
       return res.status(400).json({ detail: "Nombre de archivo inválido" });
     }
     // Autorización: adjunto de un documento visible o PDF generado por este

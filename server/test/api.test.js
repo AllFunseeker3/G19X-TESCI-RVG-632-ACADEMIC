@@ -445,9 +445,15 @@ test("Anexos: el PDF se guarda, se descarga y el no-PDF se rechaza", async () =>
     });
   assert.equal(nombreConAcento.status, 201, JSON.stringify(nombreConAcento.body));
   archivosAnexosCreados.push(nombreConAcento.body.anexos[0].nombre_archivo);
-  // Sin el arreglo de latin1 el disco diría "Petici-n-a-o.pdf".
-  assert.match(nombreConAcento.body.anexos[0].nombre_archivo, /-Peticion_ano\.pdf$/);
+  // El nombre original debe conservarse con acentos y ñ (NFC), sin mojibake.
+  assert.match(nombreConAcento.body.anexos[0].nombre_archivo, /-Petición_año\.pdf$/);
   assert.doesNotMatch(nombreConAcento.body.anexos[0].nombre_archivo, /Ã|Â/);
+
+  // La ruta de descarga debe aceptar el nombre con acentos (URL codificada).
+  const descargaAcento = await request(app)
+    .get(`/api/ia/pdf/${encodeURIComponent(nombreConAcento.body.anexos[0].nombre_archivo)}`)
+    .set(bearer(adminToken));
+  assert.equal(descargaAcento.status, 200, JSON.stringify(descargaAcento.body));
 
   const trasAceptar = await request(app)
     .get(`/api/documentos/${conAnexos.body.id}`)

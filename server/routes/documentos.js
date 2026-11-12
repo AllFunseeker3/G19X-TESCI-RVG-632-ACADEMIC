@@ -65,16 +65,21 @@ const MAX_ANEXOS = 10; // Tope por petición (evita lotes abusivos).
 const decodificarNombreOriginal = (original) =>
   Buffer.from(String(original || ""), "latin1").toString("utf8");
 
-// QUÉ HACE: nombre de disco seguro y único (sin acentos, espacios ni "../").
+// QUÉ HACE: nombre de disco seguro y único (conserva acentos y ñ, sin "../").
 function nombreAnexoUnico(original) {
-  const limpio = path
-    .basename(decodificarNombreOriginal(original) || "anexo.pdf")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\.pdf$/i, "")
-    .replace(/[^\w.-]+/g, "-")
-    .replace(/^[-.]+|[-.]+$/g, "")
-    .slice(0, 80) || "anexo";
+  const limpio =
+    Array.from(
+      path
+        .basename(decodificarNombreOriginal(original) || "anexo.pdf")
+        .normalize("NFC")
+        .replace(/\.pdf$/i, "")
+        .replace(/[\p{Cc}<>:"/\\|?*]+/gu, "-") // Controles y reservados.
+        .replace(/\s+/g, "-") // Espacios -> guion.
+        .replace(/[^\p{L}\p{N}\p{M}._-]+/gu, "-") // Letras/números/acentos.
+        .replace(/^[-.]+|[-.]+$/g, "")
+    )
+      .slice(0, 80)
+      .join("") || "anexo";
   return `anexo-${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${limpio}.pdf`;
 }
 
